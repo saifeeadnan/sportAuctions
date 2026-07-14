@@ -33,12 +33,18 @@ export function useAuctionSocket(auctionId: string, initialState: AuctionState) 
 
     socket.on(
       "player:sold",
-      (payload: { auctionPlayerId: string; teamName: string; price: string }) => {
+      (payload: { auctionPlayerId: string; teamName: string; price: string; soldAt: string }) => {
         setState((prev) => ({
           ...prev,
           players: prev.players.map((p) =>
             p.id === payload.auctionPlayerId
-              ? { ...p, status: "SOLD", soldPrice: payload.price, soldToTeamName: payload.teamName }
+              ? {
+                  ...p,
+                  status: "SOLD",
+                  soldPrice: payload.price,
+                  soldToTeamName: payload.teamName,
+                  soldAt: payload.soldAt,
+                }
               : p
           ),
         }));

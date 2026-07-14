@@ -23,7 +23,8 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
 
   const onClock = state.players.find((p) => p.status === "IN_BIDDING");
   const queue = state.players.filter(
-    (p) => p.status === "AVAILABLE" || p.status === "IN_PRE_AUCTION_POOL"
+    (p) =>
+      p.status === "AVAILABLE" || p.status === "IN_PRE_AUCTION_POOL" || p.status === "UNSOLD"
   );
 
   async function handleSelect(playerId: string) {
@@ -85,7 +86,7 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
       <div className="flex flex-col gap-6">
         <p className="text-lg font-medium">Auction completed.</p>
         <TeamBudgetBoard teams={state.teams} />
-        <SoldTicker players={state.players} />
+        <SoldTicker players={state.players} teams={state.teams} />
       </div>
     );
   }
@@ -124,9 +125,9 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
             </select>
             <input
               type="number"
-              min={1}
+              min={onClock.basePrice}
               step="0.01"
-              placeholder="Winning price"
+              placeholder={`Winning price (min ${onClock.basePrice})`}
               value={price}
               onChange={(e) => setPrice(e.target.value)}
               className="border border-black/20 dark:border-white/20 rounded px-3 py-2 bg-transparent"
@@ -162,6 +163,7 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
               <span>
                 {p.name} &middot; {p.categoryName} &middot; base {p.basePrice}
                 {p.status === "IN_PRE_AUCTION_POOL" ? " (contested)" : ""}
+                {p.status === "UNSOLD" ? " (unsold — re-offer)" : ""}
               </span>
               <button
                 onClick={() => handleSelect(p.id)}
@@ -182,7 +184,7 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
 
       <section>
         <h2 className="text-lg font-medium mb-3">Sold / unsold</h2>
-        <SoldTicker players={state.players} />
+        <SoldTicker players={state.players} teams={state.teams} />
       </section>
 
       <button

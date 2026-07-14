@@ -10,7 +10,7 @@ import {
 } from "@/lib/services/bidding.service";
 
 export async function selectNextPlayerAction(auctionId: string, auctionPlayerId: string) {
-  await requireRole("AUCTIONEER");
+  await requireRole("AUCTIONEER", "ADMIN");
   await selectNextPlayer(auctionId, auctionPlayerId);
   revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
 }
@@ -21,19 +21,19 @@ export async function recordSaleAction(
   winningTeamAuctionEntryId: string,
   price: number
 ) {
-  await requireRole("AUCTIONEER");
+  await requireRole("AUCTIONEER", "ADMIN");
   await recordSale(auctionId, auctionPlayerId, winningTeamAuctionEntryId, price);
   revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
 }
 
 export async function markUnsoldAction(auctionId: string, auctionPlayerId: string) {
-  await requireRole("AUCTIONEER");
+  await requireRole("AUCTIONEER", "ADMIN");
   await markUnsold(auctionId, auctionPlayerId);
   revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
 }
 
 export async function concludeAuctionAction(auctionId: string) {
-  await requireRole("AUCTIONEER");
+  await requireRole("AUCTIONEER", "ADMIN");
   await concludeAuction(auctionId);
   revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
   revalidatePath(`/admin/auctions/${auctionId}`);

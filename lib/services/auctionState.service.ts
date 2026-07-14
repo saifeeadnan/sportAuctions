@@ -9,6 +9,7 @@ export type AuctionStatePlayer = {
   status: string;
   soldPrice: string | null;
   soldToTeamName: string | null;
+  soldAt: string | null;
 };
 
 export type AuctionStateTeam = {
@@ -57,6 +58,7 @@ export async function getAuctionState(auctionId: string): Promise<AuctionState |
       status: ap.status,
       soldPrice: ap.soldPrice != null ? String(ap.soldPrice) : null,
       soldToTeamName: ap.soldToEntry?.team.name ?? null,
+      soldAt: ap.soldAt != null ? ap.soldAt.toISOString() : null,
     })),
     teams: auction.entries.map((e) => ({
       id: e.id,

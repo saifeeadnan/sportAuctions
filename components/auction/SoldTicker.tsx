@@ -1,24 +1,80 @@
-import type { AuctionStatePlayer } from "@/lib/services/auctionState.service";
+import type { AuctionStatePlayer, AuctionStateTeam } from "@/lib/services/auctionState.service";
 
-export function SoldTicker({ players }: { players: AuctionStatePlayer[] }) {
-  const resolved = players.filter((p) => p.status === "SOLD" || p.status === "UNSOLD");
-  if (resolved.length === 0) {
+function byMostRecentFirst(a: AuctionStatePlayer, b: AuctionStatePlayer): number {
+  const aTime = a.soldAt ? new Date(a.soldAt).getTime() : 0;
+  const bTime = b.soldAt ? new Date(b.soldAt).getTime() : 0;
+  return bTime - aTime;
+}
+
+export function SoldTicker({
+  players,
+  teams,
+}: {
+  players: AuctionStatePlayer[];
+  teams: AuctionStateTeam[];
+}) {
+  const soldByTeam = new Map<string, AuctionStatePlayer[]>();
+  for (const team of teams) soldByTeam.set(team.teamName, []);
+  for (const p of players) {
+    if (p.status === "SOLD" && p.soldToTeamName) {
+      soldByTeam.get(p.soldToTeamName)?.push(p);
+    }
+  }
+  for (const list of soldByTeam.values()) {
+    list.sort(byMostRecentFirst);
+  }
+
+  const unsold = players
+    .filter((p) => p.status === "UNSOLD")
+    .sort((a, b) => a.name.localeCompare(b.name));
+
+  const columnNames = [...teams.map((t) => t.teamName), "Unsold"];
+  const columnLists = [...teams.map((t) => soldByTeam.get(t.teamName) ?? []), unsold];
+  const maxRows = Math.max(0, ...columnLists.map((list) => list.length));
+
+  if (maxRows === 0) {
     return <p className="text-sm text-black/60 dark:text-white/60">No players resolved yet.</p>;
   }
 
   return (
-    <ul className="flex flex-col gap-1 text-sm">
-      {resolved.map((p) => (
-        <li key={p.id}>
-          {p.status === "SOLD" ? (
-            <span>
-              <strong>{p.name}</strong> sold to {p.soldToTeamName} for {p.soldPrice}
-            </span>
-          ) : (
-            <span className="text-black/60 dark:text-white/60">{p.name} — unsold</span>
-          )}
-        </li>
-      ))}
-    </ul>
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm border-collapse">
+        <thead>
+          <tr className="text-left border-b border-black/10 dark:border-white/10">
+            {columnNames.map((name) => (
+              <th key={name} className="py-2 pr-4 align-bottom whitespace-nowrap">
+                {name}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {Array.from({ length: maxRows }).map((_, rowIndex) => (
+            <tr key={rowIndex} className="border-b border-black/5 dark:border-white/5">
+              {columnLists.map((list, colIndex) => {
+                const player = list[rowIndex];
+                const isUnsoldColumn = colIndex === columnLists.length - 1;
+                return (
+                  <td key={colIndex} className="py-2 pr-4 align-top whitespace-nowrap">
+                    {player ? (
+                      isUnsoldColumn ? (
+                        <span className="text-black/60 dark:text-white/60">{player.name}</span>
+                      ) : (
+                        <span>
+                          {player.name}{" "}
+                          <span className="text-black/50 dark:text-white/50">
+                            ({player.soldPrice})
+                          </span>
+                        </span>
+                      )
+                    ) : null}
+                  </td>
+                );
+              })}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

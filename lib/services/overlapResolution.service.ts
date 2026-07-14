@@ -79,6 +79,7 @@ export async function resolveOverlaps(auctionId: string): Promise<ResolveOverlap
           soldVia: "PRE_AUCTION_DRAFT",
           soldToEntryId: alloc.entryId,
           soldPrice: alloc.price,
+          soldAt: new Date(),
         },
       });
     }

@@ -55,7 +55,7 @@ export function LiveAuctionView({
 
       <section>
         <h2 className="text-lg font-medium mb-3">Sold / unsold</h2>
-        <SoldTicker players={state.players} />
+        <SoldTicker players={state.players} teams={state.teams} />
       </section>
     </div>
   );

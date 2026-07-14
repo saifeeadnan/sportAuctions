@@ -29,7 +29,7 @@ export async function selectNextPlayer(auctionId: string, auctionPlayerId: strin
   if (!auctionPlayer || auctionPlayer.auctionId !== auctionId) {
     throw new ValidationError("Player not found in this auction");
   }
-  if (!["AVAILABLE", "IN_PRE_AUCTION_POOL"].includes(auctionPlayer.status)) {
+  if (!["AVAILABLE", "IN_PRE_AUCTION_POOL", "UNSOLD"].includes(auctionPlayer.status)) {
     throw new InvalidStateTransitionError(
       `Player cannot be put on the clock from status ${auctionPlayer.status}`
     );
@@ -60,7 +60,10 @@ export async function recordSale(
   if (price <= 0) throw new ValidationError("Sale price must be greater than 0");
 
   const [auctionPlayer, entry, categories] = await Promise.all([
-    prisma.auctionPlayer.findUnique({ where: { id: auctionPlayerId }, include: { player: true } }),
+    prisma.auctionPlayer.findUnique({
+      where: { id: auctionPlayerId },
+      include: { player: true, category: true },
+    }),
     prisma.teamAuctionEntry.findUnique({
       where: { id: winningTeamAuctionEntryId },
       include: { team: true },
@@ -84,6 +87,11 @@ export async function recordSale(
   }
 
   const priceDecimal = new Prisma.Decimal(price);
+  if (priceDecimal.lessThan(auctionPlayer.category.basePrice)) {
+    throw new ValidationError(
+      `Sale price must be at least the base price (${String(auctionPlayer.category.basePrice)}) for category "${auctionPlayer.category.name}"`
+    );
+  }
   if (priceDecimal.greaterThan(entry.budgetRemaining)) {
     throw new InsufficientBudgetError(
       `Team "${entry.team.name}" does not have enough budget remaining for this bid`
@@ -100,6 +108,7 @@ export async function recordSale(
     );
   }
 
+  const soldAt = new Date();
   const [updatedPlayer, updatedEntry] = await prisma.$transaction([
     prisma.auctionPlayer.update({
       where: { id: auctionPlayerId },
@@ -108,6 +117,7 @@ export async function recordSale(
         soldVia: "LIVE_BID",
         soldToEntryId: winningTeamAuctionEntryId,
         soldPrice: priceDecimal,
+        soldAt,
       },
       include: { player: true },
     }),
@@ -126,6 +136,7 @@ export async function recordSale(
     playerName: updatedPlayer.player.name,
     teamName: updatedEntry.team.name,
     price: priceDecimal.toString(),
+    soldAt: soldAt.toISOString(),
   });
   emitAuctionEvent(auctionId, "team:budget-updated", {
     teamAuctionEntryId: updatedEntry.id,
