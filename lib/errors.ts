@@ -1,0 +1,11 @@
+export class DomainError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = new.target.name;
+  }
+}
+
+export class InsufficientBudgetError extends DomainError {}
+export class SquadCapExceededError extends DomainError {}
+export class InvalidStateTransitionError extends DomainError {}
+export class ValidationError extends DomainError {}
