@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { createTeamAction } from "@/lib/actions/tournament.actions";
+import { DeleteAuctionButton } from "@/components/admin/DeleteAuctionButton";
 
 export default async function TournamentDetailPage({
   params,
@@ -75,7 +76,7 @@ export default async function TournamentDetailPage({
                 <option value="">— None yet —</option>
                 {managers.map((m) => (
                   <option key={m.id} value={m.id}>
-                    {m.name} ({m.email})
+                    {m.name} ({m.loginId})
                   </option>
                 ))}
               </select>
@@ -113,14 +114,18 @@ export default async function TournamentDetailPage({
         ) : (
           <ul className="flex flex-col gap-2">
             {auctions.map((a) => (
-              <li key={a.id}>
+              <li
+                key={a.id}
+                className="flex items-center justify-between gap-4 rounded border border-black/10 dark:border-white/10 px-4 py-3"
+              >
                 <Link
                   href={`/admin/auctions/${a.id}`}
-                  className="flex items-center justify-between rounded border border-black/10 dark:border-white/10 px-4 py-3 hover:bg-black/5 dark:hover:bg-white/5"
+                  className="flex-1 flex items-center justify-between hover:underline"
                 >
                   <span>{a.name}</span>
-                  <span className="text-sm text-black/60 dark:text-white/60">{a.status}</span>
+                  <span className="text-sm text-black/60 dark:text-white/60 mr-4">{a.status}</span>
                 </Link>
+                <DeleteAuctionButton auctionId={a.id} auctionName={a.name} status={a.status} />
               </li>
             ))}
           </ul>

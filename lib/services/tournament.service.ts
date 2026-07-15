@@ -78,3 +78,20 @@ export async function createTeam(input: CreateTeamInput) {
     },
   });
 }
+
+export async function deleteTournament(tournamentId: string) {
+  const tournament = await prisma.tournament.findUnique({
+    where: { id: tournamentId },
+    include: { auctions: true },
+  });
+  if (!tournament) throw new ValidationError("Tournament not found");
+
+  const liveAuction = tournament.auctions.find((a) => a.status === "BIDDING");
+  if (liveAuction) {
+    throw new ValidationError(
+      `Cannot delete — auction "${liveAuction.name}" is currently in progress. Conclude it first.`
+    );
+  }
+
+  await prisma.tournament.delete({ where: { id: tournamentId } });
+}

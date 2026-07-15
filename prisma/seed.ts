@@ -7,7 +7,7 @@ const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 
 async function upsertUser(
-  email: string,
+  loginId: string,
   name: string,
   role: "ADMIN" | "TEAM_MANAGER" | "AUCTIONEER" | "VIEWER",
   password: string,
@@ -15,9 +15,9 @@ async function upsertUser(
 ) {
   const passwordHash = await bcrypt.hash(password, 10);
   return prisma.user.upsert({
-    where: { email },
+    where: { loginId },
     update: {},
-    create: { email, name, role, passwordHash, managerBasePrice },
+    create: { loginId, name, role, passwordHash, managerBasePrice },
   });
 }
 
@@ -46,14 +46,14 @@ async function main() {
     "ADMIN",
     "admin123"
   );
-  console.log(`Admin: ${admin.email} (password: admin123)`);
+  console.log(`Admin: ${admin.loginId} (password: admin123)`);
 
   const managers = await Promise.all([
     upsertUser("manager1@sportsauction.local", "Manager One", "TEAM_MANAGER", "manager123", 50),
     upsertUser("manager2@sportsauction.local", "Manager Two", "TEAM_MANAGER", "manager123", 50),
     upsertUser("manager3@sportsauction.local", "Manager Three", "TEAM_MANAGER", "manager123", 50),
   ]);
-  console.log(`Managers: ${managers.map((m) => m.email).join(", ")} (password: manager123)`);
+  console.log(`Managers: ${managers.map((m) => m.loginId).join(", ")} (password: manager123)`);
 
   const auctioneer = await upsertUser(
     "auctioneer1@sportsauction.local",
@@ -61,7 +61,7 @@ async function main() {
     "AUCTIONEER",
     "auction123"
   );
-  console.log(`Auctioneer: ${auctioneer.email} (password: auction123)`);
+  console.log(`Auctioneer: ${auctioneer.loginId} (password: auction123)`);
 
   const viewer = await upsertUser(
     "viewer1@sportsauction.local",
@@ -69,7 +69,7 @@ async function main() {
     "VIEWER",
     "viewer123"
   );
-  console.log(`Viewer: ${viewer.email} (password: viewer123)`);
+  console.log(`Viewer: ${viewer.loginId} (password: viewer123)`);
 
   let roster = await prisma.playerRoster.findFirst({ where: { name: "Demo Season Roster" } });
   if (!roster) {

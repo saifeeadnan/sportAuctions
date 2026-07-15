@@ -7,9 +7,14 @@ export type ParsedPlayerRow = {
   name: string;
   position?: string;
   age?: number;
-  contact?: string;
+  loginId?: string;
+  defaultCategory?: string;
+  previousTeam?: string;
   photoUrl?: string;
   rating?: number;
+  battingRating?: number;
+  bowlingRating?: number;
+  fieldingRating?: number;
 };
 
 export type RowError = {
@@ -29,16 +34,42 @@ const HEADER_ALIASES: Record<string, keyof ParsedPlayerRow> = {
   position: "position",
   role: "position",
   age: "age",
-  contact: "contact",
-  phone: "contact",
-  email: "contact",
+  loginid: "loginId",
+  login: "loginId",
+  contact: "loginId",
+  phone: "loginId",
+  email: "loginId",
+  defaultcategory: "defaultCategory",
+  category: "defaultCategory",
+  previousteam: "previousTeam",
+  prevteam: "previousTeam",
+  formerteam: "previousTeam",
   photourl: "photoUrl",
   photo: "photoUrl",
   image: "photoUrl",
   imageurl: "photoUrl",
   rating: "rating",
   score: "rating",
+  batting: "battingRating",
+  battingrating: "battingRating",
+  bowling: "bowlingRating",
+  bowlingrating: "bowlingRating",
+  fielding: "fieldingRating",
+  fieldingrating: "fieldingRating",
 };
+
+type NumericField = "age" | "rating" | "battingRating" | "bowlingRating" | "fieldingRating";
+const NUMERIC_FIELDS = new Set<NumericField>([
+  "age",
+  "rating",
+  "battingRating",
+  "bowlingRating",
+  "fieldingRating",
+]);
+
+function isNumericField(field: keyof ParsedPlayerRow): field is NumericField {
+  return NUMERIC_FIELDS.has(field as NumericField);
+}
 
 function normalizeHeader(header: string): keyof ParsedPlayerRow | null {
   const key = header.trim().toLowerCase().replace(/[\s_-]/g, "");
@@ -57,7 +88,7 @@ function rowsFromRecords(records: Record<string, unknown>[]): ParseResult {
       const field = normalizeHeader(rawHeader);
       if (!field || value === undefined || value === null || value === "") continue;
 
-      if (field === "age" || field === "rating") {
+      if (isNumericField(field)) {
         const num = Number(value);
         if (Number.isNaN(num)) {
           errors.push({
@@ -128,12 +159,34 @@ export async function createRosterFromUpload(
         name: row.name,
         position: row.position,
         age: row.age,
-        contact: row.contact,
+        loginId: row.loginId,
+        defaultCategory: row.defaultCategory,
+        previousTeam: row.previousTeam,
         photoUrl: row.photoUrl,
         rating: row.rating,
+        battingRating: row.battingRating,
+        bowlingRating: row.bowlingRating,
+        fieldingRating: row.fieldingRating,
       })),
     });
 
     return roster;
   });
+}
+
+export async function deleteRoster(rosterId: string) {
+  const roster = await prisma.playerRoster.findUnique({
+    where: { id: rosterId },
+    include: { _count: { select: { tournaments: true } } },
+  });
+  if (!roster) {
+    throw new ValidationError("Roster not found");
+  }
+  if (roster._count.tournaments > 0) {
+    throw new ValidationError(
+      `Cannot delete "${roster.name}" — it is used by ${roster._count.tournaments} tournament(s). Delete those tournaments first.`
+    );
+  }
+
+  await prisma.playerRoster.delete({ where: { id: rosterId } });
 }

@@ -68,10 +68,11 @@ async function main() {
     );
   }
 
-  // A valid bid within reserve rule: 200 leaves 1250 remaining, need >= 2*100=200 -> ok
-  const result = await recordSale(auction.id, contested.id, team1Entry.id, 200);
+  // A valid bid: must be >= the Icon category base price (500) and within the reserve
+  // rule (600 leaves 850 remaining, need >= 2*100=200 -> ok).
+  const result = await recordSale(auction.id, contested.id, team1Entry.id, 600);
   assert(result.player.status === "SOLD" && result.player.soldVia === "LIVE_BID", "Contested player sold via live bid");
-  assert(String(result.entry.budgetRemaining) === "1250", `Team 1 budgetRemaining is 1250 after winning bid, got ${result.entry.budgetRemaining}`);
+  assert(String(result.entry.budgetRemaining) === "850", `Team 1 budgetRemaining is 850 after winning bid, got ${result.entry.budgetRemaining}`);
   assert(result.entry.slotsFilled === 3, `Team 1 slotsFilled is 3, got ${result.entry.slotsFilled}`);
 
   // Mark an available player unsold via the on-clock flow

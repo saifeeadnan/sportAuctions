@@ -1,8 +1,9 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth/guards";
-import { createTournament, createTeam } from "@/lib/services/tournament.service";
+import { createTournament, createTeam, deleteTournament } from "@/lib/services/tournament.service";
 
 export async function createTournamentAction(formData: FormData) {
   const session = await requireRole("ADMIN");
@@ -34,4 +35,10 @@ export async function createTeamAction(formData: FormData) {
   });
 
   redirect(`/admin/tournaments/${tournamentId}`);
+}
+
+export async function deleteTournamentAction(tournamentId: string) {
+  await requireRole("ADMIN");
+  await deleteTournament(tournamentId);
+  revalidatePath("/admin/tournaments");
 }

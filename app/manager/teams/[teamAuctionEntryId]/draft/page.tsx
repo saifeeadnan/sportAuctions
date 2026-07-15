@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { DraftForm } from "@/components/manager/DraftForm";
+import { findManagerSelfAuctionPlayerId } from "@/lib/services/preAuctionDraft.service";
 
 export default async function DraftPage({
   params,
@@ -22,11 +23,16 @@ export default async function DraftPage({
 
   if (!entry || entry.team.managerId !== session!.user.id) notFound();
 
-  const availablePlayers = await prisma.auctionPlayer.findMany({
-    where: { auctionId: entry.auctionId, status: "AVAILABLE" },
-    include: { player: true, category: true },
-    orderBy: { player: { name: "asc" } },
-  });
+  const [availablePlayers, lockedPlayerId] = await Promise.all([
+    prisma.auctionPlayer.findMany({
+      where: { auctionId: entry.auctionId, status: "AVAILABLE" },
+      include: { player: true, category: true },
+      orderBy: { player: { name: "asc" } },
+    }),
+    entry.team.managerId
+      ? findManagerSelfAuctionPlayerId(entry.auctionId, entry.team.managerId)
+      : Promise.resolve(null),
+  ]);
 
   const editable = entry.status === "PRE_AUCTION_DRAFTING" || entry.status === "PRE_AUCTION_SUBMITTED";
   const cap = entry.slotsTotal - entry.slotsFilled;
@@ -56,6 +62,7 @@ export default async function DraftPage({
             basePrice: String(ap.category.basePrice),
           }))}
           initialSelected={entry.draftSubmissions.map((s) => s.auctionPlayerId)}
+          lockedPlayerId={lockedPlayerId ?? undefined}
         />
       )}
     </div>

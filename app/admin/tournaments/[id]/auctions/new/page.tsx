@@ -26,6 +26,7 @@ export default async function NewAuctionPage({
           id: p.id,
           name: p.name,
           position: p.position,
+          defaultCategory: p.defaultCategory,
         }))}
       />
     </div>

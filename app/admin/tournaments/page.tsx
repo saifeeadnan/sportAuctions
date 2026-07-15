@@ -1,10 +1,15 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { DeleteTournamentButton } from "@/components/admin/DeleteTournamentButton";
 
 export default async function TournamentsPage() {
   const tournaments = await prisma.tournament.findMany({
     orderBy: { createdAt: "desc" },
-    include: { roster: true, _count: { select: { teams: true, auctions: true } } },
+    include: {
+      roster: true,
+      _count: { select: { teams: true, auctions: true } },
+      auctions: { select: { status: true } },
+    },
   });
 
   return (
@@ -24,10 +29,13 @@ export default async function TournamentsPage() {
       ) : (
         <ul className="flex flex-col gap-2">
           {tournaments.map((t) => (
-            <li key={t.id}>
+            <li
+              key={t.id}
+              className="flex items-center justify-between gap-4 rounded border border-black/10 dark:border-white/10 px-4 py-3"
+            >
               <Link
                 href={`/admin/tournaments/${t.id}`}
-                className="flex items-center justify-between rounded border border-black/10 dark:border-white/10 px-4 py-3 hover:bg-black/5 dark:hover:bg-white/5"
+                className="flex-1 flex items-center justify-between hover:underline"
               >
                 <span>
                   {t.name}{" "}
@@ -35,10 +43,17 @@ export default async function TournamentsPage() {
                     ({t.roster.name})
                   </span>
                 </span>
-                <span className="text-sm text-black/60 dark:text-white/60">
+                <span className="text-sm text-black/60 dark:text-white/60 mr-4">
                   {t._count.teams}/{t.numTeams} teams &middot; {t._count.auctions} auctions
                 </span>
               </Link>
+              <DeleteTournamentButton
+                tournamentId={t.id}
+                tournamentName={t.name}
+                teamCount={t._count.teams}
+                auctionCount={t._count.auctions}
+                hasLiveAuction={t.auctions.some((a) => a.status === "BIDDING")}
+              />
             </li>
           ))}
         </ul>

@@ -10,17 +10,23 @@ export default async function LoginPage({
   return (
     <div className="mx-auto max-w-sm px-4 py-16">
       <h1 className="text-xl font-semibold mb-6">Log in</h1>
-      {error && (
+      {error === "invalid" && (
         <p className="mb-4 text-sm text-red-600">
-          Invalid email or password.
+          Invalid login ID or password.
+        </p>
+      )}
+      {error === "system" && (
+        <p className="mb-4 text-sm text-red-600">
+          Something went wrong while checking your credentials — this usually means the database
+          is temporarily unavailable. Please try again in a moment.
         </p>
       )}
       <form action={loginAction} className="flex flex-col gap-3">
         <label className="flex flex-col gap-1 text-sm">
-          Email
+          Login ID
           <input
-            name="email"
-            type="email"
+            name="loginId"
+            type="text"
             required
             className="border border-black/20 dark:border-white/20 rounded px-3 py-2 bg-transparent"
           />

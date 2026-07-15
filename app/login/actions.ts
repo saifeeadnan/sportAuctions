@@ -1,22 +1,26 @@
 "use server";
 
-import { AuthError } from "next-auth";
+import { AuthError, CredentialsSignin } from "next-auth";
 import { redirect } from "next/navigation";
 import { signIn } from "@/auth";
 
 export async function loginAction(formData: FormData) {
-  const email = String(formData.get("email") ?? "");
+  const loginId = String(formData.get("loginId") ?? "");
   const password = String(formData.get("password") ?? "");
 
   try {
     await signIn("credentials", {
-      email,
+      loginId,
       password,
       redirectTo: "/",
     });
   } catch (error) {
+    if (error instanceof CredentialsSignin) {
+      redirect("/login?error=invalid");
+    }
     if (error instanceof AuthError) {
-      redirect("/login?error=1");
+      console.error("Login failed due to a system error:", error.cause ?? error);
+      redirect("/login?error=system");
     }
     throw error;
   }

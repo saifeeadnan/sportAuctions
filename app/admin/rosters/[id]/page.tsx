@@ -21,30 +21,48 @@ export default async function RosterDetailPage({
         {roster.players.length} players
       </p>
 
-      <table className="w-full text-sm border-collapse">
-        <thead>
-          <tr className="text-left border-b border-black/10 dark:border-white/10">
-            <th className="py-2 pr-4">Name</th>
-            <th className="py-2 pr-4">Position</th>
-            <th className="py-2 pr-4">Age</th>
-            <th className="py-2 pr-4">Contact</th>
-            <th className="py-2 pr-4">Rating</th>
-          </tr>
-        </thead>
-        <tbody>
-          {roster.players.map((player) => (
-            <tr key={player.id} className="border-b border-black/5 dark:border-white/5">
-              <td className="py-2 pr-4">{player.name}</td>
-              <td className="py-2 pr-4">{player.position ?? "—"}</td>
-              <td className="py-2 pr-4">{player.age ?? "—"}</td>
-              <td className="py-2 pr-4">{player.contact ?? "—"}</td>
-              <td className="py-2 pr-4">
-                {player.rating != null ? String(player.rating) : "—"}
-              </td>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm border-collapse">
+          <thead>
+            <tr className="text-left border-b border-black/10 dark:border-white/10">
+              <th className="py-2 pr-4 whitespace-nowrap">Name</th>
+              <th className="py-2 pr-4 whitespace-nowrap">Position</th>
+              <th className="py-2 pr-4 whitespace-nowrap">Age</th>
+              <th className="py-2 pr-4 whitespace-nowrap">Login ID</th>
+              <th className="py-2 pr-4 whitespace-nowrap">Default category</th>
+              <th className="py-2 pr-4 whitespace-nowrap">Previous team</th>
+              <th className="py-2 pr-4 whitespace-nowrap">Rating</th>
+              <th className="py-2 pr-4 whitespace-nowrap">Batting</th>
+              <th className="py-2 pr-4 whitespace-nowrap">Bowling</th>
+              <th className="py-2 pr-4 whitespace-nowrap">Fielding</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {roster.players.map((player) => (
+              <tr key={player.id} className="border-b border-black/5 dark:border-white/5">
+                <td className="py-2 pr-4 whitespace-nowrap">{player.name}</td>
+                <td className="py-2 pr-4 whitespace-nowrap">{player.position ?? "—"}</td>
+                <td className="py-2 pr-4 whitespace-nowrap">{player.age ?? "—"}</td>
+                <td className="py-2 pr-4 whitespace-nowrap">{player.loginId ?? "—"}</td>
+                <td className="py-2 pr-4 whitespace-nowrap">{player.defaultCategory ?? "—"}</td>
+                <td className="py-2 pr-4 whitespace-nowrap">{player.previousTeam ?? "—"}</td>
+                <td className="py-2 pr-4 whitespace-nowrap">
+                  {player.rating != null ? String(player.rating) : "—"}
+                </td>
+                <td className="py-2 pr-4 whitespace-nowrap">
+                  {player.battingRating != null ? String(player.battingRating) : "—"}
+                </td>
+                <td className="py-2 pr-4 whitespace-nowrap">
+                  {player.bowlingRating != null ? String(player.bowlingRating) : "—"}
+                </td>
+                <td className="py-2 pr-4 whitespace-nowrap">
+                  {player.fieldingRating != null ? String(player.fieldingRating) : "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

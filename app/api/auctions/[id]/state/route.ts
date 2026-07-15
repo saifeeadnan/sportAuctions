@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { AuthError, requireSession } from "@/lib/auth/guards";
+import { requireSession } from "@/lib/auth/guards";
+import { toErrorResponse } from "@/lib/api/errors";
 import { getAuctionState } from "@/lib/services/auctionState.service";
 
 export async function GET(
@@ -8,17 +9,13 @@ export async function GET(
 ) {
   try {
     await requireSession();
-  } catch (error) {
-    if (error instanceof AuthError) {
-      return NextResponse.json({ error: error.message }, { status: 401 });
+    const { id } = await params;
+    const state = await getAuctionState(id);
+    if (!state) {
+      return NextResponse.json({ error: "Auction not found" }, { status: 404 });
     }
-    throw error;
+    return NextResponse.json(state);
+  } catch (error) {
+    return toErrorResponse(error);
   }
-
-  const { id } = await params;
-  const state = await getAuctionState(id);
-  if (!state) {
-    return NextResponse.json({ error: "Auction not found" }, { status: 404 });
-  }
-  return NextResponse.json(state);
 }

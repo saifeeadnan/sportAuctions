@@ -10,6 +10,15 @@ type PreviewResult = {
   sample: Record<string, unknown>[];
 };
 
+async function readErrorMessage(res: Response, fallback: string): Promise<string> {
+  try {
+    const data = await res.json();
+    return data.error ?? fallback;
+  } catch {
+    return `${fallback} (HTTP ${res.status})`;
+  }
+}
+
 export default function NewRosterPage() {
   const router = useRouter();
   const [rosterName, setRosterName] = useState("");
@@ -32,7 +41,7 @@ export default function NewRosterPage() {
         method: "POST",
         body: formData,
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? "Preview failed");
+      if (!res.ok) throw new Error(await readErrorMessage(res, "Preview failed"));
       setPreview(await res.json());
     } catch (err) {
       setError(err instanceof Error ? err.message : "Preview failed");
@@ -54,7 +63,7 @@ export default function NewRosterPage() {
         method: "POST",
         body: formData,
       });
-      if (!res.ok) throw new Error((await res.json()).error ?? "Import failed");
+      if (!res.ok) throw new Error(await readErrorMessage(res, "Import failed"));
       const data = await res.json();
       router.push(`/admin/rosters/${data.rosterId}`);
     } catch (err) {
@@ -122,24 +131,38 @@ export default function NewRosterPage() {
           )}
 
           {preview.sample.length > 0 && (
-            <table className="w-full text-sm border-collapse">
-              <thead>
-                <tr className="text-left border-b border-black/10 dark:border-white/10">
-                  <th className="py-2 pr-4">Name</th>
-                  <th className="py-2 pr-4">Position</th>
-                  <th className="py-2 pr-4">Age</th>
-                </tr>
-              </thead>
-              <tbody>
-                {preview.sample.map((row, i) => (
-                  <tr key={i} className="border-b border-black/5 dark:border-white/5">
-                    <td className="py-2 pr-4">{String(row.name ?? "")}</td>
-                    <td className="py-2 pr-4">{String(row.position ?? "—")}</td>
-                    <td className="py-2 pr-4">{String(row.age ?? "—")}</td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="text-left border-b border-black/10 dark:border-white/10">
+                    <th className="py-2 pr-4 whitespace-nowrap">Name</th>
+                    <th className="py-2 pr-4 whitespace-nowrap">Position</th>
+                    <th className="py-2 pr-4 whitespace-nowrap">Age</th>
+                    <th className="py-2 pr-4 whitespace-nowrap">Login ID</th>
+                    <th className="py-2 pr-4 whitespace-nowrap">Default category</th>
+                    <th className="py-2 pr-4 whitespace-nowrap">Previous team</th>
+                    <th className="py-2 pr-4 whitespace-nowrap">Batting</th>
+                    <th className="py-2 pr-4 whitespace-nowrap">Bowling</th>
+                    <th className="py-2 pr-4 whitespace-nowrap">Fielding</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {preview.sample.map((row, i) => (
+                    <tr key={i} className="border-b border-black/5 dark:border-white/5">
+                      <td className="py-2 pr-4 whitespace-nowrap">{String(row.name ?? "")}</td>
+                      <td className="py-2 pr-4 whitespace-nowrap">{String(row.position ?? "—")}</td>
+                      <td className="py-2 pr-4 whitespace-nowrap">{String(row.age ?? "—")}</td>
+                      <td className="py-2 pr-4 whitespace-nowrap">{String(row.loginId ?? "—")}</td>
+                      <td className="py-2 pr-4 whitespace-nowrap">{String(row.defaultCategory ?? "—")}</td>
+                      <td className="py-2 pr-4 whitespace-nowrap">{String(row.previousTeam ?? "—")}</td>
+                      <td className="py-2 pr-4 whitespace-nowrap">{String(row.battingRating ?? "—")}</td>
+                      <td className="py-2 pr-4 whitespace-nowrap">{String(row.bowlingRating ?? "—")}</td>
+                      <td className="py-2 pr-4 whitespace-nowrap">{String(row.fieldingRating ?? "—")}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
 
           <button

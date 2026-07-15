@@ -55,7 +55,7 @@ enum TeamAuctionEntryStatus {
 
 model User {
   id               String   @id @default(cuid())
-  email            String   @unique
+  loginId          String   @unique
   passwordHash     String
   name             String
   role             Role
@@ -84,17 +84,22 @@ model PlayerRoster {
 }
 
 model Player {
-  id         String   @id @default(cuid())
-  rosterId   String
-  roster     PlayerRoster @relation(fields: [rosterId], references: [id], onDelete: Cascade)
-  name       String
-  position   String?
-  age        Int?
-  contact    String?
-  photoUrl   String?
-  rating     Decimal? @db.Decimal(6, 2)
-  priorStats Json?
-  createdAt  DateTime @default(now())
+  id              String   @id @default(cuid())
+  rosterId        String
+  roster          PlayerRoster @relation(fields: [rosterId], references: [id], onDelete: Cascade)
+  name            String
+  position        String?
+  age             Int?
+  loginId         String?
+  defaultCategory String?
+  previousTeam    String?
+  photoUrl        String?
+  rating          Decimal? @db.Decimal(6, 2)
+  battingRating   Decimal? @db.Decimal(6, 2)
+  bowlingRating   Decimal? @db.Decimal(6, 2)
+  fieldingRating  Decimal? @db.Decimal(6, 2)
+  priorStats      Json?
+  createdAt       DateTime @default(now())
 
   auctionPlayers AuctionPlayer[]
 

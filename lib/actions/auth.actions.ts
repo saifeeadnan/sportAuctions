@@ -1,10 +1,12 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import { signOut } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { requireRole, type Role } from "@/lib/auth/guards";
+import { deleteUser } from "@/lib/services/user.service";
 
 export async function logoutAction() {
   await signOut({ redirectTo: "/login" });
@@ -13,14 +15,14 @@ export async function logoutAction() {
 export async function registerUserAction(formData: FormData) {
   await requireRole("ADMIN");
 
-  const email = String(formData.get("email") ?? "").trim().toLowerCase();
+  const loginId = String(formData.get("loginId") ?? "").trim().toLowerCase();
   const name = String(formData.get("name") ?? "").trim();
   const role = String(formData.get("role") ?? "") as Role;
   const password = String(formData.get("password") ?? "");
   const managerBasePrice = formData.get("managerBasePrice");
 
-  if (!email || !name || !password) {
-    throw new Error("Email, name, and password are required");
+  if (!loginId || !name || !password) {
+    throw new Error("Login ID, name, and password are required");
   }
   if (!["ADMIN", "TEAM_MANAGER", "AUCTIONEER", "VIEWER"].includes(role)) {
     throw new Error("Invalid role");
@@ -30,7 +32,7 @@ export async function registerUserAction(formData: FormData) {
 
   await prisma.user.create({
     data: {
-      email,
+      loginId,
       name,
       role,
       passwordHash,
@@ -42,4 +44,10 @@ export async function registerUserAction(formData: FormData) {
   });
 
   redirect("/admin/users");
+}
+
+export async function deleteUserAction(userId: string) {
+  const session = await requireRole("ADMIN");
+  await deleteUser(userId, session.user.id);
+  revalidatePath("/admin/users");
 }

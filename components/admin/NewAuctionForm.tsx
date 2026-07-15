@@ -1,10 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createAuctionAction } from "@/lib/actions/auction.actions";
 
-type Player = { id: string; name: string; position: string | null };
+type Player = {
+  id: string;
+  name: string;
+  position: string | null;
+  defaultCategory: string | null;
+};
 type Category = { name: string; basePrice: string };
 
 export function NewAuctionForm({
@@ -19,10 +24,34 @@ export function NewAuctionForm({
   const [teamBudget, setTeamBudget] = useState("");
   const [categories, setCategories] = useState<Category[]>([{ name: "", basePrice: "" }]);
   const [assignments, setAssignments] = useState<Record<string, string>>({});
+  const [overridden, setOverridden] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const categoryNames = categories.map((c) => c.name.trim()).filter(Boolean);
+
+  // Pre-fill each player's category from their roster default as soon as a
+  // matching category is defined, unless the admin has manually overridden it.
+  useEffect(() => {
+    setAssignments((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      for (const p of players) {
+        if (overridden.has(p.id) || !p.defaultCategory) continue;
+        if (categoryNames.includes(p.defaultCategory) && next[p.id] !== p.defaultCategory) {
+          next[p.id] = p.defaultCategory;
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categoryNames.join("|")]);
+
+  function assignPlayer(playerId: string, categoryName: string) {
+    setOverridden((prev) => new Set(prev).add(playerId));
+    setAssignments((prev) => ({ ...prev, [playerId]: categoryName }));
+  }
 
   function updateCategory(index: number, field: keyof Category, value: string) {
     setCategories((prev) =>
@@ -148,11 +177,16 @@ export function NewAuctionForm({
         <h2 className="text-sm font-medium mb-2">
           Player pool ({players.length} in roster)
         </h2>
+        <p className="text-xs text-black/50 dark:text-white/50 mb-2">
+          Categories are pre-filled from each player&apos;s default category once you&apos;ve
+          created a matching category below — override any player individually as needed.
+        </p>
         <table className="w-full text-sm border-collapse">
           <thead>
             <tr className="text-left border-b border-black/10 dark:border-white/10">
               <th className="py-2 pr-4">Player</th>
               <th className="py-2 pr-4">Position</th>
+              <th className="py-2 pr-4">Default category</th>
               <th className="py-2 pr-4">Category</th>
             </tr>
           </thead>
@@ -161,12 +195,11 @@ export function NewAuctionForm({
               <tr key={p.id} className="border-b border-black/5 dark:border-white/5">
                 <td className="py-2 pr-4">{p.name}</td>
                 <td className="py-2 pr-4">{p.position ?? "—"}</td>
+                <td className="py-2 pr-4">{p.defaultCategory ?? "—"}</td>
                 <td className="py-2 pr-4">
                   <select
                     value={assignments[p.id] ?? ""}
-                    onChange={(e) =>
-                      setAssignments((prev) => ({ ...prev, [p.id]: e.target.value }))
-                    }
+                    onChange={(e) => assignPlayer(p.id, e.target.value)}
                     className="border border-black/20 dark:border-white/20 rounded px-2 py-1 bg-transparent"
                   >
                     <option value="">— Exclude —</option>

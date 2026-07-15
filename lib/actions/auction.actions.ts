@@ -9,6 +9,7 @@ import {
   openPreAuction,
   lockPreAuction,
   startBidding,
+  deleteAuction,
   type CreateAuctionInput,
 } from "@/lib/services/auction.service";
 import { submitDraft } from "@/lib/services/preAuctionDraft.service";
@@ -38,6 +39,16 @@ export async function startBiddingAction(auctionId: string) {
   await startBidding(auctionId);
   revalidatePath(`/admin/auctions/${auctionId}`);
   revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
+}
+
+export async function deleteAuctionAction(auctionId: string) {
+  await requireRole("ADMIN");
+  const auction = await prisma.auction.findUnique({
+    where: { id: auctionId },
+    select: { tournamentId: true },
+  });
+  await deleteAuction(auctionId);
+  if (auction) revalidatePath(`/admin/tournaments/${auction.tournamentId}`);
 }
 
 export async function submitDraftAction(

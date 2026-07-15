@@ -3,6 +3,7 @@ import { Prisma } from "@/app/generated/prisma/client";
 import { ValidationError, InsufficientBudgetError, InvalidStateTransitionError } from "@/lib/errors";
 import { computeManagerSlotPrice } from "@/lib/services/budget.service";
 import { resolveOverlaps } from "@/lib/services/overlapResolution.service";
+import { findManagerSelfAuctionPlayerId } from "@/lib/services/preAuctionDraft.service";
 
 export type CreateAuctionInput = {
   tournamentId: string;
@@ -95,13 +96,30 @@ export async function openPreAuction(auctionId: string) {
     );
   }
 
+  // A manager who is matched (by login ID) to a player already in the auction's
+  // pool occupies their squad slot AS that player — no separate manager-fee slot.
+  const selfPlayerIdByManagerId = new Map<string, string | null>();
+  for (const team of auction.tournament.teams) {
+    if (team.managerId && !selfPlayerIdByManagerId.has(team.managerId)) {
+      selfPlayerIdByManagerId.set(
+        team.managerId,
+        await findManagerSelfAuctionPlayerId(auctionId, team.managerId)
+      );
+    }
+  }
+
   return prisma.$transaction(async (tx) => {
     for (const team of auction.tournament.teams) {
-      const managerSlotPrice = computeManagerSlotPrice(
-        team.managerOccupiesSlot,
-        team.manager?.managerBasePrice ?? null,
-        null
-      );
+      const selfPlayerId = team.managerId ? selfPlayerIdByManagerId.get(team.managerId) : null;
+      const managerHasOwnPlayerPick = team.managerOccupiesSlot && !!selfPlayerId;
+
+      const managerSlotPrice = managerHasOwnPlayerPick
+        ? new Prisma.Decimal(0)
+        : computeManagerSlotPrice(
+            team.managerOccupiesSlot,
+            team.manager?.managerBasePrice ?? null,
+            null
+          );
       const budgetRemaining = new Prisma.Decimal(auction.teamBudget).minus(managerSlotPrice);
       if (budgetRemaining.lessThan(0)) {
         throw new InsufficientBudgetError(
@@ -115,7 +133,7 @@ export async function openPreAuction(auctionId: string) {
           auctionId: auction.id,
           status: "PRE_AUCTION_DRAFTING",
           budgetRemaining,
-          slotsFilled: team.managerOccupiesSlot ? 1 : 0,
+          slotsFilled: managerHasOwnPlayerPick ? 0 : team.managerOccupiesSlot ? 1 : 0,
           slotsTotal: auction.tournament.squadSize,
         },
       });
@@ -174,4 +192,16 @@ export async function startBidding(auctionId: string) {
       data: { status: "BIDDING", startedAt: new Date() },
     });
   });
+}
+
+export async function deleteAuction(auctionId: string) {
+  const auction = await prisma.auction.findUnique({ where: { id: auctionId } });
+  if (!auction) throw new ValidationError("Auction not found");
+  if (auction.status === "BIDDING") {
+    throw new ValidationError(
+      "Cannot delete an auction that is currently in progress. Conclude it first."
+    );
+  }
+
+  await prisma.auction.delete({ where: { id: auctionId } });
 }

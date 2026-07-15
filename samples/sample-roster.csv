@@ -1,0 +1,11 @@
+name,position,age,loginId,defaultCategory,previousTeam,photoUrl,rating,battingRating,bowlingRating,fieldingRating
+Virat Kohli,Batsman,35,virat.kohli@example.com,Icon,Royal Challengers Bangalore,https://example.com/photos/virat-kohli.jpg,95,96,20,88
+Jasprit Bumrah,Bowler,30,+91-9876500001,Icon,Mumbai Indians,https://example.com/photos/jasprit-bumrah.jpg,92,25,97,75
+MS Dhoni,Wicketkeeper,42,ms.dhoni@example.com,Icon,Chennai Super Kings,https://example.com/photos/ms-dhoni.jpg,90,82,15,90
+Rohit Sharma,Batsman,37,+91-9876500002,Regular,Mumbai Indians,https://example.com/photos/rohit-sharma.jpg,88,90,10,80
+Ravindra Jadeja,All-rounder,35,ravindra.jadeja@example.com,Regular,Chennai Super Kings,https://example.com/photos/ravindra-jadeja.jpg,85,75,80,92
+KL Rahul,Batsman,32,+91-9876500003,Regular,Lucknow Super Giants,,82,86,,78
+Mohammed Shami,Bowler,34,mohammed.shami@example.com,Regular,Gujarat Titans,,80,18,93,70
+Rishabh Pant,Wicketkeeper,27,+91-9876500004,Regular,Delhi Capitals,,78,80,,82
+Hardik Pandya,All-rounder,31,hardik.pandya@example.com,Regular,Gujarat Titans,,84,78,76,83
+Shubman Gill,Batsman,25,,Uncapped,Gujarat Titans,,79,81,,74

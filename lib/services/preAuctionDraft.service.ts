@@ -2,9 +2,32 @@ import { prisma } from "@/lib/prisma";
 import { ValidationError, SquadCapExceededError, InvalidStateTransitionError } from "@/lib/errors";
 import { remainingSlots } from "@/lib/services/budget.service";
 
+/** The auction pool player matching a manager's own login ID, if the manager is also on the roster. */
+export async function findManagerSelfAuctionPlayerId(
+  auctionId: string,
+  managerUserId: string
+): Promise<string | null> {
+  const manager = await prisma.user.findUnique({
+    where: { id: managerUserId },
+    select: { loginId: true },
+  });
+  if (!manager?.loginId) return null;
+
+  const match = await prisma.auctionPlayer.findFirst({
+    where: {
+      auctionId,
+      status: "AVAILABLE",
+      player: { loginId: { equals: manager.loginId, mode: "insensitive" } },
+    },
+    select: { id: true },
+  });
+  return match?.id ?? null;
+}
+
 export async function submitDraft(teamAuctionEntryId: string, auctionPlayerIds: string[]) {
   const entry = await prisma.teamAuctionEntry.findUnique({
     where: { id: teamAuctionEntryId },
+    include: { team: true },
   });
   if (!entry) throw new ValidationError("Team auction entry not found");
 
@@ -14,20 +37,29 @@ export async function submitDraft(teamAuctionEntryId: string, auctionPlayerIds: 
     );
   }
 
+  const uniqueIds = new Set(auctionPlayerIds);
+
+  // The manager's own player entry (matched by login ID) is always part of their draft
+  // and can never be removed, even if the client omits it.
+  if (entry.team.managerId) {
+    const selfId = await findManagerSelfAuctionPlayerId(entry.auctionId, entry.team.managerId);
+    if (selfId) uniqueIds.add(selfId);
+  }
+
+  const idsArray = Array.from(uniqueIds);
   const cap = remainingSlots(entry);
-  const uniqueIds = Array.from(new Set(auctionPlayerIds));
-  if (uniqueIds.length > cap) {
+  if (idsArray.length > cap) {
     throw new SquadCapExceededError(
       `Draft list exceeds the remaining ${cap} squad slot(s) for this team`
     );
   }
 
-  if (uniqueIds.length > 0) {
+  if (idsArray.length > 0) {
     const validPlayers = await prisma.auctionPlayer.findMany({
-      where: { id: { in: uniqueIds }, auctionId: entry.auctionId, status: "AVAILABLE" },
+      where: { id: { in: idsArray }, auctionId: entry.auctionId, status: "AVAILABLE" },
       select: { id: true },
     });
-    if (validPlayers.length !== uniqueIds.length) {
+    if (validPlayers.length !== idsArray.length) {
       throw new ValidationError(
         "One or more selected players are not available in this auction's pool"
       );
@@ -36,9 +68,9 @@ export async function submitDraft(teamAuctionEntryId: string, auctionPlayerIds: 
 
   await prisma.$transaction(async (tx) => {
     await tx.preAuctionSubmission.deleteMany({ where: { teamAuctionEntryId } });
-    if (uniqueIds.length > 0) {
+    if (idsArray.length > 0) {
       await tx.preAuctionSubmission.createMany({
-        data: uniqueIds.map((auctionPlayerId) => ({ teamAuctionEntryId, auctionPlayerId })),
+        data: idsArray.map((auctionPlayerId) => ({ teamAuctionEntryId, auctionPlayerId })),
       });
     }
     await tx.teamAuctionEntry.update({
