@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { Prisma } from "@/app/generated/prisma/client";
+import { Prisma, type $Enums } from "@/app/generated/prisma/client";
 import {
   ValidationError,
   InsufficientBudgetError,
@@ -51,13 +51,20 @@ export async function selectNextPlayer(auctionId: string, auctionPlayerId: strin
   return updated;
 }
 
-export async function recordSale(
+/**
+ * Shared allocation logic for both live-bid sales and direct admin assignments:
+ * validates price/budget/slot-reserve rules, marks the player SOLD, and debits
+ * the winning team's entry. Callers are responsible for checking the player's
+ * starting status is appropriate for their flow.
+ */
+async function allocatePlayerToTeam(
   auctionId: string,
   auctionPlayerId: string,
-  winningTeamAuctionEntryId: string,
-  price: number
+  teamAuctionEntryId: string,
+  price: number,
+  soldVia: $Enums.SoldVia
 ) {
-  if (price <= 0) throw new ValidationError("Sale price must be greater than 0");
+  if (price <= 0) throw new ValidationError("Price must be greater than 0");
 
   const [auctionPlayer, entry, categories] = await Promise.all([
     prisma.auctionPlayer.findUnique({
@@ -65,7 +72,7 @@ export async function recordSale(
       include: { player: true, category: true },
     }),
     prisma.teamAuctionEntry.findUnique({
-      where: { id: winningTeamAuctionEntryId },
+      where: { id: teamAuctionEntryId },
       include: { team: true },
     }),
     prisma.auctionCategory.findMany({ where: { auctionId } }),
@@ -73,11 +80,6 @@ export async function recordSale(
 
   if (!auctionPlayer || auctionPlayer.auctionId !== auctionId) {
     throw new ValidationError("Player not found in this auction");
-  }
-  if (auctionPlayer.status !== "IN_BIDDING") {
-    throw new InvalidStateTransitionError(
-      `Player must be on the clock to record a sale (current status: ${auctionPlayer.status})`
-    );
   }
   if (!entry || entry.auctionId !== auctionId) {
     throw new ValidationError("Team is not part of this auction");
@@ -89,12 +91,12 @@ export async function recordSale(
   const priceDecimal = new Prisma.Decimal(price);
   if (priceDecimal.lessThan(auctionPlayer.category.basePrice)) {
     throw new ValidationError(
-      `Sale price must be at least the base price (${String(auctionPlayer.category.basePrice)}) for category "${auctionPlayer.category.name}"`
+      `Price must be at least the base price (${String(auctionPlayer.category.basePrice)}) for category "${auctionPlayer.category.name}"`
     );
   }
   if (priceDecimal.greaterThan(entry.budgetRemaining)) {
     throw new InsufficientBudgetError(
-      `Team "${entry.team.name}" does not have enough budget remaining for this bid`
+      `Team "${entry.team.name}" does not have enough budget remaining for this price`
     );
   }
 
@@ -114,15 +116,15 @@ export async function recordSale(
       where: { id: auctionPlayerId },
       data: {
         status: "SOLD",
-        soldVia: "LIVE_BID",
-        soldToEntryId: winningTeamAuctionEntryId,
+        soldVia,
+        soldToEntryId: teamAuctionEntryId,
         soldPrice: priceDecimal,
         soldAt,
       },
       include: { player: true },
     }),
     prisma.teamAuctionEntry.update({
-      where: { id: winningTeamAuctionEntryId },
+      where: { id: teamAuctionEntryId },
       data: {
         budgetRemaining: budgetAfterPick,
         slotsFilled: { increment: 1 },
@@ -147,6 +149,59 @@ export async function recordSale(
   });
 
   return { player: updatedPlayer, entry: updatedEntry };
+}
+
+export async function recordSale(
+  auctionId: string,
+  auctionPlayerId: string,
+  winningTeamAuctionEntryId: string,
+  price: number
+) {
+  const auctionPlayer = await prisma.auctionPlayer.findUnique({ where: { id: auctionPlayerId } });
+  if (!auctionPlayer || auctionPlayer.auctionId !== auctionId) {
+    throw new ValidationError("Player not found in this auction");
+  }
+  if (auctionPlayer.status !== "IN_BIDDING") {
+    throw new InvalidStateTransitionError(
+      `Player must be on the clock to record a sale (current status: ${auctionPlayer.status})`
+    );
+  }
+
+  return allocatePlayerToTeam(auctionId, auctionPlayerId, winningTeamAuctionEntryId, price, "LIVE_BID");
+}
+
+/**
+ * Admin directly assigns a roster player to a team at a specified price,
+ * bypassing the pre-auction draft and live auction entirely. The player is
+ * immediately marked SOLD, so they never appear in a manager's draft pool
+ * or the auctioneer's live queue.
+ */
+export async function adminAssignPlayer(
+  auctionId: string,
+  auctionPlayerId: string,
+  teamAuctionEntryId: string,
+  price: number
+) {
+  const auction = await prisma.auction.findUnique({ where: { id: auctionId } });
+  if (!auction) throw new ValidationError("Auction not found");
+  if (auction.status === "CREATED") {
+    throw new InvalidStateTransitionError("Open pre-auction before assigning players to teams");
+  }
+  if (auction.status === "COMPLETED") {
+    throw new InvalidStateTransitionError("Cannot assign players once the auction has concluded");
+  }
+
+  const auctionPlayer = await prisma.auctionPlayer.findUnique({ where: { id: auctionPlayerId } });
+  if (!auctionPlayer || auctionPlayer.auctionId !== auctionId) {
+    throw new ValidationError("Player not found in this auction");
+  }
+  if (auctionPlayer.status !== "AVAILABLE") {
+    throw new InvalidStateTransitionError(
+      `Player cannot be directly assigned from status ${auctionPlayer.status}`
+    );
+  }
+
+  return allocatePlayerToTeam(auctionId, auctionPlayerId, teamAuctionEntryId, price, "ADMIN_ASSIGNED");
 }
 
 export async function markUnsold(auctionId: string, auctionPlayerId: string) {

@@ -6,6 +6,7 @@ import {
   lockPreAuctionAction,
   startBiddingAction,
 } from "@/lib/actions/auction.actions";
+import { AssignPlayerForm } from "@/components/admin/AssignPlayerForm";
 
 export default async function AuctionDetailPage({
   params,
@@ -79,7 +80,14 @@ export default async function AuctionDetailPage({
             <tbody>
               {auction.entries.map((entry) => (
                 <tr key={entry.id} className="border-b border-black/5 dark:border-white/5">
-                  <td className="py-2 pr-4">{entry.team.name}</td>
+                  <td className="py-2 pr-4">
+                    <Link
+                      href={`/admin/auctions/${auction.id}/teams/${entry.id}`}
+                      className="underline underline-offset-2"
+                    >
+                      {entry.team.name}
+                    </Link>
+                  </td>
                   <td className="py-2 pr-4">{entry.status}</td>
                   <td className="py-2 pr-4">{String(entry.budgetRemaining)}</td>
                   <td className="py-2 pr-4">
@@ -91,6 +99,34 @@ export default async function AuctionDetailPage({
           </table>
         )}
       </section>
+
+      {auction.entries.length > 0 && auction.status !== "COMPLETED" && (
+        <section>
+          <h2 className="text-lg font-medium mb-1">Assign player directly</h2>
+          <p className="text-sm text-black/60 dark:text-white/60 mb-3">
+            Assigns a player straight to a team as sold, bypassing the pre-auction draft and
+            live auction entirely.
+          </p>
+          <AssignPlayerForm
+            auctionId={auction.id}
+            players={auction.auctionPlayers
+              .filter((ap) => ap.status === "AVAILABLE")
+              .map((ap) => ({
+                id: ap.id,
+                name: ap.player.name,
+                categoryName: ap.category.name,
+                basePrice: String(ap.category.basePrice),
+              }))}
+            teams={auction.entries.map((entry) => ({
+              id: entry.id,
+              teamName: entry.team.name,
+              budgetRemaining: String(entry.budgetRemaining),
+              slotsFilled: entry.slotsFilled,
+              slotsTotal: entry.slotsTotal,
+            }))}
+          />
+        </section>
+      )}
 
       <section className="flex gap-3">
         {auction.status === "CREATED" && (

@@ -71,7 +71,11 @@ export default async function AuctionResultsPage({
                       <td className="py-2 pr-4">{ap.category.name}</td>
                       <td className="py-2 pr-4">{String(ap.soldPrice)}</td>
                       <td className="py-2 pr-4">
-                        {ap.soldVia === "PRE_AUCTION_DRAFT" ? "Pre-auction draft" : "Live bid"}
+                        {ap.soldVia === "PRE_AUCTION_DRAFT"
+                          ? "Pre-auction draft"
+                          : ap.soldVia === "ADMIN_ASSIGNED"
+                            ? "Admin assigned"
+                            : "Live bid"}
                       </td>
                     </tr>
                   ))}

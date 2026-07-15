@@ -7,6 +7,7 @@ import {
   recordSale,
   markUnsold,
   concludeAuction,
+  adminAssignPlayer,
 } from "@/lib/services/bidding.service";
 
 export async function selectNextPlayerAction(auctionId: string, auctionPlayerId: string) {
@@ -37,4 +38,16 @@ export async function concludeAuctionAction(auctionId: string) {
   await concludeAuction(auctionId);
   revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
   revalidatePath(`/admin/auctions/${auctionId}`);
+}
+
+export async function adminAssignPlayerAction(
+  auctionId: string,
+  auctionPlayerId: string,
+  teamAuctionEntryId: string,
+  price: number
+) {
+  await requireRole("ADMIN");
+  await adminAssignPlayer(auctionId, auctionPlayerId, teamAuctionEntryId, price);
+  revalidatePath(`/admin/auctions/${auctionId}`);
+  revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
 }

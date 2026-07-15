@@ -42,6 +42,7 @@ enum AuctionPlayerStatus {
 enum SoldVia {
   PRE_AUCTION_DRAFT
   LIVE_BID
+  ADMIN_ASSIGNED
 }
 
 enum TeamAuctionEntryStatus {

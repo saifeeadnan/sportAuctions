@@ -44,3 +44,6 @@ next-env.d.ts
 
 # claude code local session state (auto-generated permission approvals)
 /.claude/
+
+# local database backups (contain password hashes — never commit)
+/backups/
