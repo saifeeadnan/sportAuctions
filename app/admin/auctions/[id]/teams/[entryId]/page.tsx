@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { ConfirmedRosterTable } from "@/components/roster/ConfirmedRosterTable";
+import { DeleteDraftPickButton } from "@/components/admin/DeleteDraftPickButton";
 
 export default async function TeamRosterPage({
   params,
@@ -31,6 +32,7 @@ export default async function TeamRosterPage({
 
   const showDraftPicks =
     entry.status === "PRE_AUCTION_DRAFTING" || entry.status === "PRE_AUCTION_SUBMITTED";
+  const canDeleteDraftPicks = entry.status === "PRE_AUCTION_DRAFTING";
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 flex flex-col gap-8">
@@ -80,6 +82,7 @@ export default async function TeamRosterPage({
                   <th className="py-2 pr-4">Category</th>
                   <th className="py-2 pr-4">Base price</th>
                   <th className="py-2 pr-4">Status</th>
+                  {canDeleteDraftPicks && <th className="py-2 pr-4"></th>}
                 </tr>
               </thead>
               <tbody>
@@ -91,6 +94,16 @@ export default async function TeamRosterPage({
                     <td className="py-2 pr-4">
                       {pick.auctionPlayer.status === "AVAILABLE" ? "Pending" : pick.auctionPlayer.status}
                     </td>
+                    {canDeleteDraftPicks && (
+                      <td className="py-2 pr-4 text-right">
+                        <DeleteDraftPickButton
+                          auctionId={id}
+                          teamAuctionEntryId={entryId}
+                          auctionPlayerId={pick.auctionPlayer.id}
+                          playerName={pick.auctionPlayer.player.name}
+                        />
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>

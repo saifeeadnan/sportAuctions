@@ -1,11 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-import {
-  openPreAuctionAction,
-  lockPreAuctionAction,
-  startBiddingAction,
-} from "@/lib/actions/auction.actions";
+import { openPreAuctionAction, startBiddingAction } from "@/lib/actions/auction.actions";
 import { AssignPlayerForm } from "@/components/admin/AssignPlayerForm";
 
 export default async function AuctionDetailPage({
@@ -141,24 +137,12 @@ export default async function AuctionDetailPage({
         )}
 
         {auction.status === "PRE_AUCTION_OPEN" && (
-          <>
-            <form action={lockPreAuctionAction.bind(null, auction.id, false)}>
-              <button
-                type="submit"
-                className="rounded bg-black text-white dark:bg-white dark:text-black px-3 py-2 text-sm font-medium"
-              >
-                Lock &amp; resolve overlaps
-              </button>
-            </form>
-            <form action={lockPreAuctionAction.bind(null, auction.id, true)}>
-              <button
-                type="submit"
-                className="rounded border border-black/20 dark:border-white/20 px-3 py-2 text-sm font-medium"
-              >
-                Force lock (skip missing submissions)
-              </button>
-            </form>
-          </>
+          <Link
+            href={`/admin/auctions/${auction.id}/lock-review`}
+            className="rounded bg-black text-white dark:bg-white dark:text-black px-3 py-2 text-sm font-medium"
+          >
+            Lock &amp; resolve overlaps
+          </Link>
         )}
 
         {auction.status === "PRE_AUCTION_LOCKED" && (

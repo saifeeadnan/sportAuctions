@@ -50,7 +50,8 @@ export default async function DraftPage({
           {entry.team.name} &middot; {entry.auction.name}
         </h1>
         <p className="text-sm text-black/60 dark:text-white/60">
-          Status: {entry.status} &middot; pick up to {cap} player(s)
+          Status: {entry.status} &middot; pick up to {cap} player(s) &middot; budget available:{" "}
+          {String(entry.budgetRemaining)}
         </p>
       </div>
 
@@ -79,6 +80,7 @@ export default async function DraftPage({
           <DraftForm
             entryId={entry.id}
             cap={cap}
+            budgetRemaining={String(entry.budgetRemaining)}
             players={availablePlayers.map((ap) => ({
               id: ap.id,
               name: ap.player.name,

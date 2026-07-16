@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { registerUserAction } from "@/lib/actions/auth.actions";
 import { DeleteUserButton } from "@/components/admin/DeleteUserButton";
+import { NameLoginIdFields } from "@/components/admin/NameLoginIdFields";
 
 const ROLES = ["ADMIN", "TEAM_MANAGER", "AUCTIONEER", "VIEWER"] as const;
 export type RoleTab = (typeof ROLES)[number];
@@ -44,25 +45,7 @@ export async function UsersPanel({
           Create user
         </summary>
         <form action={registerUserAction} className="flex flex-col gap-3 max-w-xl px-4 pb-4">
-          <div className="grid grid-cols-2 gap-3">
-            <label className="flex flex-col gap-1 text-sm">
-              Name
-              <input
-                name="name"
-                required
-                className="border border-black/20 dark:border-white/20 rounded px-3 py-2 bg-transparent"
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-sm">
-              Login ID
-              <input
-                name="loginId"
-                type="text"
-                required
-                className="border border-black/20 dark:border-white/20 rounded px-3 py-2 bg-transparent"
-              />
-            </label>
-          </div>
+          <NameLoginIdFields />
           <div className="grid grid-cols-2 gap-3">
             <label className="flex flex-col gap-1 text-sm">
               Password

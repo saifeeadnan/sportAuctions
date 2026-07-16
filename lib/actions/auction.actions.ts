@@ -1,5 +1,6 @@
 "use server";
 
+import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth/guards";
 import { ValidationError } from "@/lib/errors";
@@ -12,7 +13,7 @@ import {
   deleteAuction,
   type CreateAuctionInput,
 } from "@/lib/services/auction.service";
-import { submitDraft } from "@/lib/services/preAuctionDraft.service";
+import { submitDraft, removeDraftPick } from "@/lib/services/preAuctionDraft.service";
 
 export async function createAuctionAction(
   input: Omit<CreateAuctionInput, "createdById">
@@ -32,6 +33,7 @@ export async function lockPreAuctionAction(auctionId: string, force: boolean) {
   await requireRole("ADMIN");
   await lockPreAuction(auctionId, force);
   revalidatePath(`/admin/auctions/${auctionId}`);
+  redirect(`/admin/auctions/${auctionId}`);
 }
 
 export async function startBiddingAction(auctionId: string) {
@@ -67,4 +69,14 @@ export async function submitDraftAction(
 
   await submitDraft(teamAuctionEntryId, auctionPlayerIds);
   revalidatePath(`/manager/teams/${teamAuctionEntryId}/draft`);
+}
+
+export async function adminRemoveDraftPickAction(
+  auctionId: string,
+  teamAuctionEntryId: string,
+  auctionPlayerId: string
+) {
+  await requireRole("ADMIN");
+  await removeDraftPick(teamAuctionEntryId, auctionPlayerId);
+  revalidatePath(`/admin/auctions/${auctionId}/teams/${teamAuctionEntryId}`);
 }

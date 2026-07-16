@@ -27,6 +27,10 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
       p.status === "AVAILABLE" || p.status === "IN_PRE_AUCTION_POOL" || p.status === "UNSOLD"
   );
 
+  const categories = Array.from(new Set(state.players.map((p) => p.categoryName))).sort();
+  const [activeCategory, setActiveCategory] = useState<string>(categories[0] ?? "");
+  const visibleQueue = queue.filter((p) => p.categoryName === activeCategory);
+
   async function handleSelect(playerId: string) {
     setError(null);
     try {
@@ -154,8 +158,34 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
 
       <section>
         <h2 className="text-lg font-medium mb-3">Remaining pool ({queue.length})</h2>
+
+        <div className="flex gap-1 border-b border-black/10 dark:border-white/10 mb-3">
+          {categories.map((cat) => {
+            const count = queue.filter((p) => p.categoryName === cat).length;
+            return (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setActiveCategory(cat)}
+                className={`px-3 py-2 text-sm border-b-2 -mb-px ${
+                  activeCategory === cat
+                    ? "border-black dark:border-white font-medium"
+                    : "border-transparent text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white"
+                }`}
+              >
+                {cat} ({count})
+              </button>
+            );
+          })}
+        </div>
+
+        {visibleQueue.length === 0 ? (
+          <p className="text-sm text-black/60 dark:text-white/60">
+            No remaining players in this category.
+          </p>
+        ) : (
         <ul className="flex flex-col gap-1">
-          {queue.map((p) => (
+          {visibleQueue.map((p) => (
             <li
               key={p.id}
               className="flex items-center justify-between rounded border border-black/10 dark:border-white/10 px-3 py-2 text-sm"
@@ -175,6 +205,7 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
             </li>
           ))}
         </ul>
+        )}
       </section>
 
       <section>
