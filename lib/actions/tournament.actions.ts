@@ -41,4 +41,5 @@ export async function deleteTournamentAction(tournamentId: string) {
   await requireRole("ADMIN");
   await deleteTournament(tournamentId);
   revalidatePath("/admin/tournaments");
+  revalidatePath("/");
 }

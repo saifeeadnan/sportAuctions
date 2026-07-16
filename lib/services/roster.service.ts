@@ -174,6 +174,66 @@ export async function createRosterFromUpload(
   });
 }
 
+export type PlayerInput = {
+  name: string;
+  position?: string;
+  age?: number;
+  loginId?: string;
+  defaultCategory?: string;
+  previousTeam?: string;
+  photoUrl?: string;
+  rating?: number;
+  battingRating?: number;
+  bowlingRating?: number;
+  fieldingRating?: number;
+};
+
+export async function createPlayer(rosterId: string, input: PlayerInput) {
+  if (!input.name.trim()) {
+    throw new ValidationError("Player name is required");
+  }
+  const roster = await prisma.playerRoster.findUnique({ where: { id: rosterId } });
+  if (!roster) {
+    throw new ValidationError("Roster not found");
+  }
+
+  return prisma.player.create({
+    data: { ...input, rosterId, name: input.name.trim() },
+  });
+}
+
+export async function updatePlayer(playerId: string, input: PlayerInput) {
+  if (!input.name.trim()) {
+    throw new ValidationError("Player name is required");
+  }
+  const player = await prisma.player.findUnique({ where: { id: playerId } });
+  if (!player) {
+    throw new ValidationError("Player not found");
+  }
+
+  return prisma.player.update({
+    where: { id: playerId },
+    data: { ...input, name: input.name.trim() },
+  });
+}
+
+export async function deletePlayer(playerId: string) {
+  const player = await prisma.player.findUnique({
+    where: { id: playerId },
+    include: { _count: { select: { auctionPlayers: true } } },
+  });
+  if (!player) {
+    throw new ValidationError("Player not found");
+  }
+  if (player._count.auctionPlayers > 0) {
+    throw new ValidationError(
+      `Cannot delete "${player.name}" — already used in ${player._count.auctionPlayers} auction(s).`
+    );
+  }
+
+  await prisma.player.delete({ where: { id: playerId } });
+}
+
 export async function deleteRoster(rosterId: string) {
   const roster = await prisma.playerRoster.findUnique({
     where: { id: rosterId },

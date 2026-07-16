@@ -43,6 +43,7 @@ export async function registerUserAction(formData: FormData) {
     },
   });
 
+  revalidatePath("/");
   redirect("/admin/users");
 }
 
@@ -50,4 +51,5 @@ export async function deleteUserAction(userId: string) {
   const session = await requireRole("ADMIN");
   await deleteUser(userId, session.user.id);
   revalidatePath("/admin/users");
+  revalidatePath("/");
 }

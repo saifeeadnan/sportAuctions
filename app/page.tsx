@@ -1,18 +1,18 @@
 import Link from "next/link";
 import { auth } from "@/auth";
+import { AdminDashboard } from "@/components/admin/AdminDashboard";
 
 const roleLinks: Record<string, { href: string; label: string }[]> = {
-  ADMIN: [
-    { href: "/admin/rosters", label: "Player rosters" },
-    { href: "/admin/tournaments", label: "Tournaments" },
-    { href: "/admin/users", label: "Users" },
-  ],
   TEAM_MANAGER: [{ href: "/manager", label: "My teams" }],
   AUCTIONEER: [{ href: "/auctioneer", label: "Auctions to run" }],
   VIEWER: [{ href: "/viewer", label: "Watch an auction" }],
 };
 
-export default async function Home() {
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ section?: string; role?: string }>;
+}) {
   const session = await auth();
 
   if (!session?.user) {
@@ -25,6 +25,14 @@ export default async function Home() {
         <Link href="/login" className="underline underline-offset-2">
           Log in to continue
         </Link>
+      </div>
+    );
+  }
+
+  if (session.user.role === "ADMIN") {
+    return (
+      <div className="mx-auto max-w-4xl px-4 py-8">
+        <AdminDashboard searchParams={await searchParams} />
       </div>
     );
   }

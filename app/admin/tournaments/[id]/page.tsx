@@ -46,7 +46,12 @@ export default async function TournamentDetailPage({
                 key={team.id}
                 className="flex items-center justify-between rounded border border-black/10 dark:border-white/10 px-4 py-3"
               >
-                <span>{team.name}</span>
+                <Link
+                  href={`/admin/tournaments/${tournament.id}/teams/${team.id}`}
+                  className="underline underline-offset-2"
+                >
+                  {team.name}
+                </Link>
                 <span className="text-sm text-black/60 dark:text-white/60">
                   {team.manager ? team.manager.name : "No manager assigned"}
                   {team.managerOccupiesSlot ? " (occupies a slot)" : ""}

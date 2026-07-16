@@ -1,13 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
-
-function formatSoldVia(soldVia: string | null) {
-  if (soldVia === "PRE_AUCTION_DRAFT") return "Pre-auction draft";
-  if (soldVia === "ADMIN_ASSIGNED") return "Admin assigned";
-  if (soldVia === "LIVE_BID") return "Live bid";
-  return "—";
-}
+import { ConfirmedRosterTable } from "@/components/roster/ConfirmedRosterTable";
 
 export default async function TeamRosterPage({
   params,
@@ -54,30 +48,15 @@ export default async function TeamRosterPage({
 
       <section>
         <h2 className="text-lg font-medium mb-3">Confirmed roster ({confirmedPlayers.length})</h2>
-        {confirmedPlayers.length === 0 ? (
-          <p className="text-sm text-black/60 dark:text-white/60">No players confirmed yet.</p>
-        ) : (
-          <table className="w-full text-sm border-collapse">
-            <thead>
-              <tr className="text-left border-b border-black/10 dark:border-white/10">
-                <th className="py-2 pr-4">Player</th>
-                <th className="py-2 pr-4">Category</th>
-                <th className="py-2 pr-4">Price</th>
-                <th className="py-2 pr-4">Via</th>
-              </tr>
-            </thead>
-            <tbody>
-              {confirmedPlayers.map((ap) => (
-                <tr key={ap.id} className="border-b border-black/5 dark:border-white/5">
-                  <td className="py-2 pr-4">{ap.player.name}</td>
-                  <td className="py-2 pr-4">{ap.category.name}</td>
-                  <td className="py-2 pr-4">{ap.soldPrice != null ? String(ap.soldPrice) : "—"}</td>
-                  <td className="py-2 pr-4">{formatSoldVia(ap.soldVia)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+        <ConfirmedRosterTable
+          players={confirmedPlayers.map((ap) => ({
+            id: ap.id,
+            playerName: ap.player.name,
+            categoryName: ap.category.name,
+            soldPrice: ap.soldPrice != null ? String(ap.soldPrice) : null,
+            soldVia: ap.soldVia,
+          }))}
+        />
       </section>
 
       {showDraftPicks && (
