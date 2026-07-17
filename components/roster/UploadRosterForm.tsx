@@ -19,7 +19,7 @@ async function readErrorMessage(res: Response, fallback: string): Promise<string
   }
 }
 
-export default function NewRosterPage() {
+export function UploadRosterForm() {
   const router = useRouter();
   const [rosterName, setRosterName] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -74,10 +74,8 @@ export default function NewRosterPage() {
   }
 
   return (
-    <div>
-      <h1 className="text-xl font-semibold mb-6">Upload player roster</h1>
-
-      <form onSubmit={handlePreview} className="flex flex-col gap-3 mb-6">
+    <div className="flex flex-col gap-4 px-4 pb-4">
+      <form onSubmit={handlePreview} className="flex flex-col gap-3 max-w-xl">
         <label className="flex flex-col gap-1 text-sm">
           Roster name
           <input
@@ -109,7 +107,7 @@ export default function NewRosterPage() {
         </button>
       </form>
 
-      {error && <p className="text-sm text-red-600 mb-4">{error}</p>}
+      {error && <p className="text-sm text-red-600">{error}</p>}
 
       {preview && (
         <div className="flex flex-col gap-4">

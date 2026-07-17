@@ -27,6 +27,14 @@ export default async function AuctionDetailPage({
     return acc;
   }, {});
 
+  const playerCountByCategory = auction.auctionPlayers.reduce<Record<string, number>>(
+    (acc, ap) => {
+      acc[ap.categoryId] = (acc[ap.categoryId] ?? 0) + 1;
+      return acc;
+    },
+    {}
+  );
+
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 flex flex-col gap-8">
       <div>
@@ -35,27 +43,39 @@ export default async function AuctionDetailPage({
           {auction.tournament.name} &middot; status: {auction.status} &middot; team budget:{" "}
           {String(auction.teamBudget)}
         </p>
-      </div>
-
-      <section>
-        <h2 className="text-lg font-medium mb-3">Categories</h2>
-        <ul className="flex flex-col gap-1 text-sm">
-          {auction.categories.map((c) => (
-            <li key={c.id}>
-              {c.name}: base price {String(c.basePrice)}
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section>
-        <h2 className="text-lg font-medium mb-3">Player pool ({auction.auctionPlayers.length})</h2>
         <p className="text-sm text-black/60 dark:text-white/60">
+          Player pool ({auction.auctionPlayers.length}):{" "}
           {Object.entries(statusCounts)
             .map(([status, count]) => `${count} ${status}`)
             .join(" · ")}
         </p>
-      </section>
+      </div>
+
+      <details className="rounded border border-black/10 dark:border-white/10">
+        <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
+          Categories &amp; base prices ({auction.categories.length})
+        </summary>
+        <div className="px-4 pb-4">
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="text-left border-b border-black/10 dark:border-white/10">
+                <th className="py-2 pr-4">Category</th>
+                <th className="py-2 pr-4">Base price</th>
+                <th className="py-2 pr-4">Players</th>
+              </tr>
+            </thead>
+            <tbody>
+              {auction.categories.map((c) => (
+                <tr key={c.id} className="border-b border-black/5 dark:border-white/5">
+                  <td className="py-2 pr-4">{c.name}</td>
+                  <td className="py-2 pr-4">{String(c.basePrice)}</td>
+                  <td className="py-2 pr-4">{playerCountByCategory[c.id] ?? 0}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </details>
 
       <section>
         <h2 className="text-lg font-medium mb-3">Teams</h2>
@@ -97,31 +117,35 @@ export default async function AuctionDetailPage({
       </section>
 
       {auction.entries.length > 0 && auction.status !== "COMPLETED" && (
-        <section>
-          <h2 className="text-lg font-medium mb-1">Assign player directly</h2>
-          <p className="text-sm text-black/60 dark:text-white/60 mb-3">
-            Assigns a player straight to a team as sold, bypassing the pre-auction draft and
-            live auction entirely.
-          </p>
-          <AssignPlayerForm
-            auctionId={auction.id}
-            players={auction.auctionPlayers
-              .filter((ap) => ap.status === "AVAILABLE")
-              .map((ap) => ({
-                id: ap.id,
-                name: ap.player.name,
-                categoryName: ap.category.name,
-                basePrice: String(ap.category.basePrice),
+        <details className="rounded border border-black/10 dark:border-white/10">
+          <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
+            Assign player directly
+          </summary>
+          <div className="px-4 pb-4">
+            <p className="text-sm text-black/60 dark:text-white/60 mb-3">
+              Assigns a player straight to a team as sold, bypassing the pre-auction draft and
+              live auction entirely.
+            </p>
+            <AssignPlayerForm
+              auctionId={auction.id}
+              players={auction.auctionPlayers
+                .filter((ap) => ap.status === "AVAILABLE")
+                .map((ap) => ({
+                  id: ap.id,
+                  name: ap.player.name,
+                  categoryName: ap.category.name,
+                  basePrice: String(ap.category.basePrice),
+                }))}
+              teams={auction.entries.map((entry) => ({
+                id: entry.id,
+                teamName: entry.team.name,
+                budgetRemaining: String(entry.budgetRemaining),
+                slotsFilled: entry.slotsFilled,
+                slotsTotal: entry.slotsTotal,
               }))}
-            teams={auction.entries.map((entry) => ({
-              id: entry.id,
-              teamName: entry.team.name,
-              budgetRemaining: String(entry.budgetRemaining),
-              slotsFilled: entry.slotsFilled,
-              slotsTotal: entry.slotsTotal,
-            }))}
-          />
-        </section>
+            />
+          </div>
+        </details>
       )}
 
       <section className="flex gap-3">

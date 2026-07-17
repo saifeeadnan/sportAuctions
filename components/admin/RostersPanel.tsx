@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { DeleteRosterButton } from "@/components/admin/DeleteRosterButton";
+import { UploadRosterForm } from "@/components/roster/UploadRosterForm";
 
 export async function RostersPanel() {
   const rosters = await prisma.playerRoster.findMany({
@@ -10,15 +11,14 @@ export async function RostersPanel() {
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-lg font-medium">Player rosters</h2>
-        <Link
-          href="/admin/rosters/new"
-          className="rounded bg-black text-white dark:bg-white dark:text-black px-3 py-2 text-sm font-medium"
-        >
+      <h2 className="text-lg font-medium mb-6">Player rosters</h2>
+
+      <details className="mb-8 rounded border border-black/10 dark:border-white/10">
+        <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
           Upload roster
-        </Link>
-      </div>
+        </summary>
+        <UploadRosterForm />
+      </details>
 
       {rosters.length === 0 ? (
         <p className="text-black/60 dark:text-white/60">No rosters yet.</p>

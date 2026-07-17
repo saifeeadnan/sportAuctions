@@ -16,10 +16,22 @@ function formatAmount(n: number) {
   return Number.isInteger(n) ? String(n) : n.toFixed(2);
 }
 
+type PositionGroup = "Batsmen" | "Bowlers" | "All-rounders" | "Other";
+const POSITION_GROUPS: PositionGroup[] = ["Batsmen", "Bowlers", "All-rounders", "Other"];
+
+function groupPosition(position: string | null): PositionGroup {
+  const normalized = (position ?? "").toLowerCase().replace(/[\s-]/g, "");
+  if (normalized === "batsman" || normalized === "batsmen") return "Batsmen";
+  if (normalized === "bowler" || normalized === "bowlers") return "Bowlers";
+  if (normalized === "allrounder" || normalized === "allrounders") return "All-rounders";
+  return "Other";
+}
+
 export function DraftForm({
   entryId,
   cap,
   budgetRemaining,
+  confirmedPositions,
   players,
   initialSelected,
   lockedPlayerId,
@@ -27,6 +39,7 @@ export function DraftForm({
   entryId: string;
   cap: number;
   budgetRemaining: string;
+  confirmedPositions: (string | null)[];
   players: PlayerOption[];
   initialSelected: string[];
   lockedPlayerId?: string;
@@ -85,6 +98,17 @@ export function DraftForm({
 
   const visiblePlayers = players.filter((p) => p.categoryName === activeCategory);
 
+  const positionCounts = POSITION_GROUPS.reduce(
+    (acc, group) => ({ ...acc, [group]: 0 }),
+    {} as Record<PositionGroup, number>
+  );
+  for (const position of confirmedPositions) {
+    positionCounts[groupPosition(position)] += 1;
+  }
+  for (const p of players) {
+    if (selected.has(p.id)) positionCounts[groupPosition(p.position)] += 1;
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm">
@@ -93,6 +117,11 @@ export function DraftForm({
         <span className={budgetRemainingAfterSelection < 0 ? "text-red-600" : ""}>
           {formatAmount(budgetRemainingAfterSelection)}
         </span>
+      </p>
+      <p className="text-sm text-black/60 dark:text-white/60">
+        Team so far — Batsmen: {positionCounts.Batsmen} &middot; Bowlers: {positionCounts.Bowlers}{" "}
+        &middot; All-rounders: {positionCounts["All-rounders"]}
+        {positionCounts.Other > 0 ? ` · Other: ${positionCounts.Other}` : ""}
       </p>
 
       <div className="flex gap-1 border-b border-black/10 dark:border-white/10">
@@ -139,9 +168,7 @@ export function DraftForm({
                   {p.name} {p.position ? `(${p.position})` : ""}
                   {isLocked ? " — you (locked in)" : ""}
                 </span>
-                <span className="text-black/60 dark:text-white/60">
-                  {p.categoryName} &middot; base {p.basePrice}
-                </span>
+                <span className="text-black/60 dark:text-white/60">base {p.basePrice}</span>
               </label>
             </li>
           );

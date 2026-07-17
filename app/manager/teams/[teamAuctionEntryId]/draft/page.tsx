@@ -81,6 +81,7 @@ export default async function DraftPage({
             entryId={entry.id}
             cap={cap}
             budgetRemaining={String(entry.budgetRemaining)}
+            confirmedPositions={confirmedPlayers.map((ap) => ap.player.position)}
             players={availablePlayers.map((ap) => ({
               id: ap.id,
               name: ap.player.name,
