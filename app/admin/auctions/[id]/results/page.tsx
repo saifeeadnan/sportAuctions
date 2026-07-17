@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { TeamStrengthSummary } from "@/components/manager/TeamStrengthSummary";
 
 export default async function AuctionResultsPage({
   params,
@@ -47,11 +48,25 @@ export default async function AuctionResultsPage({
         return (
           <section key={entry.id}>
             <h2 className="text-lg font-medium mb-1">{entry.team.name}</h2>
-            <p className="text-sm text-black/60 dark:text-white/60 mb-3">
+            <p className="text-sm text-black/60 dark:text-white/60 mb-1">
               Budget remaining: {String(entry.budgetRemaining)} &middot; Spent on{" "}
               {entry.playersWon.length} player(s): {totalSpent} &middot; Slots {entry.slotsFilled}/
               {entry.slotsTotal}
             </p>
+            <div className="mb-3">
+              <TeamStrengthSummary
+                players={entry.playersWon.map((ap) => ({
+                  position: ap.player.position,
+                  rating: ap.player.rating != null ? String(ap.player.rating) : null,
+                  battingRating:
+                    ap.player.battingRating != null ? String(ap.player.battingRating) : null,
+                  bowlingRating:
+                    ap.player.bowlingRating != null ? String(ap.player.bowlingRating) : null,
+                  fieldingRating:
+                    ap.player.fieldingRating != null ? String(ap.player.fieldingRating) : null,
+                }))}
+              />
+            </div>
             {entry.playersWon.length === 0 ? (
               <p className="text-sm text-black/60 dark:text-white/60">No players won.</p>
             ) : (

@@ -5,18 +5,62 @@ import { createPlayerAction } from "@/lib/actions/roster.actions";
 import { PlayerFormFields } from "@/components/roster/PlayerFormFields";
 import { DeletePlayerButton } from "@/components/admin/DeletePlayerButton";
 
+const SORT_FIELDS = ["name", "position", "category", "rating"] as const;
+type SortField = (typeof SORT_FIELDS)[number];
+type SortDir = "asc" | "desc";
+
+const SORT_FIELD_TO_COLUMN: Record<SortField, string> = {
+  name: "name",
+  position: "position",
+  category: "defaultCategory",
+  rating: "rating",
+};
+
+function resolveSortField(value?: string): SortField {
+  return SORT_FIELDS.includes(value as SortField) ? (value as SortField) : "name";
+}
+
+function resolveSortDir(value?: string): SortDir {
+  return value === "desc" ? "desc" : "asc";
+}
+
+function sortHref(field: SortField, activeField: SortField, activeDir: SortDir): string {
+  const nextDir: SortDir = activeField === field && activeDir === "asc" ? "desc" : "asc";
+  return `?sort=${field}&dir=${nextDir}`;
+}
+
 export default async function RosterDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ sort?: string; dir?: string }>;
 }) {
   const { id } = await params;
+  const { sort, dir } = await searchParams;
+  const sortField = resolveSortField(sort);
+  const sortDir = resolveSortDir(dir);
+
+  const orderByValue =
+    sortField === "name" ? sortDir : { sort: sortDir, nulls: "last" as const };
+
   const roster = await prisma.playerRoster.findUnique({
     where: { id },
-    include: { players: { orderBy: { name: "asc" } } },
+    include: {
+      players: {
+        orderBy: { [SORT_FIELD_TO_COLUMN[sortField]]: orderByValue },
+      },
+    },
   });
 
   if (!roster) notFound();
+
+  const columns: { field: SortField; label: string }[] = [
+    { field: "name", label: "Name" },
+    { field: "position", label: "Position" },
+    { field: "category", label: "Category" },
+    { field: "rating", label: "Rating" },
+  ];
 
   return (
     <div>
@@ -46,10 +90,21 @@ export default async function RosterDetailPage({
       <table className="w-full text-sm border-collapse">
         <thead>
           <tr className="text-left border-b border-black/10 dark:border-white/10">
-            <th className="py-2 pr-4">Name</th>
-            <th className="py-2 pr-4">Position</th>
-            <th className="py-2 pr-4">Category</th>
-            <th className="py-2 pr-4">Rating</th>
+            {columns.map((col) => (
+              <th key={col.field} className="py-2 pr-4">
+                <Link
+                  href={sortHref(col.field, sortField, sortDir)}
+                  className="inline-flex items-center gap-1 hover:underline"
+                >
+                  {col.label}
+                  {sortField === col.field && (
+                    <span className="text-black/50 dark:text-white/50">
+                      {sortDir === "asc" ? "▲" : "▼"}
+                    </span>
+                  )}
+                </Link>
+              </th>
+            ))}
             <th className="py-2 pr-4"></th>
           </tr>
         </thead>

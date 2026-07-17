@@ -2,8 +2,26 @@ import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { DraftForm } from "@/components/manager/DraftForm";
+import { TeamStrengthSummary } from "@/components/manager/TeamStrengthSummary";
 import { findManagerSelfAuctionPlayerId } from "@/lib/services/preAuctionDraft.service";
 import { ConfirmedRosterTable } from "@/components/roster/ConfirmedRosterTable";
+import type { RatedPlayer } from "@/lib/teamStrength";
+
+function toRatedPlayer(player: {
+  position: string | null;
+  rating: unknown;
+  battingRating: unknown;
+  bowlingRating: unknown;
+  fieldingRating: unknown;
+}): RatedPlayer {
+  return {
+    position: player.position,
+    rating: player.rating != null ? String(player.rating) : null,
+    battingRating: player.battingRating != null ? String(player.battingRating) : null,
+    bowlingRating: player.bowlingRating != null ? String(player.bowlingRating) : null,
+    fieldingRating: player.fieldingRating != null ? String(player.fieldingRating) : null,
+  };
+}
 
 export default async function DraftPage({
   params,
@@ -41,6 +59,7 @@ export default async function DraftPage({
   ]);
 
   const editable = entry.status === "PRE_AUCTION_DRAFTING" || entry.status === "PRE_AUCTION_SUBMITTED";
+  const allocated = entry.status === "ALLOCATED_PRE_AUCTION";
   const cap = entry.slotsTotal - entry.slotsFilled;
 
   return (
@@ -71,27 +90,35 @@ export default async function DraftPage({
       </section>
 
       <section>
-        <h2 className="text-lg font-medium mb-3">Draft picks</h2>
-        {!editable ? (
-          <p className="text-black/60 dark:text-white/60">
-            The draft window for this auction is closed.
-          </p>
-        ) : (
+        <h2 className="text-lg font-medium mb-3">{allocated ? "Draft results" : "Draft picks"}</h2>
+        {editable ? (
           <DraftForm
             entryId={entry.id}
             cap={cap}
             budgetRemaining={String(entry.budgetRemaining)}
-            confirmedPositions={confirmedPlayers.map((ap) => ap.player.position)}
+            confirmedPlayers={confirmedPlayers.map((ap) => toRatedPlayer(ap.player))}
             players={availablePlayers.map((ap) => ({
               id: ap.id,
               name: ap.player.name,
-              position: ap.player.position,
               categoryName: ap.category.name,
               basePrice: String(ap.category.basePrice),
+              ...toRatedPlayer(ap.player),
             }))}
             initialSelected={entry.draftSubmissions.map((s) => s.auctionPlayerId)}
             lockedPlayerId={lockedPlayerId ?? undefined}
           />
+        ) : allocated ? (
+          <div className="flex flex-col gap-3">
+            <p className="text-sm text-black/60 dark:text-white/60">
+              The pre-auction draft has been resolved — uniquely-picked players are confirmed to
+              your roster above, and any contested picks moved to the live auction pool.
+            </p>
+            <TeamStrengthSummary players={confirmedPlayers.map((ap) => toRatedPlayer(ap.player))} />
+          </div>
+        ) : (
+          <p className="text-black/60 dark:text-white/60">
+            The draft window for this auction is closed.
+          </p>
         )}
       </section>
     </div>

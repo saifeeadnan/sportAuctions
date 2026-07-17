@@ -3,11 +3,12 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { submitDraftAction } from "@/lib/actions/auction.actions";
+import type { RatedPlayer } from "@/lib/teamStrength";
+import { TeamStrengthSummary } from "@/components/manager/TeamStrengthSummary";
 
-type PlayerOption = {
+type PlayerOption = RatedPlayer & {
   id: string;
   name: string;
-  position: string | null;
   categoryName: string;
   basePrice: string;
 };
@@ -16,22 +17,11 @@ function formatAmount(n: number) {
   return Number.isInteger(n) ? String(n) : n.toFixed(2);
 }
 
-type PositionGroup = "Batsmen" | "Bowlers" | "All-rounders" | "Other";
-const POSITION_GROUPS: PositionGroup[] = ["Batsmen", "Bowlers", "All-rounders", "Other"];
-
-function groupPosition(position: string | null): PositionGroup {
-  const normalized = (position ?? "").toLowerCase().replace(/[\s-]/g, "");
-  if (normalized === "batsman" || normalized === "batsmen") return "Batsmen";
-  if (normalized === "bowler" || normalized === "bowlers") return "Bowlers";
-  if (normalized === "allrounder" || normalized === "allrounders") return "All-rounders";
-  return "Other";
-}
-
 export function DraftForm({
   entryId,
   cap,
   budgetRemaining,
-  confirmedPositions,
+  confirmedPlayers,
   players,
   initialSelected,
   lockedPlayerId,
@@ -39,7 +29,7 @@ export function DraftForm({
   entryId: string;
   cap: number;
   budgetRemaining: string;
-  confirmedPositions: (string | null)[];
+  confirmedPlayers: RatedPlayer[];
   players: PlayerOption[];
   initialSelected: string[];
   lockedPlayerId?: string;
@@ -98,16 +88,10 @@ export function DraftForm({
 
   const visiblePlayers = players.filter((p) => p.categoryName === activeCategory);
 
-  const positionCounts = POSITION_GROUPS.reduce(
-    (acc, group) => ({ ...acc, [group]: 0 }),
-    {} as Record<PositionGroup, number>
-  );
-  for (const position of confirmedPositions) {
-    positionCounts[groupPosition(position)] += 1;
-  }
-  for (const p of players) {
-    if (selected.has(p.id)) positionCounts[groupPosition(p.position)] += 1;
-  }
+  const teamSoFar: RatedPlayer[] = [
+    ...confirmedPlayers,
+    ...players.filter((p) => selected.has(p.id)),
+  ];
 
   return (
     <div className="flex flex-col gap-4">
@@ -118,11 +102,7 @@ export function DraftForm({
           {formatAmount(budgetRemainingAfterSelection)}
         </span>
       </p>
-      <p className="text-sm text-black/60 dark:text-white/60">
-        Team so far — Batsmen: {positionCounts.Batsmen} &middot; Bowlers: {positionCounts.Bowlers}{" "}
-        &middot; All-rounders: {positionCounts["All-rounders"]}
-        {positionCounts.Other > 0 ? ` · Other: ${positionCounts.Other}` : ""}
-      </p>
+      <TeamStrengthSummary players={teamSoFar} />
 
       <div className="flex gap-1 border-b border-black/10 dark:border-white/10">
         {categories.map((cat) => {

@@ -4,12 +4,19 @@ export type AuctionStatePlayer = {
   id: string;
   name: string;
   position: string | null;
+  photoUrl: string | null;
   categoryName: string;
   basePrice: string;
   status: string;
   soldPrice: string | null;
+  soldToEntryId: string | null;
   soldToTeamName: string | null;
+  soldVia: string | null;
   soldAt: string | null;
+  rating: string | null;
+  battingRating: string | null;
+  bowlingRating: string | null;
+  fieldingRating: string | null;
 };
 
 export type AuctionStateTeam = {
@@ -53,12 +60,19 @@ export async function getAuctionState(auctionId: string): Promise<AuctionState |
       id: ap.id,
       name: ap.player.name,
       position: ap.player.position,
+      photoUrl: ap.player.photoUrl,
       categoryName: ap.category.name,
       basePrice: String(ap.category.basePrice),
       status: ap.status,
       soldPrice: ap.soldPrice != null ? String(ap.soldPrice) : null,
+      soldToEntryId: ap.soldToEntryId,
       soldToTeamName: ap.soldToEntry?.team.name ?? null,
+      soldVia: ap.soldVia,
       soldAt: ap.soldAt != null ? ap.soldAt.toISOString() : null,
+      rating: ap.player.rating != null ? String(ap.player.rating) : null,
+      battingRating: ap.player.battingRating != null ? String(ap.player.battingRating) : null,
+      bowlingRating: ap.player.bowlingRating != null ? String(ap.player.bowlingRating) : null,
+      fieldingRating: ap.player.fieldingRating != null ? String(ap.player.fieldingRating) : null,
     })),
     teams: auction.entries.map((e) => ({
       id: e.id,

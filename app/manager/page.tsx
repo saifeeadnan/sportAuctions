@@ -54,6 +54,14 @@ export default async function ManagerHomePage() {
                           Submit draft
                         </Link>
                       )}
+                      {entry.status === "ALLOCATED_PRE_AUCTION" && (
+                        <Link
+                          href={`/manager/teams/${entry.id}/draft`}
+                          className="underline underline-offset-2"
+                        >
+                          View team
+                        </Link>
+                      )}
                       {(entry.status === "AUCTION_LIVE" || entry.status === "FINAL") && (
                         <Link
                           href={`/manager/teams/${entry.id}/live`}
