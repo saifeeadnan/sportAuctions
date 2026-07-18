@@ -26,29 +26,33 @@ export function skillScore(p: RatedPlayer): number {
   const overall = p.rating != null ? Number(p.rating) / 10 : null;
   const batting = p.battingRating != null ? Number(p.battingRating) : null;
   const bowling = p.bowlingRating != null ? Number(p.bowlingRating) : null;
-  const fielding = p.fieldingRating != null ? Number(p.fieldingRating) : 0;
+  const fielding = p.fieldingRating != null ? Number(p.fieldingRating) : null;
 
-  let base: number;
+  let primary: number | null;
   if (group === "Batsmen") {
-    base = batting ?? overall ?? 0;
+    primary = batting ?? overall;
   } else if (group === "Bowlers") {
-    base = bowling ?? overall ?? 0;
+    primary = bowling ?? overall;
   } else if (group === "All-rounders") {
     const parts = [batting, bowling].filter((v): v is number => v != null);
-    base = parts.length > 0 ? parts.reduce((a, b) => a + b, 0) / parts.length : overall ?? 0;
+    primary = parts.length > 0 ? parts.reduce((a, b) => a + b, 0) / parts.length : overall;
   } else {
-    base = overall ?? 0;
+    primary = overall;
   }
-  return base + fielding * 0.1;
+
+  // Fielding is weighted equally alongside the position-relevant rating(s),
+  // not just a minor bonus — a great fielder meaningfully lifts the score.
+  const components = [primary, fielding].filter((v): v is number => v != null);
+  return components.length > 0 ? components.reduce((a, b) => a + b, 0) / components.length : 0;
 }
 
-// Rewards a squad mix close to a Batsmen-heavy but balanced XI; penalizes
+// Rewards a squad mix close to an all-rounder-heavy but balanced XI; penalizes
 // squads that are lopsided (e.g. all batsmen, no bowlers).
 const TARGET_POSITION_RATIO: Record<PositionGroup, number> = {
-  Batsmen: 0.4,
+  Batsmen: 0.3,
   Bowlers: 0.3,
-  "All-rounders": 0.2,
-  Other: 0.1,
+  "All-rounders": 0.4,
+  Other: 0,
 };
 
 function balanceMultiplier(counts: Record<PositionGroup, number>, total: number): number {
