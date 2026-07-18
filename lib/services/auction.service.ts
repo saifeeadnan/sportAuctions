@@ -4,6 +4,8 @@ import { ValidationError, InsufficientBudgetError, InvalidStateTransitionError }
 import { computeManagerSlotPrice } from "@/lib/services/budget.service";
 import { resolveOverlaps } from "@/lib/services/overlapResolution.service";
 import { findManagerSelfAuctionPlayerId } from "@/lib/services/preAuctionDraft.service";
+import { getAuctionState } from "@/lib/services/auctionState.service";
+import { emitAuctionEvent } from "@/server/ws/broadcaster";
 
 export type CreateAuctionInput = {
   tournamentId: string;
@@ -192,6 +194,102 @@ export async function startBidding(auctionId: string) {
       data: { status: "BIDDING", startedAt: new Date() },
     });
   });
+}
+
+/**
+ * Reverts an auction from BIDDING back to PRE_AUCTION_LOCKED, undoing everything
+ * that happened during this bidding session: live-bid sales are unwound (players
+ * un-sold, teams refunded budget/slots), and any player put on the clock or marked
+ * unsold is restored to its pre-bidding status. Pre-auction draft allocations and
+ * admin-assigned players are untouched — those happened before bidding started.
+ */
+export async function resetAuctionToPreBidding(auctionId: string) {
+  const auction = await prisma.auction.findUnique({ where: { id: auctionId } });
+  if (!auction) throw new ValidationError("Auction not found");
+  if (auction.status !== "BIDDING") {
+    throw new InvalidStateTransitionError(`Cannot reset from status ${auction.status}`);
+  }
+
+  const [auctionPlayers, submissions] = await Promise.all([
+    prisma.auctionPlayer.findMany({ where: { auctionId } }),
+    prisma.preAuctionSubmission.findMany({ where: { teamAuctionEntry: { auctionId } } }),
+  ]);
+
+  const submissionCountByPlayer = new Map<string, number>();
+  for (const s of submissions) {
+    submissionCountByPlayer.set(
+      s.auctionPlayerId,
+      (submissionCountByPlayer.get(s.auctionPlayerId) ?? 0) + 1
+    );
+  }
+  function preBiddingStatus(auctionPlayerId: string) {
+    return (submissionCountByPlayer.get(auctionPlayerId) ?? 0) > 1
+      ? ("IN_PRE_AUCTION_POOL" as const)
+      : ("AVAILABLE" as const);
+  }
+
+  const refundByEntry = new Map<string, { budget: Prisma.Decimal; slots: number }>();
+  for (const ap of auctionPlayers) {
+    if (ap.soldVia === "LIVE_BID" && ap.soldToEntryId) {
+      const current = refundByEntry.get(ap.soldToEntryId) ?? {
+        budget: new Prisma.Decimal(0),
+        slots: 0,
+      };
+      current.budget = current.budget.plus(ap.soldPrice ?? 0);
+      current.slots += 1;
+      refundByEntry.set(ap.soldToEntryId, current);
+    }
+  }
+
+  await prisma.$transaction(async (tx) => {
+    for (const ap of auctionPlayers) {
+      if (ap.soldVia === "PRE_AUCTION_DRAFT" || ap.soldVia === "ADMIN_ASSIGNED") continue;
+
+      if (ap.soldVia === "LIVE_BID") {
+        await tx.auctionPlayer.update({
+          where: { id: ap.id },
+          data: {
+            status: preBiddingStatus(ap.id),
+            soldVia: null,
+            soldToEntryId: null,
+            soldPrice: null,
+            soldAt: null,
+          },
+        });
+      } else if (ap.status === "UNSOLD" || ap.status === "IN_BIDDING") {
+        await tx.auctionPlayer.update({
+          where: { id: ap.id },
+          data: { status: preBiddingStatus(ap.id) },
+        });
+      }
+    }
+
+    for (const [entryId, refund] of refundByEntry.entries()) {
+      const entry = await tx.teamAuctionEntry.findUniqueOrThrow({ where: { id: entryId } });
+      await tx.teamAuctionEntry.update({
+        where: { id: entryId },
+        data: {
+          budgetRemaining: new Prisma.Decimal(entry.budgetRemaining).plus(refund.budget),
+          slotsFilled: entry.slotsFilled - refund.slots,
+        },
+      });
+    }
+
+    await tx.teamAuctionEntry.updateMany({
+      where: { auctionId },
+      data: { status: "ALLOCATED_PRE_AUCTION" },
+    });
+
+    await tx.auction.update({
+      where: { id: auctionId },
+      data: { status: "PRE_AUCTION_LOCKED", startedAt: null },
+    });
+  });
+
+  const freshState = await getAuctionState(auctionId);
+  if (freshState) {
+    emitAuctionEvent(auctionId, "auction:reset", freshState);
+  }
 }
 
 export async function deleteAuction(auctionId: string) {

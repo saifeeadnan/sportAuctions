@@ -88,6 +88,10 @@ export function useAuctionSocket(auctionId: string, initialState: AuctionState) 
       setState((prev) => ({ ...prev, status: "COMPLETED" }));
     });
 
+    socket.on("auction:reset", (payload: AuctionState) => {
+      setState(payload);
+    });
+
     return () => {
       socket.disconnect();
     };

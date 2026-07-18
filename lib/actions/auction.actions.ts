@@ -10,6 +10,7 @@ import {
   openPreAuction,
   lockPreAuction,
   startBidding,
+  resetAuctionToPreBidding,
   deleteAuction,
   type CreateAuctionInput,
 } from "@/lib/services/auction.service";
@@ -39,6 +40,13 @@ export async function lockPreAuctionAction(auctionId: string, force: boolean) {
 export async function startBiddingAction(auctionId: string) {
   await requireRole("ADMIN", "AUCTIONEER");
   await startBidding(auctionId);
+  revalidatePath(`/admin/auctions/${auctionId}`);
+  revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
+}
+
+export async function resetAuctionAction(auctionId: string) {
+  await requireRole("ADMIN", "AUCTIONEER");
+  await resetAuctionToPreBidding(auctionId);
   revalidatePath(`/admin/auctions/${auctionId}`);
   revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
 }

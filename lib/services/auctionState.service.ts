@@ -5,6 +5,7 @@ export type AuctionStatePlayer = {
   name: string;
   position: string | null;
   photoUrl: string | null;
+  previousTeam: string | null;
   categoryName: string;
   basePrice: string;
   status: string;
@@ -61,6 +62,7 @@ export async function getAuctionState(auctionId: string): Promise<AuctionState |
       name: ap.player.name,
       position: ap.player.position,
       photoUrl: ap.player.photoUrl,
+      previousTeam: ap.player.previousTeam,
       categoryName: ap.category.name,
       basePrice: String(ap.category.basePrice),
       status: ap.status,

@@ -21,7 +21,7 @@ export function groupPosition(position: string | null): PositionGroup {
 // batting/bowling/fielding sub-ratings are out of 10 — normalize `rating`
 // down to /10 so scores stay comparable regardless of which fields a
 // given player happens to have filled in.
-function skillScore(p: RatedPlayer): number {
+export function skillScore(p: RatedPlayer): number {
   const group = groupPosition(p.position);
   const overall = p.rating != null ? Number(p.rating) / 10 : null;
   const batting = p.battingRating != null ? Number(p.battingRating) : null;

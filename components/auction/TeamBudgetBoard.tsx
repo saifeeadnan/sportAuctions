@@ -1,6 +1,14 @@
 import type { AuctionStateTeam } from "@/lib/services/auctionState.service";
 
-export function TeamBudgetBoard({ teams }: { teams: AuctionStateTeam[] }) {
+export function TeamBudgetBoard({
+  teams,
+  maxBids,
+  showStatus = true,
+}: {
+  teams: AuctionStateTeam[];
+  maxBids?: Record<string, string>;
+  showStatus?: boolean;
+}) {
   return (
     <table className="w-full text-sm border-collapse">
       <thead>
@@ -8,7 +16,8 @@ export function TeamBudgetBoard({ teams }: { teams: AuctionStateTeam[] }) {
           <th className="py-2 pr-4">Team</th>
           <th className="py-2 pr-4">Budget remaining</th>
           <th className="py-2 pr-4">Slots</th>
-          <th className="py-2 pr-4">Status</th>
+          {showStatus && <th className="py-2 pr-4">Status</th>}
+          {maxBids && <th className="py-2 pr-4">Max bid</th>}
         </tr>
       </thead>
       <tbody>
@@ -19,7 +28,8 @@ export function TeamBudgetBoard({ teams }: { teams: AuctionStateTeam[] }) {
             <td className="py-2 pr-4">
               {t.slotsFilled}/{t.slotsTotal}
             </td>
-            <td className="py-2 pr-4">{t.status}</td>
+            {showStatus && <td className="py-2 pr-4">{t.status}</td>}
+            {maxBids && <td className="py-2 pr-4">{maxBids[t.id] ?? "—"}</td>}
           </tr>
         ))}
       </tbody>

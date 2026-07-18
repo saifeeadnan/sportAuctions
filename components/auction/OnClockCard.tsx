@@ -22,6 +22,11 @@ export function OnClockCard({ player }: { player?: AuctionStatePlayer }) {
       <p className="text-sm text-black/60 dark:text-white/60">
         {player.categoryName} &middot; base price {player.basePrice}
       </p>
+      {player.previousTeam && (
+        <p className="text-sm text-black/60 dark:text-white/60">
+          Previous team: {player.previousTeam}
+        </p>
+      )}
     </div>
   );
 }
