@@ -3,6 +3,14 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { openPreAuctionAction, startBiddingAction } from "@/lib/actions/auction.actions";
 import { AssignPlayerForm } from "@/components/admin/AssignPlayerForm";
+import { card, cardInteractive, buttonPrimary, buttonSecondary } from "@/lib/ui";
+import { Badge } from "@/components/ui/Badge";
+
+const ENTRY_STATUS_VARIANT: Record<string, "neutral" | "info" | "success" | "warning"> = {
+  AUCTION_LIVE: "info",
+  FINAL: "success",
+  ALLOCATED_PRE_AUCTION: "warning",
+};
 
 export default async function AuctionDetailPage({
   params,
@@ -51,7 +59,7 @@ export default async function AuctionDetailPage({
         </p>
       </div>
 
-      <details className="rounded border border-black/10 dark:border-white/10">
+      <details className={card}>
         <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
           Categories &amp; base prices ({auction.categories.length})
         </summary>
@@ -84,40 +92,46 @@ export default async function AuctionDetailPage({
             Pre-auction has not been opened yet.
           </p>
         ) : (
-          <table className="w-full text-sm border-collapse">
-            <thead>
-              <tr className="text-left border-b border-black/10 dark:border-white/10">
-                <th className="py-2 pr-4">Team</th>
-                <th className="py-2 pr-4">Status</th>
-                <th className="py-2 pr-4">Budget remaining</th>
-                <th className="py-2 pr-4">Slots</th>
-              </tr>
-            </thead>
-            <tbody>
-              {auction.entries.map((entry) => (
-                <tr key={entry.id} className="border-b border-black/5 dark:border-white/5">
-                  <td className="py-2 pr-4">
-                    <Link
-                      href={`/admin/auctions/${auction.id}/teams/${entry.id}`}
-                      className="underline underline-offset-2"
-                    >
-                      {entry.team.name}
-                    </Link>
-                  </td>
-                  <td className="py-2 pr-4">{entry.status}</td>
-                  <td className="py-2 pr-4">{String(entry.budgetRemaining)}</td>
-                  <td className="py-2 pr-4">
-                    {entry.slotsFilled}/{entry.slotsTotal}
-                  </td>
+          <div className={`${card} overflow-x-auto`}>
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="text-left border-b border-black/10 dark:border-white/10">
+                  <th className="py-2 pl-4 pr-4">Team</th>
+                  <th className="py-2 pr-4">Status</th>
+                  <th className="py-2 pr-4">Budget remaining</th>
+                  <th className="py-2 pr-4">Slots</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {auction.entries.map((entry) => (
+                  <tr key={entry.id} className="border-b border-black/5 dark:border-white/5 last:border-0">
+                    <td className="py-2 pl-4 pr-4">
+                      <Link
+                        href={`/admin/auctions/${auction.id}/teams/${entry.id}`}
+                        className="underline underline-offset-2"
+                      >
+                        {entry.team.name}
+                      </Link>
+                    </td>
+                    <td className="py-2 pr-4">
+                      <Badge variant={ENTRY_STATUS_VARIANT[entry.status] ?? "neutral"}>
+                        {entry.status}
+                      </Badge>
+                    </td>
+                    <td className="py-2 pr-4">{String(entry.budgetRemaining)}</td>
+                    <td className="py-2 pr-4">
+                      {entry.slotsFilled}/{entry.slotsTotal}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
 
       {auction.entries.length > 0 && auction.status !== "COMPLETED" && (
-        <details className="rounded border border-black/10 dark:border-white/10">
+        <details className={card}>
           <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
             Assign player directly
           </summary>
@@ -151,49 +165,34 @@ export default async function AuctionDetailPage({
       <section className="flex gap-3">
         {auction.status === "CREATED" && (
           <form action={openPreAuctionAction.bind(null, auction.id)}>
-            <button
-              type="submit"
-              className="rounded bg-black text-white dark:bg-white dark:text-black px-3 py-2 text-sm font-medium"
-            >
+            <button type="submit" className={buttonPrimary}>
               Open pre-auction
             </button>
           </form>
         )}
 
         {auction.status === "PRE_AUCTION_OPEN" && (
-          <Link
-            href={`/admin/auctions/${auction.id}/lock-review`}
-            className="rounded bg-black text-white dark:bg-white dark:text-black px-3 py-2 text-sm font-medium"
-          >
+          <Link href={`/admin/auctions/${auction.id}/lock-review`} className={buttonPrimary}>
             Lock &amp; resolve overlaps
           </Link>
         )}
 
         {auction.status === "PRE_AUCTION_LOCKED" && (
           <form action={startBiddingAction.bind(null, auction.id)}>
-            <button
-              type="submit"
-              className="rounded bg-black text-white dark:bg-white dark:text-black px-3 py-2 text-sm font-medium"
-            >
+            <button type="submit" className={buttonPrimary}>
               Start bidding
             </button>
           </form>
         )}
 
         {auction.status === "BIDDING" && (
-          <Link
-            href={`/auctioneer/auctions/${auction.id}/console`}
-            className="rounded bg-black text-white dark:bg-white dark:text-black px-3 py-2 text-sm font-medium"
-          >
+          <Link href={`/auctioneer/auctions/${auction.id}/console`} className={buttonPrimary}>
             Go to auctioneer console
           </Link>
         )}
 
         {auction.status === "COMPLETED" && (
-          <Link
-            href={`/admin/auctions/${auction.id}/results`}
-            className="rounded bg-black text-white dark:bg-white dark:text-black px-3 py-2 text-sm font-medium"
-          >
+          <Link href={`/admin/auctions/${auction.id}/results`} className={buttonSecondary}>
             View results
           </Link>
         )}

@@ -3,6 +3,15 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { createTeamAction } from "@/lib/actions/tournament.actions";
 import { DeleteAuctionButton } from "@/components/admin/DeleteAuctionButton";
+import { card, cardInteractive, buttonPrimary, buttonSecondary, inputClass } from "@/lib/ui";
+import { Badge } from "@/components/ui/Badge";
+
+const AUCTION_STATUS_VARIANT: Record<string, "neutral" | "info" | "success" | "warning"> = {
+  BIDDING: "info",
+  COMPLETED: "success",
+  PRE_AUCTION_OPEN: "warning",
+  PRE_AUCTION_LOCKED: "warning",
+};
 
 export default async function TournamentDetailPage({
   params,
@@ -25,7 +34,7 @@ export default async function TournamentDetailPage({
   const canAddTeam = tournament.teams.length < tournament.numTeams;
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-xl font-semibold mb-1">{tournament.name}</h1>
         <p className="text-sm text-black/60 dark:text-white/60">
@@ -44,7 +53,7 @@ export default async function TournamentDetailPage({
             {tournament.teams.map((team) => (
               <li
                 key={team.id}
-                className="flex items-center justify-between rounded border border-black/10 dark:border-white/10 px-4 py-3"
+                className={`${cardInteractive} flex items-center justify-between px-4 py-3`}
               >
                 <Link
                   href={`/admin/tournaments/${tournament.id}/teams/${team.id}`}
@@ -62,41 +71,36 @@ export default async function TournamentDetailPage({
         )}
 
         {canAddTeam ? (
-          <form action={createTeamAction} className="flex flex-col gap-3 max-w-sm">
-            <input type="hidden" name="tournamentId" value={tournament.id} />
-            <label className="flex flex-col gap-1 text-sm">
-              Team name
-              <input
-                name="name"
-                required
-                className="border border-black/20 dark:border-white/20 rounded px-3 py-2 bg-transparent"
-              />
-            </label>
-            <label className="flex flex-col gap-1 text-sm">
-              Manager
-              <select
-                name="managerId"
-                className="border border-black/20 dark:border-white/20 rounded px-3 py-2 bg-transparent"
-              >
-                <option value="">— None yet —</option>
-                {managers.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name} ({m.loginId})
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="flex items-center gap-2 text-sm">
-              <input type="checkbox" name="managerOccupiesSlot" defaultChecked />
-              Manager occupies a squad slot and costs budget
-            </label>
-            <button
-              type="submit"
-              className="mt-2 self-start rounded bg-black text-white dark:bg-white dark:text-black px-3 py-2 text-sm font-medium"
-            >
+          <details className={card}>
+            <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
               Add team
-            </button>
-          </form>
+            </summary>
+            <form action={createTeamAction} className="flex flex-col gap-3 max-w-sm px-4 pb-4">
+              <input type="hidden" name="tournamentId" value={tournament.id} />
+              <label className="flex flex-col gap-1 text-sm">
+                Team name
+                <input name="name" required className={inputClass} />
+              </label>
+              <label className="flex flex-col gap-1 text-sm">
+                Manager
+                <select name="managerId" className={inputClass}>
+                  <option value="">— None yet —</option>
+                  {managers.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.name} ({m.loginId})
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" name="managerOccupiesSlot" defaultChecked />
+                Manager occupies a squad slot and costs budget
+              </label>
+              <button type="submit" className={`${buttonPrimary} mt-2 self-start`}>
+                Add team
+              </button>
+            </form>
+          </details>
         ) : (
           <p className="text-sm text-black/60 dark:text-white/60">
             Maximum number of teams reached.
@@ -109,7 +113,7 @@ export default async function TournamentDetailPage({
           <h2 className="text-lg font-medium">Auctions</h2>
           <Link
             href={`/admin/tournaments/${tournament.id}/auctions/new`}
-            className="rounded border border-black/20 dark:border-white/20 px-3 py-2 text-sm font-medium"
+            className={`${buttonSecondary} px-3 py-2 text-sm`}
           >
             New auction
           </Link>
@@ -121,14 +125,16 @@ export default async function TournamentDetailPage({
             {auctions.map((a) => (
               <li
                 key={a.id}
-                className="flex items-center justify-between gap-4 rounded border border-black/10 dark:border-white/10 px-4 py-3"
+                className={`${cardInteractive} flex items-center justify-between gap-4 px-4 py-3`}
               >
                 <Link
                   href={`/admin/auctions/${a.id}`}
                   className="flex-1 flex items-center justify-between hover:underline"
                 >
                   <span>{a.name}</span>
-                  <span className="text-sm text-black/60 dark:text-white/60 mr-4">{a.status}</span>
+                  <span className="mr-4">
+                    <Badge variant={AUCTION_STATUS_VARIANT[a.status] ?? "neutral"}>{a.status}</Badge>
+                  </span>
                 </Link>
                 <DeleteAuctionButton auctionId={a.id} auctionName={a.name} status={a.status} />
               </li>

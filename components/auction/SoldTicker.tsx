@@ -1,4 +1,5 @@
 import type { AuctionStatePlayer, AuctionStateTeam } from "@/lib/services/auctionState.service";
+import { card } from "@/lib/ui";
 
 function byMostRecentFirst(a: AuctionStatePlayer, b: AuctionStatePlayer): number {
   const aTime = a.soldAt ? new Date(a.soldAt).getTime() : 0;
@@ -37,12 +38,15 @@ export function SoldTicker({
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div className={`${card} overflow-x-auto`}>
       <table className="w-full text-sm border-collapse">
         <thead>
           <tr className="text-left border-b border-black/10 dark:border-white/10">
-            {columnNames.map((name) => (
-              <th key={name} className="py-2 pr-4 align-bottom whitespace-nowrap">
+            {columnNames.map((name, i) => (
+              <th
+                key={name}
+                className={`py-2 align-bottom whitespace-nowrap ${i === 0 ? "pl-4 pr-4" : "pr-4"}`}
+              >
                 {name}
               </th>
             ))}
@@ -50,12 +54,15 @@ export function SoldTicker({
         </thead>
         <tbody>
           {Array.from({ length: maxRows }).map((_, rowIndex) => (
-            <tr key={rowIndex} className="border-b border-black/5 dark:border-white/5">
+            <tr key={rowIndex} className="border-b border-black/5 dark:border-white/5 last:border-0">
               {columnLists.map((list, colIndex) => {
                 const player = list[rowIndex];
                 const isUnsoldColumn = colIndex === columnLists.length - 1;
                 return (
-                  <td key={colIndex} className="py-2 pr-4 align-top whitespace-nowrap">
+                  <td
+                    key={colIndex}
+                    className={`py-2 align-top whitespace-nowrap ${colIndex === 0 ? "pl-4 pr-4" : "pr-4"}`}
+                  >
                     {player ? (
                       isUnsoldColumn ? (
                         <span className="text-black/60 dark:text-white/60">{player.name}</span>

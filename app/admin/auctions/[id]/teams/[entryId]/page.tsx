@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { ConfirmedRosterTable } from "@/components/roster/ConfirmedRosterTable";
 import { DeleteDraftPickButton } from "@/components/admin/DeleteDraftPickButton";
+import { card } from "@/lib/ui";
+import { Badge } from "@/components/ui/Badge";
 
 export default async function TeamRosterPage({
   params,
@@ -75,39 +77,43 @@ export default async function TeamRosterPage({
               No draft picks submitted yet.
             </p>
           ) : (
-            <table className="w-full text-sm border-collapse">
-              <thead>
-                <tr className="text-left border-b border-black/10 dark:border-white/10">
-                  <th className="py-2 pr-4">Player</th>
-                  <th className="py-2 pr-4">Category</th>
-                  <th className="py-2 pr-4">Base price</th>
-                  <th className="py-2 pr-4">Status</th>
-                  {canDeleteDraftPicks && <th className="py-2 pr-4"></th>}
-                </tr>
-              </thead>
-              <tbody>
-                {draftPicks.map((pick) => (
-                  <tr key={pick.id} className="border-b border-black/5 dark:border-white/5">
-                    <td className="py-2 pr-4">{pick.auctionPlayer.player.name}</td>
-                    <td className="py-2 pr-4">{pick.auctionPlayer.category.name}</td>
-                    <td className="py-2 pr-4">{String(pick.auctionPlayer.category.basePrice)}</td>
-                    <td className="py-2 pr-4">
-                      {pick.auctionPlayer.status === "AVAILABLE" ? "Pending" : pick.auctionPlayer.status}
-                    </td>
-                    {canDeleteDraftPicks && (
-                      <td className="py-2 pr-4 text-right">
-                        <DeleteDraftPickButton
-                          auctionId={id}
-                          teamAuctionEntryId={entryId}
-                          auctionPlayerId={pick.auctionPlayer.id}
-                          playerName={pick.auctionPlayer.player.name}
-                        />
-                      </td>
-                    )}
+            <div className={`${card} overflow-x-auto`}>
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="text-left border-b border-black/10 dark:border-white/10">
+                    <th className="py-2 pl-4 pr-4">Player</th>
+                    <th className="py-2 pr-4">Category</th>
+                    <th className="py-2 pr-4">Base price</th>
+                    <th className="py-2 pr-4">Status</th>
+                    {canDeleteDraftPicks && <th className="py-2 pr-4"></th>}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {draftPicks.map((pick) => (
+                    <tr key={pick.id} className="border-b border-black/5 dark:border-white/5 last:border-0">
+                      <td className="py-2 pl-4 pr-4">{pick.auctionPlayer.player.name}</td>
+                      <td className="py-2 pr-4">{pick.auctionPlayer.category.name}</td>
+                      <td className="py-2 pr-4">{String(pick.auctionPlayer.category.basePrice)}</td>
+                      <td className="py-2 pr-4">
+                        <Badge variant={pick.auctionPlayer.status === "AVAILABLE" ? "warning" : "neutral"}>
+                          {pick.auctionPlayer.status === "AVAILABLE" ? "Pending" : pick.auctionPlayer.status}
+                        </Badge>
+                      </td>
+                      {canDeleteDraftPicks && (
+                        <td className="py-2 pr-4 text-right">
+                          <DeleteDraftPickButton
+                            auctionId={id}
+                            teamAuctionEntryId={entryId}
+                            auctionPlayerId={pick.auctionPlayer.id}
+                            playerName={pick.auctionPlayer.player.name}
+                          />
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </section>
       )}

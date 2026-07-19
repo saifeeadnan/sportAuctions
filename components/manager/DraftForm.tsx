@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { submitDraftAction } from "@/lib/actions/auction.actions";
 import type { RatedPlayer } from "@/lib/teamStrength";
 import { TeamStrengthSummary } from "@/components/manager/TeamStrengthSummary";
+import { card, buttonPrimary, tabsTrack, tabItem } from "@/lib/ui";
 
 type PlayerOption = RatedPlayer & {
   id: string;
@@ -98,13 +99,13 @@ export function DraftForm({
       <p className="text-sm">
         Selected {selected.size}/{cap} &middot; Total base price: {formatAmount(totalBasePrice)}{" "}
         &middot; Budget remaining after selection:{" "}
-        <span className={budgetRemainingAfterSelection < 0 ? "text-red-600" : ""}>
+        <span className={budgetRemainingAfterSelection < 0 ? "text-red-600 dark:text-red-400" : ""}>
           {formatAmount(budgetRemainingAfterSelection)}
         </span>
       </p>
       <TeamStrengthSummary players={teamSoFar} />
 
-      <div className="flex gap-1 border-b border-black/10 dark:border-white/10">
+      <div className={tabsTrack}>
         {categories.map((cat) => {
           const selectedInCategory = players.filter(
             (p) => p.categoryName === cat && selected.has(p.id)
@@ -115,11 +116,7 @@ export function DraftForm({
               key={cat}
               type="button"
               onClick={() => setActiveCategory(cat)}
-              className={`px-3 py-2 text-sm border-b-2 -mb-px ${
-                activeCategory === cat
-                  ? "border-black dark:border-white font-medium"
-                  : "border-transparent text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white"
-              }`}
+              className={tabItem(activeCategory === cat)}
             >
               {cat} ({selectedInCategory}/{totalInCategory})
             </button>
@@ -127,14 +124,14 @@ export function DraftForm({
         })}
       </div>
 
-      <ul className="flex flex-col gap-1">
+      <ul className="flex flex-col gap-1.5">
         {visiblePlayers.map((p) => {
           const isLocked = p.id === lockedPlayerId;
           const wouldExceedBudget =
             !selected.has(p.id) && totalBasePrice + Number(p.basePrice) > budget;
           return (
             <li key={p.id}>
-              <label className="flex items-center gap-2 text-sm rounded border border-black/10 dark:border-white/10 px-3 py-2">
+              <label className={`${card} flex items-center gap-2 text-sm px-3 py-2`}>
                 <input
                   type="checkbox"
                   checked={selected.has(p.id)}
@@ -155,14 +152,10 @@ export function DraftForm({
         })}
       </ul>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
-      {saved && <p className="text-sm text-green-600">Draft submitted.</p>}
+      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+      {saved && <p className="text-sm text-emerald-600 dark:text-emerald-400">Draft submitted.</p>}
 
-      <button
-        onClick={handleSubmit}
-        disabled={loading}
-        className="self-start rounded bg-black text-white dark:bg-white dark:text-black px-3 py-2 text-sm font-medium disabled:opacity-50"
-      >
+      <button onClick={handleSubmit} disabled={loading} className={`${buttonPrimary} self-start`}>
         {loading ? "Submitting…" : "Submit draft"}
       </button>
     </div>

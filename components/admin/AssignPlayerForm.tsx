@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { adminAssignPlayerAction } from "@/lib/actions/bidding.actions";
+import { buttonPrimary, inputClass } from "@/lib/ui";
 
 type PlayerOption = { id: string; name: string; categoryName: string; basePrice: string };
 type TeamOption = {
@@ -66,7 +67,7 @@ export function AssignPlayerForm({
         <select
           value={playerId}
           onChange={(e) => handlePlayerChange(e.target.value)}
-          className="border border-black/20 dark:border-white/20 rounded px-3 py-2 bg-transparent"
+          className={inputClass}
         >
           <option value="">Select player…</option>
           {players.map((p) => (
@@ -82,7 +83,7 @@ export function AssignPlayerForm({
         <select
           value={teamEntryId}
           onChange={(e) => setTeamEntryId(e.target.value)}
-          className="border border-black/20 dark:border-white/20 rounded px-3 py-2 bg-transparent"
+          className={inputClass}
         >
           <option value="">Select team…</option>
           {teams
@@ -103,16 +104,16 @@ export function AssignPlayerForm({
           step="0.01"
           value={price}
           onChange={(e) => setPrice(e.target.value)}
-          className="border border-black/20 dark:border-white/20 rounded px-3 py-2 bg-transparent"
+          className={inputClass}
         />
       </label>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
       <button
         type="submit"
         disabled={loading || !playerId || !teamEntryId || !price}
-        className="self-start rounded bg-black text-white dark:bg-white dark:text-black px-3 py-2 text-sm font-medium disabled:opacity-50"
+        className={`${buttonPrimary} self-start`}
       >
         {loading ? "Assigning…" : "Assign to team"}
       </button>

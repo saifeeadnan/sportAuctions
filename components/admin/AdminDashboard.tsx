@@ -2,6 +2,7 @@ import Link from "next/link";
 import { RostersPanel } from "@/components/admin/RostersPanel";
 import { TournamentsPanel } from "@/components/admin/TournamentsPanel";
 import { UsersPanel, resolveRoleTab } from "@/components/admin/UsersPanel";
+import { tabsTrack, tabItem } from "@/lib/ui";
 
 const SECTIONS = ["rosters", "tournaments", "users"] as const;
 type Section = (typeof SECTIONS)[number];
@@ -25,19 +26,11 @@ export async function AdminDashboard({
 
   return (
     <div>
-      <h1 className="text-xl font-semibold mb-6">Admin dashboard</h1>
+      <h1 className="text-xl font-semibold mb-5">Admin dashboard</h1>
 
-      <div className="flex gap-1 border-b border-black/10 dark:border-white/10 mb-6">
+      <div className={`${tabsTrack} mb-6`}>
         {SECTIONS.map((s) => (
-          <Link
-            key={s}
-            href={`/?section=${s}`}
-            className={`px-4 py-2 text-sm border-b-2 -mb-px ${
-              activeSection === s
-                ? "border-black dark:border-white font-medium"
-                : "border-transparent text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white"
-            }`}
-          >
+          <Link key={s} href={`/?section=${s}`} className={tabItem(activeSection === s)}>
             {SECTION_LABELS[s]}
           </Link>
         ))}

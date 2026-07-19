@@ -27,7 +27,7 @@ export default async function TournamentTeamRosterPage({
   if (!team || team.tournamentId !== id) notFound();
 
   return (
-    <div className="mx-auto max-w-2xl px-4 py-8 flex flex-col gap-8">
+    <div className="mx-auto max-w-2xl px-4 py-6 flex flex-col gap-6">
       <div>
         <h1 className="text-xl font-semibold mb-1">{team.name}</h1>
         <p className="text-sm text-black/60 dark:text-white/60">

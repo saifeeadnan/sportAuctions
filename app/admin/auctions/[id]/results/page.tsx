@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { TeamStrengthSummary } from "@/components/manager/TeamStrengthSummary";
+import { card, buttonSecondary } from "@/lib/ui";
+import { Badge } from "@/components/ui/Badge";
 
 export default async function AuctionResultsPage({
   params,
@@ -35,10 +37,7 @@ export default async function AuctionResultsPage({
             {auction.tournament.name} &middot; status: {auction.status}
           </p>
         </div>
-        <a
-          href={`/api/auctions/${auction.id}/export.csv`}
-          className="rounded border border-black/20 dark:border-white/20 px-3 py-2 text-sm font-medium"
-        >
+        <a href={`/api/auctions/${auction.id}/export.csv`} className={buttonSecondary}>
           Export CSV
         </a>
       </div>
@@ -70,32 +69,36 @@ export default async function AuctionResultsPage({
             {entry.playersWon.length === 0 ? (
               <p className="text-sm text-black/60 dark:text-white/60">No players won.</p>
             ) : (
-              <table className="w-full text-sm border-collapse">
-                <thead>
-                  <tr className="text-left border-b border-black/10 dark:border-white/10">
-                    <th className="py-2 pr-4">Player</th>
-                    <th className="py-2 pr-4">Category</th>
-                    <th className="py-2 pr-4">Price</th>
-                    <th className="py-2 pr-4">Via</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {entry.playersWon.map((ap) => (
-                    <tr key={ap.id} className="border-b border-black/5 dark:border-white/5">
-                      <td className="py-2 pr-4">{ap.player.name}</td>
-                      <td className="py-2 pr-4">{ap.category.name}</td>
-                      <td className="py-2 pr-4">{String(ap.soldPrice)}</td>
-                      <td className="py-2 pr-4">
-                        {ap.soldVia === "PRE_AUCTION_DRAFT"
-                          ? "Pre-auction draft"
-                          : ap.soldVia === "ADMIN_ASSIGNED"
-                            ? "Admin assigned"
-                            : "Live bid"}
-                      </td>
+              <div className={`${card} overflow-x-auto`}>
+                <table className="w-full text-sm border-collapse">
+                  <thead>
+                    <tr className="text-left border-b border-black/10 dark:border-white/10">
+                      <th className="py-2 pl-4 pr-4">Player</th>
+                      <th className="py-2 pr-4">Category</th>
+                      <th className="py-2 pr-4">Price</th>
+                      <th className="py-2 pr-4">Via</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {entry.playersWon.map((ap) => (
+                      <tr key={ap.id} className="border-b border-black/5 dark:border-white/5 last:border-0">
+                        <td className="py-2 pl-4 pr-4">{ap.player.name}</td>
+                        <td className="py-2 pr-4">{ap.category.name}</td>
+                        <td className="py-2 pr-4">{String(ap.soldPrice)}</td>
+                        <td className="py-2 pr-4">
+                          <Badge variant={ap.soldVia === "LIVE_BID" ? "info" : "neutral"}>
+                            {ap.soldVia === "PRE_AUCTION_DRAFT"
+                              ? "Pre-auction draft"
+                              : ap.soldVia === "ADMIN_ASSIGNED"
+                                ? "Admin assigned"
+                                : "Live bid"}
+                          </Badge>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </section>
         );

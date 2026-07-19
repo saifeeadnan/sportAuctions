@@ -1,4 +1,5 @@
 import type { AuctionStatePlayer } from "@/lib/services/auctionState.service";
+import { card } from "@/lib/ui";
 
 export function OnClockCard({
   player,
@@ -10,21 +11,25 @@ export function OnClockCard({
   photoHeight?: number;
 }) {
   if (!player) {
-    return <p className="text-black/60 dark:text-white/60">No player is currently on the clock.</p>;
+    return (
+      <div className={`${card} px-4 py-6 text-center`}>
+        <p className="text-black/60 dark:text-white/60">No player is currently on the clock.</p>
+      </div>
+    );
   }
   return (
-    <div className="flex flex-col items-center text-center gap-3">
+    <div className={`${card} flex flex-col items-center text-center gap-3 p-4`}>
       {player.photoUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={player.photoUrl}
           alt={player.name}
-          className="rounded object-cover bg-black/5 dark:bg-white/5"
+          className="rounded-lg object-cover bg-black/5 dark:bg-white/5"
           style={{ width: photoWidth, height: photoHeight }}
         />
       ) : (
         <div
-          className="rounded bg-black/5 dark:bg-white/5 flex items-center justify-center text-xs text-black/40 dark:text-white/40"
+          className="rounded-lg bg-black/5 dark:bg-white/5 flex items-center justify-center text-xs text-black/40 dark:text-white/40"
           style={{ width: photoWidth, height: photoHeight }}
         >
           No photo

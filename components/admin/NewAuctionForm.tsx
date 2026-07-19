@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createAuctionAction } from "@/lib/actions/auction.actions";
+import { card, buttonPrimary, inputClass } from "@/lib/ui";
 
 type Player = {
   id: string;
@@ -115,7 +116,7 @@ export function NewAuctionForm({
           required
           value={name}
           onChange={(e) => setName(e.target.value)}
-          className="border border-black/20 dark:border-white/20 rounded px-3 py-2 bg-transparent"
+          className={inputClass}
         />
       </label>
 
@@ -128,7 +129,7 @@ export function NewAuctionForm({
           step="0.01"
           value={teamBudget}
           onChange={(e) => setTeamBudget(e.target.value)}
-          className="border border-black/20 dark:border-white/20 rounded px-3 py-2 bg-transparent"
+          className={inputClass}
         />
       </label>
 
@@ -141,7 +142,7 @@ export function NewAuctionForm({
                 placeholder="Category name (e.g. Icon)"
                 value={cat.name}
                 onChange={(e) => updateCategory(i, "name", e.target.value)}
-                className="border border-black/20 dark:border-white/20 rounded px-3 py-2 bg-transparent flex-1"
+                className={`${inputClass} flex-1`}
               />
               <input
                 placeholder="Base price"
@@ -150,13 +151,13 @@ export function NewAuctionForm({
                 step="0.01"
                 value={cat.basePrice}
                 onChange={(e) => updateCategory(i, "basePrice", e.target.value)}
-                className="border border-black/20 dark:border-white/20 rounded px-3 py-2 bg-transparent w-32"
+                className={`${inputClass} w-32`}
               />
               {categories.length > 1 && (
                 <button
                   type="button"
                   onClick={() => removeCategory(i)}
-                  className="text-sm text-red-600"
+                  className="text-sm text-red-600 dark:text-red-400 hover:underline"
                 >
                   Remove
                 </button>
@@ -181,48 +182,46 @@ export function NewAuctionForm({
           Categories are pre-filled from each player&apos;s default category once you&apos;ve
           created a matching category below — override any player individually as needed.
         </p>
-        <table className="w-full text-sm border-collapse">
-          <thead>
-            <tr className="text-left border-b border-black/10 dark:border-white/10">
-              <th className="py-2 pr-4">Player</th>
-              <th className="py-2 pr-4">Position</th>
-              <th className="py-2 pr-4">Default category</th>
-              <th className="py-2 pr-4">Category</th>
-            </tr>
-          </thead>
-          <tbody>
-            {players.map((p) => (
-              <tr key={p.id} className="border-b border-black/5 dark:border-white/5">
-                <td className="py-2 pr-4">{p.name}</td>
-                <td className="py-2 pr-4">{p.position ?? "—"}</td>
-                <td className="py-2 pr-4">{p.defaultCategory ?? "—"}</td>
-                <td className="py-2 pr-4">
-                  <select
-                    value={assignments[p.id] ?? ""}
-                    onChange={(e) => assignPlayer(p.id, e.target.value)}
-                    className="border border-black/20 dark:border-white/20 rounded px-2 py-1 bg-transparent"
-                  >
-                    <option value="">— Exclude —</option>
-                    {categoryNames.map((name) => (
-                      <option key={name} value={name}>
-                        {name}
-                      </option>
-                    ))}
-                  </select>
-                </td>
+        <div className={`${card} overflow-x-auto`}>
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="text-left border-b border-black/10 dark:border-white/10">
+                <th className="py-2 pl-4 pr-4">Player</th>
+                <th className="py-2 pr-4">Position</th>
+                <th className="py-2 pr-4">Default category</th>
+                <th className="py-2 pr-4">Category</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {players.map((p) => (
+                <tr key={p.id} className="border-b border-black/5 dark:border-white/5 last:border-0">
+                  <td className="py-2 pl-4 pr-4">{p.name}</td>
+                  <td className="py-2 pr-4">{p.position ?? "—"}</td>
+                  <td className="py-2 pr-4">{p.defaultCategory ?? "—"}</td>
+                  <td className="py-2 pr-4">
+                    <select
+                      value={assignments[p.id] ?? ""}
+                      onChange={(e) => assignPlayer(p.id, e.target.value)}
+                      className={`${inputClass} py-1`}
+                    >
+                      <option value="">— Exclude —</option>
+                      {categoryNames.map((name) => (
+                        <option key={name} value={name}>
+                          {name}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
-      <button
-        type="submit"
-        disabled={loading}
-        className="self-start rounded bg-black text-white dark:bg-white dark:text-black px-3 py-2 text-sm font-medium disabled:opacity-50"
-      >
+      <button type="submit" disabled={loading} className={`${buttonPrimary} self-start`}>
         {loading ? "Creating…" : "Create auction"}
       </button>
     </form>

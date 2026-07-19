@@ -1,5 +1,4 @@
-const inputClass =
-  "border border-black/20 dark:border-white/20 rounded px-3 py-2 bg-transparent";
+import { inputClass } from "@/lib/ui";
 
 export type PlayerFormDefaults = {
   name?: string;

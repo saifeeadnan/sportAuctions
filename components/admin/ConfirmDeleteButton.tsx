@@ -43,7 +43,7 @@ export function ConfirmDeleteButton({
         type="button"
         onClick={handleDelete}
         disabled={loading}
-        className="text-xs text-red-600 underline underline-offset-2 disabled:opacity-50"
+        className="text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 underline underline-offset-2 transition-colors disabled:opacity-50"
       >
         {loading ? "Deleting…" : "Delete"}
       </button>

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { createPlayerAction } from "@/lib/actions/roster.actions";
 import { PlayerFormFields } from "@/components/roster/PlayerFormFields";
 import { DeletePlayerButton } from "@/components/admin/DeletePlayerButton";
+import { card, buttonPrimary } from "@/lib/ui";
 
 const SORT_FIELDS = ["name", "position", "category", "rating"] as const;
 type SortField = (typeof SORT_FIELDS)[number];
@@ -65,11 +66,11 @@ export default async function RosterDetailPage({
   return (
     <div>
       <h1 className="text-xl font-semibold mb-1">{roster.name}</h1>
-      <p className="text-sm text-black/60 dark:text-white/60 mb-6">
+      <p className="text-sm text-black/60 dark:text-white/60 mb-5">
         {roster.players.length} players
       </p>
 
-      <details className="mb-6 rounded border border-black/10 dark:border-white/10">
+      <details className={`${card} mb-6`}>
         <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
           Add player
         </summary>
@@ -78,64 +79,63 @@ export default async function RosterDetailPage({
           className="flex flex-col gap-3 max-w-xl px-4 pb-4"
         >
           <PlayerFormFields />
-          <button
-            type="submit"
-            className="mt-2 self-start rounded bg-black text-white dark:bg-white dark:text-black px-3 py-2 text-sm font-medium"
-          >
+          <button type="submit" className={`${buttonPrimary} mt-2 self-start`}>
             Add player
           </button>
         </form>
       </details>
 
-      <table className="w-full text-sm border-collapse">
-        <thead>
-          <tr className="text-left border-b border-black/10 dark:border-white/10">
-            {columns.map((col) => (
-              <th key={col.field} className="py-2 pr-4">
-                <Link
-                  href={sortHref(col.field, sortField, sortDir)}
-                  className="inline-flex items-center gap-1 hover:underline"
-                >
-                  {col.label}
-                  {sortField === col.field && (
-                    <span className="text-black/50 dark:text-white/50">
-                      {sortDir === "asc" ? "▲" : "▼"}
-                    </span>
-                  )}
-                </Link>
-              </th>
-            ))}
-            <th className="py-2 pr-4"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {roster.players.map((player) => (
-            <tr key={player.id} className="border-b border-black/5 dark:border-white/5">
-              <td className="py-2 pr-4">{player.name}</td>
-              <td className="py-2 pr-4">{player.position ?? "—"}</td>
-              <td className="py-2 pr-4">{player.defaultCategory ?? "—"}</td>
-              <td className="py-2 pr-4">
-                {player.rating != null ? String(player.rating) : "—"}
-              </td>
-              <td className="py-2 pr-4">
-                <div className="flex items-center justify-end gap-3">
+      <div className={`${card} overflow-x-auto`}>
+        <table className="w-full text-sm border-collapse">
+          <thead>
+            <tr className="text-left border-b border-black/10 dark:border-white/10">
+              {columns.map((col, i) => (
+                <th key={col.field} className={i === 0 ? "py-2 pl-4 pr-4" : "py-2 pr-4"}>
                   <Link
-                    href={`/admin/rosters/${roster.id}/players/${player.id}/edit`}
-                    className="text-xs underline underline-offset-2"
+                    href={sortHref(col.field, sortField, sortDir)}
+                    className="inline-flex items-center gap-1 hover:underline"
                   >
-                    Edit
+                    {col.label}
+                    {sortField === col.field && (
+                      <span className="text-black/50 dark:text-white/50">
+                        {sortDir === "asc" ? "▲" : "▼"}
+                      </span>
+                    )}
                   </Link>
-                  <DeletePlayerButton
-                    rosterId={roster.id}
-                    playerId={player.id}
-                    playerName={player.name}
-                  />
-                </div>
-              </td>
+                </th>
+              ))}
+              <th className="py-2 pr-4"></th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {roster.players.map((player) => (
+              <tr key={player.id} className="border-b border-black/5 dark:border-white/5 last:border-0">
+                <td className="py-2 pl-4 pr-4">{player.name}</td>
+                <td className="py-2 pr-4">{player.position ?? "—"}</td>
+                <td className="py-2 pr-4">{player.defaultCategory ?? "—"}</td>
+                <td className="py-2 pr-4">
+                  {player.rating != null ? String(player.rating) : "—"}
+                </td>
+                <td className="py-2 pr-4">
+                  <div className="flex items-center justify-end gap-3">
+                    <Link
+                      href={`/admin/rosters/${roster.id}/players/${player.id}/edit`}
+                      className="text-xs underline underline-offset-2"
+                    >
+                      Edit
+                    </Link>
+                    <DeletePlayerButton
+                      rosterId={roster.id}
+                      playerId={player.id}
+                      playerName={player.name}
+                    />
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

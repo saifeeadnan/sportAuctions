@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { inputClass, buttonPrimary, buttonSecondary } from "@/lib/ui";
 
 type RowError = { rowNumber: number; message: string };
 type PreviewResult = {
@@ -82,7 +83,7 @@ export function UploadRosterForm() {
             required
             value={rosterName}
             onChange={(e) => setRosterName(e.target.value)}
-            className="border border-black/20 dark:border-white/20 rounded px-3 py-2 bg-transparent"
+            className={inputClass}
           />
         </label>
         <label className="flex flex-col gap-1 text-sm">
@@ -98,11 +99,7 @@ export function UploadRosterForm() {
             className="text-sm"
           />
         </label>
-        <button
-          type="submit"
-          disabled={loading || !file}
-          className="mt-2 self-start rounded border border-black/20 dark:border-white/20 px-3 py-2 text-sm font-medium disabled:opacity-50"
-        >
+        <button type="submit" disabled={loading || !file} className={`${buttonSecondary} mt-2 self-start`}>
           {loading ? "Parsing…" : "Preview"}
         </button>
       </form>
@@ -166,7 +163,7 @@ export function UploadRosterForm() {
           <button
             onClick={handleConfirm}
             disabled={loading || preview.validCount === 0}
-            className="self-start rounded bg-black text-white dark:bg-white dark:text-black px-3 py-2 text-sm font-medium disabled:opacity-50"
+            className={`${buttonPrimary} self-start`}
           >
             {loading ? "Importing…" : `Confirm & import ${preview.validCount} players`}
           </button>

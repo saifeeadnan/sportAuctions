@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { DeleteRosterButton } from "@/components/admin/DeleteRosterButton";
 import { UploadRosterForm } from "@/components/roster/UploadRosterForm";
+import { card, cardInteractive } from "@/lib/ui";
 
 export async function RostersPanel() {
   const rosters = await prisma.playerRoster.findMany({
@@ -11,9 +12,9 @@ export async function RostersPanel() {
 
   return (
     <div>
-      <h2 className="text-lg font-medium mb-6">Player rosters</h2>
+      <h2 className="text-lg font-medium mb-4">Player rosters</h2>
 
-      <details className="mb-8 rounded border border-black/10 dark:border-white/10">
+      <details className={`${card} mb-6`}>
         <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
           Upload roster
         </summary>
@@ -25,10 +26,7 @@ export async function RostersPanel() {
       ) : (
         <ul className="flex flex-col gap-2">
           {rosters.map((roster) => (
-            <li
-              key={roster.id}
-              className="flex items-center justify-between gap-4 rounded border border-black/10 dark:border-white/10 px-4 py-3"
-            >
+            <li key={roster.id} className={`${cardInteractive} flex items-center justify-between gap-4 px-4 py-3`}>
               <Link
                 href={`/admin/rosters/${roster.id}`}
                 className="flex-1 flex items-center justify-between hover:underline"

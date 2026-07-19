@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { cardInteractive } from "@/lib/ui";
+import { Badge } from "@/components/ui/Badge";
 
 export default async function ViewerHomePage() {
   const auctions = await prisma.auction.findMany({
@@ -22,7 +24,7 @@ export default async function ViewerHomePage() {
             <li key={a.id}>
               <Link
                 href={`/viewer/auctions/${a.id}/watch`}
-                className="flex items-center justify-between rounded border border-black/10 dark:border-white/10 px-4 py-3 hover:bg-black/5 dark:hover:bg-white/5"
+                className={`${cardInteractive} flex items-center justify-between px-4 py-3`}
               >
                 <span>
                   {a.name} &middot;{" "}
@@ -30,7 +32,7 @@ export default async function ViewerHomePage() {
                     {a.tournament.name}
                   </span>
                 </span>
-                <span className="text-sm text-black/60 dark:text-white/60">{a.status}</span>
+                <Badge variant={a.status === "BIDDING" ? "info" : "success"}>{a.status}</Badge>
               </Link>
             </li>
           ))}

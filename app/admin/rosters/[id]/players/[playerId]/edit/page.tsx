@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { updatePlayerAction } from "@/lib/actions/roster.actions";
 import { PlayerFormFields } from "@/components/roster/PlayerFormFields";
+import { card, buttonPrimary, buttonSecondary } from "@/lib/ui";
 
 export default async function EditPlayerPage({
   params,
@@ -39,20 +40,17 @@ export default async function EditPlayerPage({
             }}
           />
           <div className="flex items-center gap-3 mt-2">
-            <button
-              type="submit"
-              className="self-start rounded bg-black text-white dark:bg-white dark:text-black px-3 py-2 text-sm font-medium"
-            >
+            <button type="submit" className={`${buttonPrimary} self-start`}>
               Save changes
             </button>
-            <Link href={`/admin/rosters/${id}`} className="text-sm underline underline-offset-2">
+            <Link href={`/admin/rosters/${id}`} className={`${buttonSecondary} self-start`}>
               Cancel
             </Link>
           </div>
         </form>
 
         <div
-          className="shrink-0 rounded bg-black/5 dark:bg-white/5 flex items-center justify-center overflow-hidden"
+          className={`${card} shrink-0 flex items-center justify-center overflow-hidden`}
           style={{ width: 200, height: 400 }}
         >
           {player.photoUrl ? (

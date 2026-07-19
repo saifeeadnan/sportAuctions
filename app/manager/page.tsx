@@ -1,6 +1,15 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { cardInteractive } from "@/lib/ui";
+import { Badge } from "@/components/ui/Badge";
+
+const ENTRY_STATUS_VARIANT: Record<string, "neutral" | "info" | "success" | "warning"> = {
+  AUCTION_LIVE: "info",
+  FINAL: "success",
+  ALLOCATED_PRE_AUCTION: "warning",
+  PRE_AUCTION_SUBMITTED: "warning",
+};
 
 export default async function ManagerHomePage() {
   const session = await auth();
@@ -24,10 +33,7 @@ export default async function ManagerHomePage() {
       ) : (
         <ul className="flex flex-col gap-3">
           {teams.map((team) => (
-            <li
-              key={team.id}
-              className="rounded border border-black/10 dark:border-white/10 px-4 py-3"
-            >
+            <li key={team.id} className={`${cardInteractive} px-4 py-3`}>
               <p className="font-medium">
                 {team.name} &middot;{" "}
                 <span className="text-black/60 dark:text-white/60">
@@ -39,12 +45,13 @@ export default async function ManagerHomePage() {
                   No active draft yet.
                 </p>
               ) : (
-                <ul className="mt-1 text-sm text-black/60 dark:text-white/60 flex flex-col gap-1">
+                <ul className="mt-1 text-sm flex flex-col gap-1.5">
                   {team.entries.map((entry) => (
                     <li key={entry.id} className="flex items-center gap-2">
-                      <span>
-                        {entry.auction.name}: {entry.status}
-                      </span>
+                      <span className="text-black/60 dark:text-white/60">{entry.auction.name}</span>
+                      <Badge variant={ENTRY_STATUS_VARIANT[entry.status] ?? "neutral"}>
+                        {entry.status}
+                      </Badge>
                       {(entry.status === "PRE_AUCTION_DRAFTING" ||
                         entry.status === "PRE_AUCTION_SUBMITTED") && (
                         <Link

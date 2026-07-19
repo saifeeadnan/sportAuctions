@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { lockPreAuctionAction } from "@/lib/actions/auction.actions";
+import { card, buttonPrimary, buttonSecondary } from "@/lib/ui";
+import { Badge } from "@/components/ui/Badge";
 
 export default async function LockReviewPage({
   params,
@@ -57,7 +59,7 @@ export default async function LockReviewPage({
       </div>
 
       {notSubmitted.length > 0 && (
-        <p className="text-sm rounded border border-amber-500/40 bg-amber-500/10 px-3 py-2">
+        <p className="text-sm rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2">
           Not yet submitted: {notSubmitted.map((e) => e.team.name).join(", ")}. Locking normally
           will fail until every team submits — use force lock to proceed anyway.
         </p>
@@ -66,45 +68,45 @@ export default async function LockReviewPage({
       {submissions.length === 0 ? (
         <p className="text-black/60 dark:text-white/60">No draft picks have been submitted yet.</p>
       ) : (
-        <table className="w-full text-sm border-collapse">
-          <thead>
-            <tr className="text-left border-b border-black/10 dark:border-white/10">
-              <th className="py-2 pr-4">Team</th>
-              <th className="py-2 pr-4">Player</th>
-              <th className="py-2 pr-4">Category</th>
-              <th className="py-2 pr-4">Base price</th>
-              <th className="py-2 pr-4">Overlap</th>
-            </tr>
-          </thead>
-          <tbody>
-            {submissions.map((s) => {
-              const teams = teamsByPlayer.get(s.auctionPlayerId) ?? [];
-              const isOverlap = teams.length > 1;
-              return (
-                <tr
-                  key={s.id}
-                  className={`border-b border-black/5 dark:border-white/5 ${
-                    isOverlap ? "bg-amber-500/15" : ""
-                  }`}
-                >
-                  <td className="py-2 pr-4">{s.teamAuctionEntry.team.name}</td>
-                  <td className="py-2 pr-4">{s.auctionPlayer.player.name}</td>
-                  <td className="py-2 pr-4">{s.auctionPlayer.category.name}</td>
-                  <td className="py-2 pr-4">{String(s.auctionPlayer.category.basePrice)}</td>
-                  <td className="py-2 pr-4">
-                    {isOverlap ? (
-                      <span className="text-amber-700 dark:text-amber-400 font-medium">
-                        Contested by {teams.length} teams
-                      </span>
-                    ) : (
-                      "—"
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <div className={`${card} overflow-x-auto`}>
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="text-left border-b border-black/10 dark:border-white/10">
+                <th className="py-2 pl-4 pr-4">Team</th>
+                <th className="py-2 pr-4">Player</th>
+                <th className="py-2 pr-4">Category</th>
+                <th className="py-2 pr-4">Base price</th>
+                <th className="py-2 pr-4">Overlap</th>
+              </tr>
+            </thead>
+            <tbody>
+              {submissions.map((s) => {
+                const teams = teamsByPlayer.get(s.auctionPlayerId) ?? [];
+                const isOverlap = teams.length > 1;
+                return (
+                  <tr
+                    key={s.id}
+                    className={`border-b border-black/5 dark:border-white/5 last:border-0 ${
+                      isOverlap ? "bg-amber-500/10" : ""
+                    }`}
+                  >
+                    <td className="py-2 pl-4 pr-4">{s.teamAuctionEntry.team.name}</td>
+                    <td className="py-2 pr-4">{s.auctionPlayer.player.name}</td>
+                    <td className="py-2 pr-4">{s.auctionPlayer.category.name}</td>
+                    <td className="py-2 pr-4">{String(s.auctionPlayer.category.basePrice)}</td>
+                    <td className="py-2 pr-4">
+                      {isOverlap ? (
+                        <Badge variant="warning">Contested by {teams.length} teams</Badge>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
 
       <p className="text-sm text-black/60 dark:text-white/60">
@@ -115,18 +117,12 @@ export default async function LockReviewPage({
 
       <div className="flex gap-3">
         <form action={lockPreAuctionAction.bind(null, auction.id, false)}>
-          <button
-            type="submit"
-            className="rounded bg-black text-white dark:bg-white dark:text-black px-3 py-2 text-sm font-medium"
-          >
+          <button type="submit" className={buttonPrimary}>
             Confirm &amp; lock pre-auction
           </button>
         </form>
         <form action={lockPreAuctionAction.bind(null, auction.id, true)}>
-          <button
-            type="submit"
-            className="rounded border border-black/20 dark:border-white/20 px-3 py-2 text-sm font-medium"
-          >
+          <button type="submit" className={buttonSecondary}>
             Force lock (skip missing submissions)
           </button>
         </form>
