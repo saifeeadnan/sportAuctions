@@ -84,6 +84,25 @@ export function useAuctionSocket(auctionId: string, initialState: AuctionState) 
       }
     );
 
+    socket.on("player:removed", (payload: { auctionPlayerId: string }) => {
+      setState((prev) => ({
+        ...prev,
+        players: prev.players.map((p) =>
+          p.id === payload.auctionPlayerId
+            ? {
+                ...p,
+                status: "AVAILABLE",
+                soldVia: null,
+                soldToEntryId: null,
+                soldToTeamName: null,
+                soldPrice: null,
+                soldAt: null,
+              }
+            : p
+        ),
+      }));
+    });
+
     socket.on("auction:completed", () => {
       setState((prev) => ({ ...prev, status: "COMPLETED" }));
     });

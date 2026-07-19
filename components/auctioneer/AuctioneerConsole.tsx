@@ -13,6 +13,7 @@ import {
   recordSaleAction,
   markUnsoldAction,
   concludeAuctionAction,
+  removePlayerFromTeamAction,
 } from "@/lib/actions/bidding.actions";
 import { resetAuctionAction } from "@/lib/actions/auction.actions";
 
@@ -134,6 +135,25 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to mark unsold");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRemove(auctionPlayerId: string, playerName: string, teamName: string | null) {
+    if (
+      !window.confirm(
+        `Remove ${playerName} from ${teamName ?? "their team"} and return them to the pool? The team's budget and slot will be refunded.`
+      )
+    )
+      return;
+    setLoading(true);
+    setError(null);
+    try {
+      await removePlayerFromTeamAction(state.id, auctionPlayerId);
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to remove player");
     } finally {
       setLoading(false);
     }
@@ -330,6 +350,39 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
         <h2 className="text-lg font-medium mb-3">Teams</h2>
         <TeamBudgetBoard teams={state.teams} maxBids={maxBids} showStatus={false} />
       </section>
+
+      <details className="rounded border border-black/10 dark:border-white/10">
+        <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
+          Team allocations ({state.players.filter((p) => p.status === "SOLD").length})
+        </summary>
+        <div className="px-4 pb-4">
+          {state.players.filter((p) => p.status === "SOLD").length === 0 ? (
+            <p className="text-sm text-black/60 dark:text-white/60">No players allocated yet.</p>
+          ) : (
+            <ul className="flex flex-col gap-1">
+              {state.players
+                .filter((p) => p.status === "SOLD")
+                .map((p) => (
+                  <li
+                    key={p.id}
+                    className="flex items-center justify-between rounded border border-black/10 dark:border-white/10 px-3 py-2 text-sm"
+                  >
+                    <span>
+                      {p.name} &middot; {p.soldToTeamName} &middot; {p.soldPrice}
+                    </span>
+                    <button
+                      onClick={() => handleRemove(p.id, p.name, p.soldToTeamName)}
+                      disabled={loading}
+                      className="rounded border border-red-600 text-red-600 px-2 py-1 text-xs disabled:opacity-50"
+                    >
+                      Remove
+                    </button>
+                  </li>
+                ))}
+            </ul>
+          )}
+        </div>
+      </details>
 
       <details className="rounded border border-black/10 dark:border-white/10">
         <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">

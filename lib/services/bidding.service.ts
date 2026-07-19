@@ -232,6 +232,70 @@ export async function markUnsold(auctionId: string, auctionPlayerId: string) {
   return updated;
 }
 
+/**
+ * Reverses a completed allocation — however it was sold (live bid, admin
+ * assignment, or pre-auction draft) — returning the player to the pool as
+ * AVAILABLE and refunding the team's budget and slot.
+ */
+export async function removePlayerFromTeam(auctionId: string, auctionPlayerId: string) {
+  const auction = await prisma.auction.findUnique({ where: { id: auctionId } });
+  if (!auction) throw new ValidationError("Auction not found");
+  if (auction.status === "CREATED") {
+    throw new InvalidStateTransitionError("Open pre-auction before removing player allocations");
+  }
+  if (auction.status === "COMPLETED") {
+    throw new InvalidStateTransitionError("Cannot modify allocations once the auction has concluded");
+  }
+
+  const auctionPlayer = await prisma.auctionPlayer.findUnique({
+    where: { id: auctionPlayerId },
+    include: { player: true },
+  });
+  if (!auctionPlayer || auctionPlayer.auctionId !== auctionId) {
+    throw new ValidationError("Player not found in this auction");
+  }
+  if (auctionPlayer.status !== "SOLD" || !auctionPlayer.soldToEntryId) {
+    throw new InvalidStateTransitionError(
+      `Player is not currently allocated to a team (status: ${auctionPlayer.status})`
+    );
+  }
+
+  const entry = await prisma.teamAuctionEntry.findUniqueOrThrow({
+    where: { id: auctionPlayer.soldToEntryId },
+  });
+  const refund = auctionPlayer.soldPrice ?? new Prisma.Decimal(0);
+
+  const [updatedPlayer, updatedEntry] = await prisma.$transaction([
+    prisma.auctionPlayer.update({
+      where: { id: auctionPlayerId },
+      data: { status: "AVAILABLE", soldVia: null, soldToEntryId: null, soldPrice: null, soldAt: null },
+      include: { player: true },
+    }),
+    prisma.teamAuctionEntry.update({
+      where: { id: entry.id },
+      data: {
+        budgetRemaining: new Prisma.Decimal(entry.budgetRemaining).plus(refund),
+        slotsFilled: { decrement: 1 },
+      },
+      include: { team: true },
+    }),
+  ]);
+
+  emitAuctionEvent(auctionId, "player:removed", {
+    auctionPlayerId: updatedPlayer.id,
+    playerName: updatedPlayer.player.name,
+  });
+  emitAuctionEvent(auctionId, "team:budget-updated", {
+    teamAuctionEntryId: updatedEntry.id,
+    teamName: updatedEntry.team.name,
+    budgetRemaining: updatedEntry.budgetRemaining.toString(),
+    slotsFilled: updatedEntry.slotsFilled,
+    slotsTotal: updatedEntry.slotsTotal,
+  });
+
+  return { player: updatedPlayer, entry: updatedEntry };
+}
+
 export async function concludeAuction(auctionId: string) {
   const auction = await prisma.auction.findUnique({ where: { id: auctionId } });
   if (!auction) throw new ValidationError("Auction not found");
