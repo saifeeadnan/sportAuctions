@@ -1,6 +1,14 @@
 import type { AuctionStatePlayer } from "@/lib/services/auctionState.service";
 
-export function OnClockCard({ player }: { player?: AuctionStatePlayer }) {
+export function OnClockCard({
+  player,
+  photoWidth = 128,
+  photoHeight = 128,
+}: {
+  player?: AuctionStatePlayer;
+  photoWidth?: number;
+  photoHeight?: number;
+}) {
   if (!player) {
     return <p className="text-black/60 dark:text-white/60">No player is currently on the clock.</p>;
   }
@@ -11,10 +19,14 @@ export function OnClockCard({ player }: { player?: AuctionStatePlayer }) {
         <img
           src={player.photoUrl}
           alt={player.name}
-          className="w-32 h-32 rounded object-cover bg-black/5 dark:bg-white/5"
+          className="rounded object-cover bg-black/5 dark:bg-white/5"
+          style={{ width: photoWidth, height: photoHeight }}
         />
       ) : (
-        <div className="w-32 h-32 rounded bg-black/5 dark:bg-white/5 flex items-center justify-center text-xs text-black/40 dark:text-white/40">
+        <div
+          className="rounded bg-black/5 dark:bg-white/5 flex items-center justify-center text-xs text-black/40 dark:text-white/40"
+          style={{ width: photoWidth, height: photoHeight }}
+        >
           No photo
         </div>
       )}

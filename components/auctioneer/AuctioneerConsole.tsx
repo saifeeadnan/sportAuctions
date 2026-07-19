@@ -278,7 +278,7 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
         <section>
           <h2 className="text-lg font-medium mb-3">On the clock</h2>
           <div className="flex flex-col gap-3 items-center">
-            <OnClockCard player={onClock} />
+            <OnClockCard player={onClock} photoWidth={200} photoHeight={300} />
             {onClock && (
               <div className="flex flex-col gap-3 w-full max-w-sm">
                 <select

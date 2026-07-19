@@ -59,7 +59,7 @@ export function LiveAuctionView({
 
             <section>
               <h2 className="text-lg font-medium mb-3">On the clock</h2>
-              <OnClockCard player={onClock} />
+              <OnClockCard player={onClock} photoWidth={200} photoHeight={300} />
             </section>
           </div>
         </>
