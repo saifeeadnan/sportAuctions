@@ -11,7 +11,8 @@
     "db:down": "docker compose down",
     "db:logs": "docker compose logs -f postgres",
     "db:backup": "tsx scripts/backup-database.ts",
-    "db:restore": "tsx scripts/restore-database.ts"
+    "db:restore": "tsx scripts/restore-database.ts",
+    "dev:tunnel": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-tunnel.ps1"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",

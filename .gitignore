@@ -47,3 +47,6 @@ next-env.d.ts
 
 # local database backups (contain password hashes — never commit)
 /backups/
+
+# local dev tooling binaries (e.g. cloudflared.exe) — machine-specific, not source
+/tools/
