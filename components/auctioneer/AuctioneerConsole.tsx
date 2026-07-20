@@ -363,35 +363,50 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
           {soldPlayers.length === 0 ? (
             <p className="text-sm text-black/60 dark:text-white/60">No players allocated yet.</p>
           ) : (
-            <ul className="flex flex-col gap-1.5">
-              {soldPlayers.map((p) => (
-                <li
-                  key={p.id}
-                  className="flex items-center justify-between rounded-lg border border-black/[0.06] dark:border-white/10 px-3 py-2 text-sm"
-                >
-                  <span>
-                    {p.name} &middot; {p.soldToTeamName} &middot; {p.soldPrice}
-                  </span>
-                  <button
-                    onClick={() => handleRemove(p.id, p.name, p.soldToTeamName)}
-                    disabled={loading}
-                    className={`${buttonDanger} px-2 py-1 text-xs`}
+            <div className="flex gap-3 overflow-x-auto">
+              {state.teams.map((team) => {
+                const teamPlayers = soldPlayers
+                  .filter((p) => p.soldToEntryId === team.id)
+                  .sort((a, b) => a.name.localeCompare(b.name));
+                return (
+                  <div
+                    key={team.id}
+                    className="flex-1 min-w-[200px] rounded-lg border border-black/[0.06] dark:border-white/10 p-3"
                   >
-                    Remove
-                  </button>
-                </li>
-              ))}
-            </ul>
+                    <p className="text-sm font-medium mb-2">
+                      {team.teamName}{" "}
+                      <span className="text-black/50 dark:text-white/50">
+                        ({teamPlayers.length})
+                      </span>
+                    </p>
+                    {teamPlayers.length === 0 ? (
+                      <p className="text-xs text-black/50 dark:text-white/50">No players yet.</p>
+                    ) : (
+                      <ul className="flex flex-col gap-1.5">
+                        {teamPlayers.map((p) => (
+                          <li key={p.id} className="flex items-center justify-between gap-2 text-sm">
+                            <span className="truncate">
+                              {p.name}{" "}
+                              <span className="text-black/50 dark:text-white/50">
+                                ({p.soldPrice})
+                              </span>
+                            </span>
+                            <button
+                              onClick={() => handleRemove(p.id, p.name, p.soldToTeamName)}
+                              disabled={loading}
+                              className={`${buttonDanger} px-2 py-1 text-xs shrink-0`}
+                            >
+                              Remove
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
           )}
-        </div>
-      </details>
-
-      <details className={card}>
-        <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
-          Sold / unsold history
-        </summary>
-        <div className="px-4 pb-4">
-          <SoldTicker players={state.players} teams={state.teams} />
         </div>
       </details>
 

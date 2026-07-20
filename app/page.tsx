@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { AdminDashboard } from "@/components/admin/AdminDashboard";
+import { LandingHero } from "@/components/LandingHero";
 
 const roleLinks: Record<string, { href: string; label: string }[]> = {
   TEAM_MANAGER: [{ href: "/manager", label: "My teams" }],
@@ -16,17 +17,7 @@ export default async function Home({
   const session = await auth();
 
   if (!session?.user) {
-    return (
-      <div className="mx-auto max-w-3xl px-4 py-16">
-        <h1 className="text-2xl font-semibold mb-2">Sports Team Player Auction</h1>
-        <p className="text-black/60 dark:text-white/60 mb-6">
-          Upload rosters, run tournaments, and auction players live.
-        </p>
-        <Link href="/login" className="underline underline-offset-2">
-          Log in to continue
-        </Link>
-      </div>
-    );
+    return <LandingHero />;
   }
 
   if (session.user.role === "ADMIN") {

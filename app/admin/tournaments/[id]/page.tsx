@@ -92,10 +92,7 @@ export default async function TournamentDetailPage({
                   ))}
                 </select>
               </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" name="managerOccupiesSlot" defaultChecked />
-                Manager occupies a squad slot and costs budget
-              </label>
+              <input type="hidden" name="managerOccupiesSlot" value="off" />
               <button type="submit" className={`${buttonPrimary} mt-2 self-start`}>
                 Add team
               </button>
