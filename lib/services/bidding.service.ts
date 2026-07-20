@@ -136,6 +136,7 @@ async function allocatePlayerToTeam(
   emitAuctionEvent(auctionId, "player:sold", {
     auctionPlayerId: updatedPlayer.id,
     playerName: updatedPlayer.player.name,
+    teamAuctionEntryId: updatedEntry.id,
     teamName: updatedEntry.team.name,
     price: priceDecimal.toString(),
     soldAt: soldAt.toISOString(),

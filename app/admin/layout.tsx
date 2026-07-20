@@ -1,4 +1,5 @@
 import { requireRole } from "@/lib/auth/guards";
+import { AdminTabs } from "@/components/admin/AdminTabs";
 
 export default async function AdminLayout({
   children,
@@ -7,5 +8,10 @@ export default async function AdminLayout({
 }) {
   await requireRole("ADMIN");
 
-  return <div className="mx-auto max-w-4xl px-4 py-8">{children}</div>;
+  return (
+    <div className="mx-auto max-w-4xl px-4 py-8">
+      <AdminTabs />
+      {children}
+    </div>
+  );
 }

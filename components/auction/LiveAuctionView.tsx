@@ -5,6 +5,7 @@ import { useAuctionSocket } from "@/hooks/useAuctionSocket";
 import { TeamBudgetBoard } from "@/components/auction/TeamBudgetBoard";
 import { SoldTicker } from "@/components/auction/SoldTicker";
 import { OnClockCard } from "@/components/auction/OnClockCard";
+import { SaleAnnouncement } from "@/components/auction/SaleAnnouncement";
 import { TeamStrengthSummary } from "@/components/manager/TeamStrengthSummary";
 import { ConfirmedRosterTable } from "@/components/roster/ConfirmedRosterTable";
 
@@ -15,7 +16,7 @@ export function LiveAuctionView({
   initialState: AuctionState;
   highlightTeamEntryId?: string;
 }) {
-  const { state, connected } = useAuctionSocket(initialState.id, initialState);
+  const { state, connected, lastSale } = useAuctionSocket(initialState.id, initialState);
   const onClock = state.players.find((p) => p.status === "IN_BIDDING");
   const myTeam = highlightTeamEntryId
     ? state.teams.find((t) => t.id === highlightTeamEntryId)
@@ -26,6 +27,7 @@ export function LiveAuctionView({
 
   return (
     <div className="flex flex-col gap-8">
+      <SaleAnnouncement sale={lastSale} />
       <p className="text-xs text-black/50 dark:text-white/50">
         {connected ? "Live" : "Connecting…"} &middot; auction status: {state.status}
       </p>

@@ -8,6 +8,7 @@ import { useAuctionSocket } from "@/hooks/useAuctionSocket";
 import { TeamBudgetBoard } from "@/components/auction/TeamBudgetBoard";
 import { SoldTicker } from "@/components/auction/SoldTicker";
 import { OnClockCard } from "@/components/auction/OnClockCard";
+import { SaleAnnouncement } from "@/components/auction/SaleAnnouncement";
 import {
   selectNextPlayerAction,
   recordSaleAction,
@@ -19,9 +20,18 @@ import { resetAuctionAction } from "@/lib/actions/auction.actions";
 import { card, cardInteractive, buttonPrimary, buttonSecondary, buttonDanger, inputClass, tabsTrack, tabItem } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 
+// "Abdulqadir Zumkhawala" -> "Abdulqadir Z." — keeps allocation columns compact.
+function shortName(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length < 2) return fullName;
+  const first = parts[0];
+  const lastInitial = parts[parts.length - 1][0];
+  return `${first} ${lastInitial}.`;
+}
+
 export function AuctioneerConsole({ initialState }: { initialState: AuctionState }) {
   const router = useRouter();
-  const { state, connected } = useAuctionSocket(initialState.id, initialState);
+  const { state, connected, lastSale } = useAuctionSocket(initialState.id, initialState);
   const [selectedTeamId, setSelectedTeamId] = useState("");
   const [price, setPrice] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -35,7 +45,15 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
   const soldCount = state.players.filter((p) => p.status === "SOLD").length;
   const teamsWithRoom = state.teams.filter((t) => t.slotsFilled < t.slotsTotal).length;
 
-  const categories = Array.from(new Set(state.players.map((p) => p.categoryName))).sort();
+  const categoryBasePrices = new Map<string, number>();
+  for (const p of state.players) {
+    if (!categoryBasePrices.has(p.categoryName)) {
+      categoryBasePrices.set(p.categoryName, Number(p.basePrice));
+    }
+  }
+  const categories = Array.from(categoryBasePrices.keys()).sort(
+    (a, b) => (categoryBasePrices.get(b) ?? 0) - (categoryBasePrices.get(a) ?? 0)
+  );
   const [activeCategory, setActiveCategory] = useState<string>(categories[0] ?? "");
   const visibleQueue = queue.filter((p) => p.categoryName === activeCategory);
 
@@ -221,6 +239,7 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
 
   return (
     <div className="flex flex-col gap-6">
+      <SaleAnnouncement sale={lastSale} />
       <div className="flex items-center gap-2 text-xs">
         <Badge variant={connected ? "success" : "warning"}>{connected ? "Live" : "Connecting…"}</Badge>
       </div>
@@ -385,8 +404,8 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
                       <ul className="flex flex-col gap-1.5">
                         {teamPlayers.map((p) => (
                           <li key={p.id} className="flex items-center justify-between gap-2 text-sm">
-                            <span className="truncate">
-                              {p.name}{" "}
+                            <span className="truncate" title={p.name}>
+                              {shortName(p.name)}{" "}
                               <span className="text-black/50 dark:text-white/50">
                                 ({p.soldPrice})
                               </span>
@@ -394,9 +413,20 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
                             <button
                               onClick={() => handleRemove(p.id, p.name, p.soldToTeamName)}
                               disabled={loading}
-                              className={`${buttonDanger} px-2 py-1 text-xs shrink-0`}
+                              aria-label={`Remove ${p.name} and return to pool`}
+                              title="Remove from team and return to pool"
+                              className={`${buttonDanger} p-1 shrink-0`}
                             >
-                              Remove
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth={2}
+                                className="h-3.5 w-3.5"
+                              >
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                              </svg>
                             </button>
                           </li>
                         ))}

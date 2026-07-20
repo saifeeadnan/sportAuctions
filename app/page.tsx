@@ -1,6 +1,6 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { auth } from "@/auth";
-import { AdminDashboard } from "@/components/admin/AdminDashboard";
 import { LandingHero } from "@/components/LandingHero";
 
 const roleLinks: Record<string, { href: string; label: string }[]> = {
@@ -9,11 +9,7 @@ const roleLinks: Record<string, { href: string; label: string }[]> = {
   VIEWER: [{ href: "/viewer", label: "Watch an auction" }],
 };
 
-export default async function Home({
-  searchParams,
-}: {
-  searchParams: Promise<{ section?: string; role?: string }>;
-}) {
+export default async function Home() {
   const session = await auth();
 
   if (!session?.user) {
@@ -21,11 +17,7 @@ export default async function Home({
   }
 
   if (session.user.role === "ADMIN") {
-    return (
-      <div className="mx-auto max-w-4xl px-4 py-8">
-        <AdminDashboard searchParams={await searchParams} />
-      </div>
-    );
+    redirect("/admin/rosters");
   }
 
   const links = roleLinks[session.user.role] ?? [];

@@ -12,7 +12,7 @@ export type CreateAuctionInput = {
   name: string;
   teamBudget: number;
   createdById: string;
-  categories: { name: string; basePrice: number }[];
+  categories: { name: string; basePrice: number; preAuctionEligible?: boolean }[];
   playerAssignments: { playerId: string; categoryName: string }[];
 };
 
@@ -68,7 +68,12 @@ export async function createAuction(input: CreateAuctionInput) {
     const createdCategories = await Promise.all(
       input.categories.map((c) =>
         tx.auctionCategory.create({
-          data: { auctionId: auction.id, name: c.name.trim(), basePrice: c.basePrice },
+          data: {
+            auctionId: auction.id,
+            name: c.name.trim(),
+            basePrice: c.basePrice,
+            preAuctionEligible: c.preAuctionEligible ?? true,
+          },
         })
       )
     );

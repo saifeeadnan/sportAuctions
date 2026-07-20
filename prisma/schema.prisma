@@ -168,11 +168,12 @@ model Auction {
 }
 
 model AuctionCategory {
-  id        String  @id @default(cuid())
-  auctionId String
-  auction   Auction @relation(fields: [auctionId], references: [id], onDelete: Cascade)
-  name      String
-  basePrice Decimal @db.Decimal(12, 2)
+  id                  String  @id @default(cuid())
+  auctionId           String
+  auction             Auction @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  name                String
+  basePrice           Decimal @db.Decimal(12, 2)
+  preAuctionEligible  Boolean @default(true)
 
   auctionPlayers AuctionPlayer[]
 

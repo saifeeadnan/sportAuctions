@@ -42,7 +42,7 @@ export default async function DraftPage({
 
   if (!entry || entry.team.managerId !== session!.user.id) notFound();
 
-  const [availablePlayers, lockedPlayerId, confirmedPlayers] = await Promise.all([
+  const [availablePlayersRaw, lockedPlayerId, confirmedPlayers] = await Promise.all([
     prisma.auctionPlayer.findMany({
       where: { auctionId: entry.auctionId, status: "AVAILABLE" },
       include: { player: true, category: true },
@@ -57,6 +57,12 @@ export default async function DraftPage({
       orderBy: { player: { name: "asc" } },
     }),
   ]);
+
+  // Categories can be marked live-bidding-only — exclude those from the draft
+  // pool, except the manager's own guaranteed self-pick, which is never gated.
+  const availablePlayers = availablePlayersRaw.filter(
+    (ap) => ap.category.preAuctionEligible || ap.id === lockedPlayerId
+  );
 
   const editable = entry.status === "PRE_AUCTION_DRAFTING" || entry.status === "PRE_AUCTION_SUBMITTED";
   const allocated = entry.status === "ALLOCATED_PRE_AUCTION";

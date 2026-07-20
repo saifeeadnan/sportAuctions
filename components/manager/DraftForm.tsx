@@ -45,7 +45,15 @@ export function DraftForm({
 
   const budget = Number(budgetRemaining);
 
-  const categories = Array.from(new Set(players.map((p) => p.categoryName)));
+  const basePriceByCategory = new Map<string, number>();
+  for (const p of players) {
+    if (!basePriceByCategory.has(p.categoryName)) {
+      basePriceByCategory.set(p.categoryName, Number(p.basePrice));
+    }
+  }
+  const categories = Array.from(basePriceByCategory.keys()).sort(
+    (a, b) => (basePriceByCategory.get(b) ?? 0) - (basePriceByCategory.get(a) ?? 0)
+  );
   const [activeCategory, setActiveCategory] = useState<string>(categories[0] ?? "");
 
   function toggle(id: string) {

@@ -15,9 +15,9 @@ export default async function NewAuctionPage({
   if (!tournament) notFound();
 
   return (
-    <div className="mx-auto max-w-3xl px-4 py-8">
+    <div>
       <h1 className="text-xl font-semibold mb-1">New auction</h1>
-      <p className="text-sm text-black/60 dark:text-white/60 mb-6">
+      <p className="text-sm text-black/60 dark:text-white/60 mb-4">
         {tournament.name} &middot; roster: {tournament.roster.name}
       </p>
       <NewAuctionForm

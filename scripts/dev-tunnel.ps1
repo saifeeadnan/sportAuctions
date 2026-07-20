@@ -91,7 +91,10 @@ if ((-not $tunnelOk) -or (-not $cloudflaredProc)) {
   } else {
     $updatedContent = $envContent.TrimEnd() + [Environment]::NewLine + $replacement + [Environment]::NewLine
   }
-  Set-Content -Path $envPath -Value $updatedContent -NoNewline -Encoding utf8
+  # Windows PowerShell's "utf8" encoding writes a BOM, which corrupts the
+  # first .env key for tools that parse it strictly (e.g. `tsx --env-file`).
+  # Write plain UTF-8 without a BOM instead.
+  [System.IO.File]::WriteAllText($envPath, $updatedContent, (New-Object System.Text.UTF8Encoding $false))
   $currentUrl = $newUrl
 } else {
   Write-Host ("Tunnel is already up at " + $currentUrl + " - leaving it alone.")

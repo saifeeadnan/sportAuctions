@@ -47,8 +47,9 @@ export async function submitDraft(teamAuctionEntryId: string, auctionPlayerIds: 
 
   // The manager's own player entry (matched by login ID) is always part of their draft
   // and can never be removed, even if the client omits it.
+  let selfId: string | null = null;
   if (entry.team.managerId) {
-    const selfId = await findManagerSelfAuctionPlayerId(entry.auctionId, entry.team.managerId);
+    selfId = await findManagerSelfAuctionPlayerId(entry.auctionId, entry.team.managerId);
     if (selfId) uniqueIds.add(selfId);
   }
 
@@ -62,12 +63,17 @@ export async function submitDraft(teamAuctionEntryId: string, auctionPlayerIds: 
 
   if (idsArray.length > 0) {
     const validPlayers = await prisma.auctionPlayer.findMany({
-      where: { id: { in: idsArray }, auctionId: entry.auctionId, status: "AVAILABLE" },
+      where: {
+        id: { in: idsArray },
+        auctionId: entry.auctionId,
+        status: "AVAILABLE",
+        OR: [{ category: { preAuctionEligible: true } }, { id: selfId ?? undefined }],
+      },
       include: { category: true },
     });
     if (validPlayers.length !== idsArray.length) {
       throw new ValidationError(
-        "One or more selected players are not available in this auction's pool"
+        "One or more selected players are not available for the pre-auction draft (their category may be live-bidding only)"
       );
     }
 

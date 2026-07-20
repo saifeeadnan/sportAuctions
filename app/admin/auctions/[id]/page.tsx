@@ -70,6 +70,7 @@ export default async function AuctionDetailPage({
                 <th className="py-2 pr-4">Category</th>
                 <th className="py-2 pr-4">Base price</th>
                 <th className="py-2 pr-4">Players</th>
+                <th className="py-2 pr-4">Pre-auction draft</th>
               </tr>
             </thead>
             <tbody>
@@ -78,6 +79,11 @@ export default async function AuctionDetailPage({
                   <td className="py-2 pr-4">{c.name}</td>
                   <td className="py-2 pr-4">{String(c.basePrice)}</td>
                   <td className="py-2 pr-4">{playerCountByCategory[c.id] ?? 0}</td>
+                  <td className="py-2 pr-4">
+                    <Badge variant={c.preAuctionEligible ? "success" : "neutral"}>
+                      {c.preAuctionEligible ? "Allowed" : "Live bidding only"}
+                    </Badge>
+                  </td>
                 </tr>
               ))}
             </tbody>

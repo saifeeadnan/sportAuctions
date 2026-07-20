@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createAuctionAction } from "@/lib/actions/auction.actions";
-import { card, buttonPrimary, inputClass } from "@/lib/ui";
+import { card, buttonPrimary, inputClass, tabsTrack, tabItem } from "@/lib/ui";
 
 type Player = {
   id: string;
@@ -11,7 +11,7 @@ type Player = {
   position: string | null;
   defaultCategory: string | null;
 };
-type Category = { name: string; basePrice: string };
+type Category = { name: string; basePrice: string; preAuctionEligible: boolean };
 
 export function NewAuctionForm({
   tournamentId,
@@ -23,11 +23,14 @@ export function NewAuctionForm({
   const router = useRouter();
   const [name, setName] = useState("");
   const [teamBudget, setTeamBudget] = useState("");
-  const [categories, setCategories] = useState<Category[]>([{ name: "", basePrice: "" }]);
+  const [categories, setCategories] = useState<Category[]>([
+    { name: "", basePrice: "", preAuctionEligible: true },
+  ]);
   const [assignments, setAssignments] = useState<Record<string, string>>({});
   const [overridden, setOverridden] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [activeFilter, setActiveFilter] = useState("All");
 
   const categoryNames = categories.map((c) => c.name.trim()).filter(Boolean);
 
@@ -49,19 +52,45 @@ export function NewAuctionForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categoryNames.join("|")]);
 
+  useEffect(() => {
+    if (
+      activeFilter !== "All" &&
+      activeFilter !== "Unassigned" &&
+      !categoryNames.includes(activeFilter)
+    ) {
+      setActiveFilter("All");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categoryNames.join("|")]);
+
+  const filterOptions = ["All", ...categoryNames, "Unassigned"];
+  const visiblePlayers = players.filter((p) => {
+    if (activeFilter === "All") return true;
+    if (activeFilter === "Unassigned") return !assignments[p.id];
+    return assignments[p.id] === activeFilter;
+  });
+
   function assignPlayer(playerId: string, categoryName: string) {
     setOverridden((prev) => new Set(prev).add(playerId));
     setAssignments((prev) => ({ ...prev, [playerId]: categoryName }));
   }
 
-  function updateCategory(index: number, field: keyof Category, value: string) {
+  function updateCategory(index: number, field: "name" | "basePrice", value: string) {
     setCategories((prev) =>
       prev.map((c, i) => (i === index ? { ...c, [field]: value } : c))
     );
   }
 
+  function toggleCategoryPreAuctionEligible(index: number) {
+    setCategories((prev) =>
+      prev.map((c, i) =>
+        i === index ? { ...c, preAuctionEligible: !c.preAuctionEligible } : c
+      )
+    );
+  }
+
   function addCategory() {
-    setCategories((prev) => [...prev, { name: "", basePrice: "" }]);
+    setCategories((prev) => [...prev, { name: "", basePrice: "", preAuctionEligible: true }]);
   }
 
   function removeCategory(index: number) {
@@ -97,7 +126,11 @@ export function NewAuctionForm({
         teamBudget: Number(teamBudget),
         categories: categories
           .filter((c) => c.name.trim())
-          .map((c) => ({ name: c.name.trim(), basePrice: Number(c.basePrice) })),
+          .map((c) => ({
+            name: c.name.trim(),
+            basePrice: Number(c.basePrice),
+            preAuctionEligible: c.preAuctionEligible,
+          })),
         playerAssignments,
       });
       router.push(`/admin/auctions/${result.auctionId}`);
@@ -109,113 +142,145 @@ export function NewAuctionForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-6">
-      <label className="flex flex-col gap-1 text-sm max-w-sm">
-        Auction name
-        <input
-          required
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          className={inputClass}
-        />
-      </label>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+      <div className={`${card} p-4 grid gap-4 sm:grid-cols-2`}>
+        <div className="flex flex-col gap-3">
+          <label className="flex flex-col gap-1 text-sm">
+            Auction name
+            <input
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className={inputClass}
+            />
+          </label>
 
-      <label className="flex flex-col gap-1 text-sm max-w-sm">
-        Team budget
-        <input
-          required
-          type="number"
-          min={1}
-          step="0.01"
-          value={teamBudget}
-          onChange={(e) => setTeamBudget(e.target.value)}
-          className={inputClass}
-        />
-      </label>
+          <label className="flex flex-col gap-1 text-sm">
+            Team budget
+            <input
+              required
+              type="number"
+              min={1}
+              step="0.01"
+              value={teamBudget}
+              onChange={(e) => setTeamBudget(e.target.value)}
+              className={inputClass}
+            />
+          </label>
+        </div>
 
-      <div>
-        <h2 className="text-sm font-medium mb-2">Categories &amp; base prices</h2>
-        <div className="flex flex-col gap-2">
-          {categories.map((cat, i) => (
-            <div key={i} className="flex gap-2 items-center max-w-md">
-              <input
-                placeholder="Category name (e.g. Icon)"
-                value={cat.name}
-                onChange={(e) => updateCategory(i, "name", e.target.value)}
-                className={`${inputClass} flex-1`}
-              />
-              <input
-                placeholder="Base price"
-                type="number"
-                min={1}
-                step="0.01"
-                value={cat.basePrice}
-                onChange={(e) => updateCategory(i, "basePrice", e.target.value)}
-                className={`${inputClass} w-32`}
-              />
-              {categories.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() => removeCategory(i)}
-                  className="text-sm text-red-600 dark:text-red-400 hover:underline"
+        <div>
+          <h2 className="text-sm font-medium mb-2">Categories &amp; base prices</h2>
+          <div className="flex flex-col gap-2">
+            {categories.map((cat, i) => (
+              <div key={i} className="flex flex-col gap-1">
+                <div className="flex gap-2 items-center">
+                  <input
+                    placeholder="Category name (e.g. Icon)"
+                    value={cat.name}
+                    onChange={(e) => updateCategory(i, "name", e.target.value)}
+                    className={`${inputClass} flex-1`}
+                  />
+                  <input
+                    placeholder="Base price"
+                    type="number"
+                    min={1}
+                    step="0.01"
+                    value={cat.basePrice}
+                    onChange={(e) => updateCategory(i, "basePrice", e.target.value)}
+                    className={`${inputClass} w-28`}
+                  />
+                  {categories.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeCategory(i)}
+                      className="text-sm text-red-600 dark:text-red-400 hover:underline"
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+                <label
+                  className="flex items-center gap-1.5 text-xs text-black/60 dark:text-white/60"
+                  title="If unchecked, players in this category can only be won through live bidding, not the pre-auction draft"
                 >
-                  Remove
-                </button>
-              )}
-            </div>
-          ))}
-          <button
-            type="button"
-            onClick={addCategory}
-            className="self-start text-sm underline underline-offset-2"
-          >
-            + Add category
-          </button>
+                  <input
+                    type="checkbox"
+                    checked={cat.preAuctionEligible}
+                    onChange={() => toggleCategoryPreAuctionEligible(i)}
+                  />
+                  Allow pre-auction draft picks
+                </label>
+              </div>
+            ))}
+            <button
+              type="button"
+              onClick={addCategory}
+              className="self-start text-sm underline underline-offset-2"
+            >
+              + Add category
+            </button>
+          </div>
         </div>
       </div>
 
       <div>
-        <h2 className="text-sm font-medium mb-2">
-          Player pool ({players.length} in roster)
-        </h2>
-        <p className="text-xs text-black/50 dark:text-white/50 mb-2">
-          Categories are pre-filled from each player&apos;s default category once you&apos;ve
-          created a matching category below — override any player individually as needed.
-        </p>
-        <div className={`${card} overflow-x-auto`}>
-          <table className="w-full text-sm border-collapse">
-            <thead>
-              <tr className="text-left border-b border-black/10 dark:border-white/10">
-                <th className="py-2 pl-4 pr-4">Player</th>
-                <th className="py-2 pr-4">Position</th>
-                <th className="py-2 pr-4">Default category</th>
-                <th className="py-2 pr-4">Category</th>
-              </tr>
-            </thead>
-            <tbody>
-              {players.map((p) => (
-                <tr key={p.id} className="border-b border-black/5 dark:border-white/5 last:border-0">
-                  <td className="py-2 pl-4 pr-4">{p.name}</td>
-                  <td className="py-2 pr-4">{p.position ?? "—"}</td>
-                  <td className="py-2 pr-4">{p.defaultCategory ?? "—"}</td>
-                  <td className="py-2 pr-4">
-                    <select
-                      value={assignments[p.id] ?? ""}
-                      onChange={(e) => assignPlayer(p.id, e.target.value)}
-                      className={`${inputClass} py-1`}
-                    >
-                      <option value="">— Exclude —</option>
-                      {categoryNames.map((name) => (
-                        <option key={name} value={name}>
-                          {name}
-                        </option>
-                      ))}
-                    </select>
-                  </td>
+        <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
+          <h2 className="text-sm font-medium">Player pool ({players.length})</h2>
+          <div className={tabsTrack}>
+            {filterOptions.map((opt) => (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => setActiveFilter(opt)}
+                className={tabItem(activeFilter === opt)}
+              >
+                {opt}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className={`${card} overflow-hidden`}>
+          <div className="max-h-[380px] overflow-y-auto overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="text-left border-b border-black/10 dark:border-white/10 sticky top-0 bg-white/95 dark:bg-black/70 backdrop-blur-sm">
+                  <th className="py-2 pl-4 pr-4">Player</th>
+                  <th className="py-2 pr-4">Position</th>
+                  <th className="py-2 pr-4">Category</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {visiblePlayers.map((p) => (
+                  <tr key={p.id} className="border-b border-black/5 dark:border-white/5 last:border-0">
+                    <td className="py-1.5 pl-4 pr-4">{p.name}</td>
+                    <td className="py-1.5 pr-4">{p.position ?? "—"}</td>
+                    <td className="py-1.5 pr-4">
+                      <select
+                        value={assignments[p.id] ?? ""}
+                        onChange={(e) => assignPlayer(p.id, e.target.value)}
+                        className={`${inputClass} py-1`}
+                      >
+                        <option value="">— Exclude —</option>
+                        {categoryNames.map((name) => (
+                          <option key={name} value={name}>
+                            {name}
+                          </option>
+                        ))}
+                      </select>
+                    </td>
+                  </tr>
+                ))}
+                {visiblePlayers.length === 0 && (
+                  <tr>
+                    <td colSpan={3} className="py-4 text-center text-black/50 dark:text-white/50">
+                      No players in this view.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
