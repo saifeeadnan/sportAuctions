@@ -6,12 +6,14 @@ import { resolveOverlaps } from "@/lib/services/overlapResolution.service";
 import { findManagerSelfAuctionPlayerId } from "@/lib/services/preAuctionDraft.service";
 import { getAuctionState } from "@/lib/services/auctionState.service";
 import { emitAuctionEvent } from "@/server/ws/broadcaster";
+import { type AuctionType, IMPLEMENTED_AUCTION_TYPES, AUCTION_TYPE_LABELS } from "@/lib/auctionTypes";
 
 export type CreateAuctionInput = {
   tournamentId: string;
   name: string;
   teamBudget: number;
   createdById: string;
+  auctionType?: AuctionType;
   categories: { name: string; basePrice: number; preAuctionEligible?: boolean }[];
   playerAssignments: { playerId: string; categoryName: string }[];
 };
@@ -20,6 +22,13 @@ export async function createAuction(input: CreateAuctionInput) {
   if (!input.name.trim()) throw new ValidationError("Auction name is required");
   if (input.teamBudget <= 0) throw new ValidationError("Team budget must be greater than 0");
   if (input.categories.length === 0) throw new ValidationError("At least one category is required");
+
+  const auctionType = input.auctionType ?? "LIVE";
+  if (!IMPLEMENTED_AUCTION_TYPES.includes(auctionType)) {
+    throw new ValidationError(
+      `${AUCTION_TYPE_LABELS[auctionType]} isn't supported yet — choose Live Auction`
+    );
+  }
 
   const categoryNames = new Set(input.categories.map((c) => c.name.trim()));
   if (categoryNames.size !== input.categories.length) {
@@ -61,6 +70,7 @@ export async function createAuction(input: CreateAuctionInput) {
         tournamentId: input.tournamentId,
         name: input.name.trim(),
         teamBudget: input.teamBudget,
+        auctionType,
         createdById: input.createdById,
       },
     });

@@ -7,7 +7,7 @@ import { SoldTicker } from "@/components/auction/SoldTicker";
 import { OnClockCard } from "@/components/auction/OnClockCard";
 import { SaleAnnouncement } from "@/components/auction/SaleAnnouncement";
 import { TeamStrengthSummary } from "@/components/manager/TeamStrengthSummary";
-import { ConfirmedRosterTable } from "@/components/roster/ConfirmedRosterTable";
+import { RosterRibbon } from "@/components/roster/RosterRibbon";
 
 export function LiveAuctionView({
   initialState,
@@ -34,29 +34,14 @@ export function LiveAuctionView({
 
       {myTeam ? (
         <>
-          <section className="rounded border border-black/20 dark:border-white/20 px-4 py-3 flex flex-col gap-2">
-            <p className="font-medium">{myTeam.teamName} (your team)</p>
-            <p className="text-sm text-black/60 dark:text-white/60">
-              Budget remaining: {myTeam.budgetRemaining} &middot; Slots: {myTeam.slotsFilled}/
-              {myTeam.slotsTotal}
-            </p>
-            <TeamStrengthSummary players={myPlayers} />
-          </section>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <section>
-              <h2 className="text-lg font-medium mb-3">Your roster</h2>
-              <ConfirmedRosterTable
-                players={myPlayers
-                  .filter((p) => p.status === "SOLD")
-                  .map((p) => ({
-                    id: p.id,
-                    playerName: p.name,
-                    categoryName: p.categoryName,
-                    soldPrice: p.soldPrice,
-                    soldVia: p.soldVia,
-                  }))}
-              />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <section className="rounded border border-black/20 dark:border-white/20 px-4 py-3 flex flex-col gap-2">
+              <p className="font-medium">{myTeam.teamName} (your team)</p>
+              <p className="text-sm text-black/60 dark:text-white/60">
+                Budget remaining: {myTeam.budgetRemaining} &middot; Slots: {myTeam.slotsFilled}/
+                {myTeam.slotsTotal}
+              </p>
+              <TeamStrengthSummary players={myPlayers} />
             </section>
 
             <section>
@@ -64,6 +49,22 @@ export function LiveAuctionView({
               <OnClockCard player={onClock} photoWidth={200} photoHeight={300} />
             </section>
           </div>
+
+          <section>
+            <h2 className="text-lg font-medium mb-3">Your roster</h2>
+            <RosterRibbon
+              grid
+              players={myPlayers
+                .filter((p) => p.status === "SOLD")
+                .map((p) => ({
+                  id: p.id,
+                  playerName: p.name,
+                  photoUrl: p.photoUrl,
+                  position: p.position,
+                  soldPrice: p.soldPrice,
+                }))}
+            />
+          </section>
         </>
       ) : (
         <>

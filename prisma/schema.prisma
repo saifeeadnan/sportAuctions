@@ -31,6 +31,12 @@ enum AuctionStatus {
   COMPLETED
 }
 
+enum AuctionType {
+  LIVE
+  SILENT
+  FIXED_PRICE
+}
+
 enum AuctionPlayerStatus {
   AVAILABLE
   IN_PRE_AUCTION_POOL
@@ -153,6 +159,7 @@ model Auction {
   name         String
   teamBudget   Decimal       @db.Decimal(12, 2)
   status       AuctionStatus @default(CREATED)
+  auctionType  AuctionType   @default(LIVE)
   createdById  String
   createdBy    User          @relation(fields: [createdById], references: [id])
   createdAt    DateTime      @default(now())

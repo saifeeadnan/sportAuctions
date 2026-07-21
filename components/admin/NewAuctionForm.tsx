@@ -4,6 +4,12 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createAuctionAction } from "@/lib/actions/auction.actions";
 import { card, buttonPrimary, inputClass, tabsTrack, tabItem } from "@/lib/ui";
+import {
+  AUCTION_TYPES,
+  AUCTION_TYPE_LABELS,
+  IMPLEMENTED_AUCTION_TYPES,
+  type AuctionType,
+} from "@/lib/auctionTypes";
 
 type Player = {
   id: string;
@@ -23,6 +29,7 @@ export function NewAuctionForm({
   const router = useRouter();
   const [name, setName] = useState("");
   const [teamBudget, setTeamBudget] = useState("");
+  const [auctionType, setAuctionType] = useState<AuctionType>("LIVE");
   const [categories, setCategories] = useState<Category[]>([
     { name: "", basePrice: "", preAuctionEligible: true },
   ]);
@@ -62,6 +69,8 @@ export function NewAuctionForm({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [categoryNames.join("|")]);
+
+  const auctionTypeUnsupported = !IMPLEMENTED_AUCTION_TYPES.includes(auctionType);
 
   const filterOptions = ["All", ...categoryNames, "Unassigned"];
   const visiblePlayers = players.filter((p) => {
@@ -124,6 +133,7 @@ export function NewAuctionForm({
         tournamentId,
         name,
         teamBudget: Number(teamBudget),
+        auctionType,
         categories: categories
           .filter((c) => c.name.trim())
           .map((c) => ({
@@ -166,6 +176,28 @@ export function NewAuctionForm({
               onChange={(e) => setTeamBudget(e.target.value)}
               className={inputClass}
             />
+          </label>
+
+          <label className="flex flex-col gap-1 text-sm">
+            Auction type
+            <select
+              value={auctionType}
+              onChange={(e) => setAuctionType(e.target.value as AuctionType)}
+              className={inputClass}
+            >
+              {AUCTION_TYPES.map((type) => (
+                <option key={type} value={type}>
+                  {AUCTION_TYPE_LABELS[type]}
+                  {IMPLEMENTED_AUCTION_TYPES.includes(type) ? "" : " (coming soon)"}
+                </option>
+              ))}
+            </select>
+            {auctionTypeUnsupported && (
+              <span className="text-xs text-amber-700 dark:text-amber-400">
+                {AUCTION_TYPE_LABELS[auctionType]} isn&apos;t implemented yet — switch to Live
+                Auction to continue.
+              </span>
+            )}
           </label>
         </div>
 
@@ -286,7 +318,11 @@ export function NewAuctionForm({
 
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
-      <button type="submit" disabled={loading} className={`${buttonPrimary} self-start`}>
+      <button
+        type="submit"
+        disabled={loading || auctionTypeUnsupported}
+        className={`${buttonPrimary} self-start`}
+      >
         {loading ? "Creating…" : "Create auction"}
       </button>
     </form>

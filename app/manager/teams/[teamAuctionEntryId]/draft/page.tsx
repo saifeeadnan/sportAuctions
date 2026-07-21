@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { DraftForm } from "@/components/manager/DraftForm";
 import { TeamStrengthSummary } from "@/components/manager/TeamStrengthSummary";
 import { findManagerSelfAuctionPlayerId } from "@/lib/services/preAuctionDraft.service";
-import { ConfirmedRosterTable } from "@/components/roster/ConfirmedRosterTable";
+import { RosterRibbon } from "@/components/roster/RosterRibbon";
 import type { RatedPlayer } from "@/lib/teamStrength";
 
 function toRatedPlayer(player: {
@@ -84,13 +84,13 @@ export default async function DraftPage({
         <h2 className="text-lg font-medium mb-3">
           Your confirmed roster so far ({confirmedPlayers.length})
         </h2>
-        <ConfirmedRosterTable
+        <RosterRibbon
           players={confirmedPlayers.map((ap) => ({
             id: ap.id,
             playerName: ap.player.name,
-            categoryName: ap.category.name,
+            photoUrl: ap.player.photoUrl,
+            position: ap.player.position,
             soldPrice: ap.soldPrice != null ? String(ap.soldPrice) : null,
-            soldVia: ap.soldVia,
           }))}
         />
       </section>

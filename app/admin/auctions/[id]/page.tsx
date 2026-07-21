@@ -5,6 +5,7 @@ import { openPreAuctionAction, startBiddingAction } from "@/lib/actions/auction.
 import { AssignPlayerForm } from "@/components/admin/AssignPlayerForm";
 import { card, cardInteractive, buttonPrimary, buttonSecondary } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
+import { AUCTION_TYPE_LABELS } from "@/lib/auctionTypes";
 
 const ENTRY_STATUS_VARIANT: Record<string, "neutral" | "info" | "success" | "warning"> = {
   AUCTION_LIVE: "info",
@@ -48,8 +49,8 @@ export default async function AuctionDetailPage({
       <div>
         <h1 className="text-xl font-semibold mb-1">{auction.name}</h1>
         <p className="text-sm text-black/60 dark:text-white/60">
-          {auction.tournament.name} &middot; status: {auction.status} &middot; team budget:{" "}
-          {String(auction.teamBudget)}
+          {auction.tournament.name} &middot; {AUCTION_TYPE_LABELS[auction.auctionType]} &middot;
+          status: {auction.status} &middot; team budget: {String(auction.teamBudget)}
         </p>
         <p className="text-sm text-black/60 dark:text-white/60">
           Player pool ({auction.auctionPlayers.length}):{" "}
