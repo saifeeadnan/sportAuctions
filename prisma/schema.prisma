@@ -73,6 +73,7 @@ model User {
   managedTeams       Team[]
   createdTournaments Tournament[]
   createdAuctions    Auction[]
+  fantasyTeams       FantasyTeam[]
 
   @@map("users")
 }
@@ -169,6 +170,7 @@ model Auction {
   categories     AuctionCategory[]
   auctionPlayers AuctionPlayer[]
   entries        TeamAuctionEntry[]
+  fantasyTeams   FantasyTeam[]
 
   @@index([tournamentId])
   @@map("auctions")
@@ -203,12 +205,41 @@ model AuctionPlayer {
   soldPrice     Decimal?            @db.Decimal(12, 2)
   soldAt        DateTime?
   biddingOrder  Int?
+  points        Decimal?            @db.Decimal(10, 2)
 
-  draftPicks PreAuctionSubmission[]
+  draftPicks   PreAuctionSubmission[]
+  fantasyPicks FantasyTeamPlayer[]
 
   @@unique([auctionId, playerId])
   @@index([auctionId, status])
   @@map("auction_players")
+}
+
+model FantasyTeam {
+  id        String   @id @default(cuid())
+  auctionId String
+  auction   Auction  @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  picks FantasyTeamPlayer[]
+
+  @@unique([auctionId, userId])
+  @@map("fantasy_teams")
+}
+
+model FantasyTeamPlayer {
+  id              String        @id @default(cuid())
+  fantasyTeamId   String
+  fantasyTeam     FantasyTeam   @relation(fields: [fantasyTeamId], references: [id], onDelete: Cascade)
+  auctionPlayerId String
+  auctionPlayer   AuctionPlayer @relation(fields: [auctionPlayerId], references: [id])
+  price           Decimal       @db.Decimal(12, 2)
+
+  @@unique([fantasyTeamId, auctionPlayerId])
+  @@index([fantasyTeamId])
+  @@map("fantasy_team_players")
 }
 
 model TeamAuctionEntry {

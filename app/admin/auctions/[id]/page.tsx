@@ -199,9 +199,14 @@ export default async function AuctionDetailPage({
         )}
 
         {auction.status === "COMPLETED" && (
-          <Link href={`/admin/auctions/${auction.id}/results`} className={buttonSecondary}>
-            View results
-          </Link>
+          <>
+            <Link href={`/admin/auctions/${auction.id}/results`} className={buttonSecondary}>
+              View results
+            </Link>
+            <Link href={`/admin/auctions/${auction.id}/fantasy-teams`} className={buttonSecondary}>
+              Fantasy teams
+            </Link>
+          </>
         )}
       </section>
     </div>

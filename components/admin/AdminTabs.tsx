@@ -10,12 +10,22 @@ export function AdminTabs() {
   const tabs = [
     { href: "/admin/rosters", label: "Player rosters" },
     { href: "/admin/tournaments", label: "Tournaments" },
+    { href: "/admin/fantasy-teams", label: "Fantasy Teams" },
     { href: "/admin/users", label: "Users" },
   ];
 
   function isActive(href: string) {
+    const isFantasyTeamsPage =
+      pathname.startsWith("/admin/fantasy-teams") || pathname.endsWith("/fantasy-teams");
+
+    if (href === "/admin/fantasy-teams") {
+      return isFantasyTeamsPage;
+    }
     if (href === "/admin/tournaments") {
-      return pathname.startsWith("/admin/tournaments") || pathname.startsWith("/admin/auctions");
+      return (
+        (pathname.startsWith("/admin/tournaments") || pathname.startsWith("/admin/auctions")) &&
+        !isFantasyTeamsPage
+      );
     }
     return pathname.startsWith(href);
   }
