@@ -6,6 +6,7 @@ import {
   SquadCapExceededError,
   InvalidStateTransitionError,
 } from "@/lib/errors";
+import { computeTeamStrength, type RatedPlayer } from "@/lib/teamStrength";
 
 /** The price a fantasy pick costs: what it actually sold for, or its category
  * base price if it went unsold — the real auction's outcome either way. */
@@ -92,6 +93,54 @@ export async function listFantasyTeamsForAuction(auctionId: string) {
     },
     orderBy: { createdAt: "asc" },
   });
+}
+
+function toRatedPlayer(player: {
+  position: string | null;
+  rating: unknown;
+  battingRating: unknown;
+  bowlingRating: unknown;
+  fieldingRating: unknown;
+}): RatedPlayer {
+  return {
+    position: player.position,
+    rating: player.rating != null ? String(player.rating) : null,
+    battingRating: player.battingRating != null ? String(player.battingRating) : null,
+    bowlingRating: player.bowlingRating != null ? String(player.bowlingRating) : null,
+    fieldingRating: player.fieldingRating != null ? String(player.fieldingRating) : null,
+  };
+}
+
+/**
+ * Ranks every fantasy team submitted for an auction — by total points once the
+ * admin has uploaded them, or by computed team strength in the meantime — so
+ * both the admin overview and a viewer's own team page show the same standing.
+ */
+export async function getFantasyStandings(auctionId: string) {
+  const [fantasyTeams, pointsUploadedCount] = await Promise.all([
+    listFantasyTeamsForAuction(auctionId),
+    prisma.auctionPlayer.count({ where: { auctionId, points: { not: null } } }),
+  ]);
+  const hasPoints = pointsUploadedCount > 0;
+
+  const unranked = fantasyTeams.map((team) => {
+    const strength = computeTeamStrength(team.picks.map((p) => toRatedPlayer(p.auctionPlayer.player)));
+    const totalSpend = team.picks.reduce((sum, p) => sum + Number(p.price), 0);
+    const totalPoints = team.picks.reduce(
+      (sum, p) => sum + (p.auctionPlayer.points != null ? Number(p.auctionPlayer.points) : 0),
+      0
+    );
+    const selfPick = team.picks.find(
+      (p) => p.auctionPlayer.player.loginId?.toLowerCase() === team.user.loginId?.toLowerCase()
+    );
+    return { team, strength, totalSpend, totalPoints, selfAuctionPlayerId: selfPick?.auctionPlayerId };
+  });
+
+  const standings = unranked
+    .sort((a, b) => (hasPoints ? b.totalPoints - a.totalPoints : b.strength.teamStrength - a.strength.teamStrength))
+    .map((s, i) => ({ ...s, rank: i + 1 }));
+
+  return { hasPoints, standings };
 }
 
 export async function deleteFantasyTeam(fantasyTeamId: string) {

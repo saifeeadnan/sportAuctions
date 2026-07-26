@@ -2,28 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
-import { listFantasyTeamsForAuction } from "@/lib/services/fantasyTeam.service";
-import { computeTeamStrength, type RatedPlayer } from "@/lib/teamStrength";
+import { getFantasyStandings } from "@/lib/services/fantasyTeam.service";
 import { RosterRibbon } from "@/components/roster/RosterRibbon";
 import { DeleteFantasyTeamButton } from "@/components/admin/DeleteFantasyTeamButton";
 import { UploadPointsForm } from "@/components/admin/UploadPointsForm";
 import { card } from "@/lib/ui";
-
-function toRatedPlayer(player: {
-  position: string | null;
-  rating: unknown;
-  battingRating: unknown;
-  bowlingRating: unknown;
-  fieldingRating: unknown;
-}): RatedPlayer {
-  return {
-    position: player.position,
-    rating: player.rating != null ? String(player.rating) : null,
-    battingRating: player.battingRating != null ? String(player.battingRating) : null,
-    bowlingRating: player.bowlingRating != null ? String(player.bowlingRating) : null,
-    fieldingRating: player.fieldingRating != null ? String(player.fieldingRating) : null,
-  };
-}
 
 export default async function FantasyTeamsPage({
   params,
@@ -40,42 +23,14 @@ export default async function FantasyTeamsPage({
   if (!auction) notFound();
   assertInScope(leagueId, auction.tournament.leagueId);
 
-  const [fantasyTeams, pointsUploadedCount] = await Promise.all([
-    listFantasyTeamsForAuction(id),
-    prisma.auctionPlayer.count({ where: { auctionId: id, points: { not: null } } }),
-  ]);
-  const hasPoints = pointsUploadedCount > 0;
-
-  const ranked = fantasyTeams
-    .map((team) => {
-      const strength = computeTeamStrength(team.picks.map((p) => toRatedPlayer(p.auctionPlayer.player)));
-      const totalSpend = team.picks.reduce((sum, p) => sum + Number(p.price), 0);
-      const totalPoints = team.picks.reduce(
-        (sum, p) => sum + (p.auctionPlayer.points != null ? Number(p.auctionPlayer.points) : 0),
-        0
-      );
-      const selfPick = team.picks.find(
-        (p) =>
-          p.auctionPlayer.player.loginId?.toLowerCase() === team.user.loginId?.toLowerCase()
-      );
-      return {
-        team,
-        strength,
-        totalSpend,
-        totalPoints,
-        selfAuctionPlayerId: selfPick?.auctionPlayerId,
-      };
-    })
-    .sort((a, b) =>
-      hasPoints ? b.totalPoints - a.totalPoints : b.strength.teamStrength - a.strength.teamStrength
-    );
+  const { hasPoints, standings } = await getFantasyStandings(id);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 flex flex-col gap-6">
       <div>
         <h1 className="text-xl font-semibold mb-1">Fantasy teams</h1>
         <p className="text-sm text-black/60 dark:text-white/60">
-          {auction.tournament.name} &middot; {auction.name} &middot; {fantasyTeams.length}{" "}
+          {auction.tournament.name} &middot; {auction.name} &middot; {standings.length}{" "}
           submitted
         </p>
       </div>
@@ -87,7 +42,7 @@ export default async function FantasyTeamsPage({
         <UploadPointsForm auctionId={auction.id} />
       </details>
 
-      {ranked.length === 0 ? (
+      {standings.length === 0 ? (
         <p className="text-black/60 dark:text-white/60">
           No fantasy teams have been submitted for this auction yet.
         </p>
@@ -98,11 +53,11 @@ export default async function FantasyTeamsPage({
               ? "Ranked by total points."
               : "Points haven't been uploaded yet — ranked by team strength in the meantime."}
           </p>
-          {ranked.map(({ team, strength, totalSpend, totalPoints, selfAuctionPlayerId }, i) => (
+          {standings.map(({ team, strength, totalSpend, totalPoints, selfAuctionPlayerId, rank }) => (
             <details key={team.id} className={card}>
               <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium flex items-center justify-between gap-3 flex-wrap">
                 <span>
-                  #{i + 1} &middot; {team.user.name}{" "}
+                  #{rank} &middot; {team.user.name}{" "}
                   <span className="text-black/50 dark:text-white/50">
                     ({team.user.loginId})
                   </span>

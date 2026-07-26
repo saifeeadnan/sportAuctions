@@ -3,11 +3,14 @@ import { requireRole, scopeLeagueId } from "@/lib/auth/guards";
 import {
   getFantasyEligibility,
   getFantasyTeam,
+  getFantasyStandings,
   listFantasyPlayerPool,
 } from "@/lib/services/fantasyTeam.service";
 import { FantasyTeamForm } from "@/components/viewer/FantasyTeamForm";
 import { RosterRibbon } from "@/components/roster/RosterRibbon";
 import { TeamStrengthSummary } from "@/components/manager/TeamStrengthSummary";
+import { Badge } from "@/components/ui/Badge";
+import { card } from "@/lib/ui";
 import type { RatedPlayer } from "@/lib/teamStrength";
 
 function toRatedPlayer(player: {
@@ -46,6 +49,8 @@ export default async function FantasyTeamPage({
 
   const { auction } = eligibility;
   const existingTeam = await getFantasyTeam(id, session.user.id);
+  const standings = existingTeam ? await getFantasyStandings(id) : null;
+  const myStanding = standings?.standings.find((s) => s.team.userId === session.user.id);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 flex flex-col gap-6">
@@ -63,6 +68,33 @@ export default async function FantasyTeamPage({
             Your fantasy team is locked in — {existingTeam.picks.length} player(s), total spend{" "}
             {existingTeam.picks.reduce((sum, p) => sum + Number(p.price), 0)}.
           </p>
+
+          {myStanding && standings && (
+            <div className={`${card} px-4 py-3 flex items-center justify-between gap-3 flex-wrap`}>
+              <div className="flex items-center gap-2">
+                <Badge variant="info">
+                  #{myStanding.rank} of {standings.standings.length}
+                </Badge>
+                <span className="text-sm text-black/60 dark:text-white/60">current standing</span>
+              </div>
+              <span className="text-sm text-black/60 dark:text-white/60">
+                {standings.hasPoints ? (
+                  <>
+                    <span className="font-medium text-indigo-600 dark:text-indigo-400">
+                      {myStanding.totalPoints} pts
+                    </span>{" "}
+                    &middot; strength {myStanding.strength.teamStrength.toFixed(1)}/10
+                  </>
+                ) : (
+                  <>
+                    Points not uploaded yet &middot; strength{" "}
+                    {myStanding.strength.teamStrength.toFixed(1)}/10
+                  </>
+                )}
+              </span>
+            </div>
+          )}
+
           <TeamStrengthSummary
             players={existingTeam.picks.map((p) => toRatedPlayer(p.auctionPlayer.player))}
           />
@@ -75,6 +107,7 @@ export default async function FantasyTeamPage({
               photoUrl: p.auctionPlayer.player.photoUrl,
               position: p.auctionPlayer.player.position,
               soldPrice: String(p.price),
+              points: p.auctionPlayer.points != null ? String(p.auctionPlayer.points) : null,
             }))}
           />
         </>
