@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { logoutAction } from "@/lib/actions/auth.actions";
 import { buttonSecondary } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
+import { LogoMark } from "@/components/ui/LogoMark";
 
 export async function Nav() {
   const session = await auth();
@@ -10,8 +11,9 @@ export async function Nav() {
   return (
     <header className="border-b border-black/[0.08] dark:border-white/10 bg-white/80 dark:bg-black/40 backdrop-blur-sm sticky top-0 z-10">
       <div className="mx-auto max-w-5xl flex items-center justify-between px-4 py-3">
-        <Link href="/" className="font-semibold tracking-tight">
-          Sports Auction
+        <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight text-[#1B2430] dark:text-white">
+          <LogoMark className="h-6 w-6" />
+          <span>LeagueForge</span>
         </Link>
         <div className="flex items-center gap-3 text-sm">
           {session?.user ? (

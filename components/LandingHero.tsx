@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { card, buttonPrimary } from "@/lib/ui";
+import { LogoMark } from "@/components/ui/LogoMark";
 
 const FEATURES: { title: string; description: string; icon: React.ReactNode }[] = [
   {
@@ -86,15 +87,15 @@ export function LandingHero() {
 
       <div className="mx-auto max-w-5xl px-4 pt-20 pb-24 sm:pt-28 sm:pb-32">
         <div className="text-center">
+          <LogoMark className="h-16 w-16 sm:h-20 sm:w-20 mx-auto mb-6 text-black dark:text-white" />
           <span className="inline-flex items-center rounded-full border border-indigo-500/20 bg-indigo-500/10 px-3 py-1 text-xs font-medium text-indigo-700 dark:text-indigo-300">
             Draft &middot; bid &middot; win — all in one place
           </span>
           <h1 className="mt-5 text-4xl sm:text-6xl font-bold tracking-tight">
-            <span className="bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 dark:from-indigo-400 dark:via-violet-400 dark:to-fuchsia-400 bg-clip-text text-transparent">
-              Sports Team
+            <span className="font-medium">League</span>
+            <span className="font-extrabold bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 dark:from-indigo-400 dark:via-violet-400 dark:to-fuchsia-400 bg-clip-text text-transparent">
+              Forge
             </span>
-            <br />
-            Player Auction
           </h1>
           <p className="mt-5 text-lg text-black/60 dark:text-white/60 max-w-2xl mx-auto">
             Upload rosters, run pre-auction drafts, and bid live — with budgets, squad slots, and

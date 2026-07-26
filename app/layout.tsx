@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Sports Auction",
-  description: "Sports team player auction platform",
+  title: "LeagueForge",
+  description: "Form leagues, run the auction, forge the team.",
 };
 
 export default function RootLayout({
