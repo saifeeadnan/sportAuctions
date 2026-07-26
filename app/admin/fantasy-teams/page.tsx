@@ -1,11 +1,16 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { requireAdminOrLeagueAdmin } from "@/lib/auth/guards";
+import { resolveAdminScope } from "@/lib/auth/scope";
 import { cardInteractive } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 
-export default async function AdminFantasyTeamsIndexPage() {
-  const { leagueId } = await requireAdminOrLeagueAdmin();
+export default async function AdminFantasyTeamsIndexPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ league?: string }>;
+}) {
+  const { league } = await searchParams;
+  const { leagueId } = await resolveAdminScope(league);
 
   const auctions = await prisma.auction.findMany({
     where: { status: "COMPLETED", tournament: leagueId ? { leagueId } : undefined },

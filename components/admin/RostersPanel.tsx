@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { requireAdminOrLeagueAdmin } from "@/lib/auth/guards";
+import { resolveAdminScope } from "@/lib/auth/scope";
 import { listLeagues } from "@/lib/services/league.service";
 import { DeleteRosterButton } from "@/components/admin/DeleteRosterButton";
 import { UploadRosterForm } from "@/components/roster/UploadRosterForm";
 import { card, cardInteractive } from "@/lib/ui";
 
-export async function RostersPanel() {
-  const { leagueId } = await requireAdminOrLeagueAdmin();
+export async function RostersPanel({ selectedLeagueId }: { selectedLeagueId?: string }) {
+  const { leagueId } = await resolveAdminScope(selectedLeagueId);
 
   const [rosters, leagues] = await Promise.all([
     prisma.playerRoster.findMany({

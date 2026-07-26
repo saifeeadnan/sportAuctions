@@ -1,19 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { tabsTrack, tabItem } from "@/lib/ui";
 
-export function AdminTabs({ showLeagues = false }: { showLeagues?: boolean }) {
-  const pathname = usePathname();
+const TABS = [
+  { href: "/admin/rosters", label: "Player rosters" },
+  { href: "/admin/tournaments", label: "Tournaments" },
+  { href: "/admin/fantasy-teams", label: "Fantasy Teams" },
+  { href: "/admin/users", label: "Users" },
+];
 
-  const tabs = [
-    { href: "/admin/rosters", label: "Player rosters" },
-    { href: "/admin/tournaments", label: "Tournaments" },
-    { href: "/admin/fantasy-teams", label: "Fantasy Teams" },
-    { href: "/admin/users", label: "Users" },
-    ...(showLeagues ? [{ href: "/admin/leagues", label: "Leagues" }] : []),
-  ];
+export function AdminTabs() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+
+  // Carries the sidebar's league filter (if any) across tab switches, so
+  // picking a league and then switching from Rosters to Users doesn't reset it.
+  const league = searchParams.get("league");
+  const withLeague = (href: string) => (league ? `${href}?league=${league}` : href);
 
   function isActive(href: string) {
     const isFantasyTeamsPage =
@@ -33,8 +38,8 @@ export function AdminTabs({ showLeagues = false }: { showLeagues?: boolean }) {
 
   return (
     <div className={`${tabsTrack} mb-6`}>
-      {tabs.map((tab) => (
-        <Link key={tab.href} href={tab.href} className={tabItem(isActive(tab.href))}>
+      {TABS.map((tab) => (
+        <Link key={tab.href} href={withLeague(tab.href)} className={tabItem(isActive(tab.href))}>
           {tab.label}
         </Link>
       ))}

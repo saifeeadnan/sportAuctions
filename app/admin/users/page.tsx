@@ -3,12 +3,16 @@ import { UsersPanel, resolveRoleTab } from "@/components/admin/UsersPanel";
 export default async function UsersPage({
   searchParams,
 }: {
-  searchParams: Promise<{ role?: string }>;
+  searchParams: Promise<{ role?: string; league?: string }>;
 }) {
-  const { role } = await searchParams;
+  const { role, league } = await searchParams;
   const activeRole = resolveRoleTab(role);
 
   return (
-    <UsersPanel activeRole={activeRole} roleHref={(r) => `/admin/users?role=${r}`} />
+    <UsersPanel
+      activeRole={activeRole}
+      roleHref={(r) => `/admin/users?role=${r}${league ? `&league=${league}` : ""}`}
+      selectedLeagueId={league}
+    />
   );
 }

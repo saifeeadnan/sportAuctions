@@ -25,22 +25,31 @@ export function resolveRoleTab(role?: string): RoleTab {
 export async function UsersPanel({
   activeRole,
   roleHref,
+  selectedLeagueId,
 }: {
   activeRole: RoleTab;
   roleHref: (role: RoleTab) => string;
+  selectedLeagueId?: string;
 }) {
-  const { session, leagueId } = await requireAdminOrLeagueAdmin();
+  const { session, leagueId: realLeagueId } = await requireAdminOrLeagueAdmin();
+  // The sidebar's league filter is a display convenience for a site Admin's
+  // (unrestricted) view — it must never be confused with the caller's actual
+  // authorization scope, which is what gates role creation/visibility below.
+  const displayLeagueId = realLeagueId !== null ? realLeagueId : selectedLeagueId || null;
 
   // A League Admin can only see/manage their own league's users, and can never
   // create or view another Admin or League Admin account.
   const visibleRoleTabs: RoleTab[] =
-    leagueId === null ? [...ROLES] : ROLES.filter((r) => r !== "ADMIN" && r !== "LEAGUE_ADMIN");
+    realLeagueId === null ? [...ROLES] : ROLES.filter((r) => r !== "ADMIN" && r !== "LEAGUE_ADMIN");
   const creatableRoles: RoleTab[] =
-    leagueId === null ? [...ROLES] : ROLES.filter((r) => r !== "ADMIN" && r !== "LEAGUE_ADMIN");
+    realLeagueId === null ? [...ROLES] : ROLES.filter((r) => r !== "ADMIN" && r !== "LEAGUE_ADMIN");
 
   const [allUsers, leagues] = await Promise.all([
-    prisma.user.findMany({ where: leagueId ? { leagueId } : {}, orderBy: { createdAt: "desc" } }),
-    leagueId ? Promise.resolve(null) : listLeagues(),
+    prisma.user.findMany({
+      where: displayLeagueId ? { leagueId: displayLeagueId } : {},
+      orderBy: { createdAt: "desc" },
+    }),
+    realLeagueId === null ? listLeagues() : Promise.resolve(null),
   ]);
 
   const counts = Object.fromEntries(
@@ -86,7 +95,11 @@ export async function UsersPanel({
           {leagues && (
             <label className="flex flex-col gap-1 text-sm">
               League (not used for Admin accounts)
-              <select name="leagueId" className={inputClass} defaultValue={leagues[0]?.id ?? ""}>
+              <select
+                name="leagueId"
+                className={inputClass}
+                defaultValue={displayLeagueId ?? leagues[0]?.id ?? ""}
+              >
                 {leagues.length === 0 && <option value="">— No leagues yet —</option>}
                 {leagues.map((l) => (
                   <option key={l.id} value={l.id}>

@@ -1,6 +1,20 @@
 import { prisma } from "@/lib/prisma";
 import { ValidationError } from "@/lib/errors";
-import { assertInScope } from "@/lib/auth/guards";
+import { assertInScope, requireAdminOrLeagueAdmin } from "@/lib/auth/guards";
+
+/**
+ * Resolves the effective league scope for an admin list view, honoring the
+ * sidebar's league switcher. A League Admin is always confined to their own
+ * league regardless of the URL — only a site Admin's (unrestricted) view can
+ * be narrowed this way, and it's a display filter, not a security boundary,
+ * so it must never be used in place of `requireAdminOrLeagueAdmin` for
+ * mutations or by-ID access checks.
+ */
+export async function resolveAdminScope(selectedLeagueId?: string) {
+  const { session, leagueId } = await requireAdminOrLeagueAdmin();
+  const effectiveLeagueId = leagueId !== null ? leagueId : selectedLeagueId || null;
+  return { session, leagueId: effectiveLeagueId };
+}
 
 export async function loadScopedRoster(rosterId: string, leagueId: string | null) {
   const roster = await prisma.playerRoster.findUnique({ where: { id: rosterId } });

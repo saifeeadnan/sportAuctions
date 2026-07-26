@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
-import { requireAdminOrLeagueAdmin } from "@/lib/auth/guards";
+import { resolveAdminScope } from "@/lib/auth/scope";
 import { DeleteTournamentButton } from "@/components/admin/DeleteTournamentButton";
 import { createTournamentAction } from "@/lib/actions/tournament.actions";
 import { card, cardInteractive, buttonPrimary, inputClass } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 
-export async function TournamentsPanel() {
-  const { leagueId } = await requireAdminOrLeagueAdmin();
+export async function TournamentsPanel({ selectedLeagueId }: { selectedLeagueId?: string }) {
+  const { leagueId } = await resolveAdminScope(selectedLeagueId);
 
   const [tournaments, rosters] = await Promise.all([
     prisma.tournament.findMany({
