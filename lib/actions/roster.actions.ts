@@ -2,7 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { requireRole } from "@/lib/auth/guards";
+import { requireAdminOrLeagueAdmin } from "@/lib/auth/guards";
+import { loadScopedRoster } from "@/lib/auth/scope";
 import {
   deleteRoster,
   createPlayer,
@@ -12,7 +13,8 @@ import {
 } from "@/lib/services/roster.service";
 
 export async function deleteRosterAction(rosterId: string) {
-  await requireRole("ADMIN");
+  const { leagueId } = await requireAdminOrLeagueAdmin();
+  await loadScopedRoster(rosterId, leagueId);
   await deleteRoster(rosterId);
   revalidatePath("/admin/rosters");
   revalidatePath("/");
@@ -46,7 +48,8 @@ function parsePlayerInput(formData: FormData): PlayerInput {
 }
 
 export async function createPlayerAction(rosterId: string, formData: FormData) {
-  await requireRole("ADMIN");
+  const { leagueId } = await requireAdminOrLeagueAdmin();
+  await loadScopedRoster(rosterId, leagueId);
   await createPlayer(rosterId, parsePlayerInput(formData));
   revalidatePath(`/admin/rosters/${rosterId}`);
 }
@@ -56,14 +59,16 @@ export async function updatePlayerAction(
   playerId: string,
   formData: FormData
 ) {
-  await requireRole("ADMIN");
+  const { leagueId } = await requireAdminOrLeagueAdmin();
+  await loadScopedRoster(rosterId, leagueId);
   await updatePlayer(playerId, parsePlayerInput(formData));
   revalidatePath(`/admin/rosters/${rosterId}`);
   redirect(`/admin/rosters/${rosterId}`);
 }
 
 export async function deletePlayerAction(rosterId: string, playerId: string) {
-  await requireRole("ADMIN");
+  const { leagueId } = await requireAdminOrLeagueAdmin();
+  await loadScopedRoster(rosterId, leagueId);
   await deletePlayer(playerId);
   revalidatePath(`/admin/rosters/${rosterId}`);
 }

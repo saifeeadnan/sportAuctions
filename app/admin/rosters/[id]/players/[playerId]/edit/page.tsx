@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
 import { updatePlayerAction } from "@/lib/actions/roster.actions";
 import { PlayerFormFields } from "@/components/roster/PlayerFormFields";
 import { card, buttonPrimary, buttonSecondary } from "@/lib/ui";
@@ -11,9 +12,14 @@ export default async function EditPlayerPage({
   params: Promise<{ id: string; playerId: string }>;
 }) {
   const { id, playerId } = await params;
+  const { leagueId } = await requireAdminOrLeagueAdmin();
 
-  const player = await prisma.player.findUnique({ where: { id: playerId } });
+  const player = await prisma.player.findUnique({
+    where: { id: playerId },
+    include: { roster: { select: { leagueId: true } } },
+  });
   if (!player || player.rosterId !== id) notFound();
+  assertInScope(leagueId, player.roster.leagueId);
 
   return (
     <div className="max-w-3xl">

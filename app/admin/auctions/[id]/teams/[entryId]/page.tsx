@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
 import { ConfirmedRosterTable } from "@/components/roster/ConfirmedRosterTable";
 import { DeleteDraftPickButton } from "@/components/admin/DeleteDraftPickButton";
 import { card } from "@/lib/ui";
@@ -12,12 +13,14 @@ export default async function TeamRosterPage({
   params: Promise<{ id: string; entryId: string }>;
 }) {
   const { id, entryId } = await params;
+  const { leagueId } = await requireAdminOrLeagueAdmin();
 
   const entry = await prisma.teamAuctionEntry.findUnique({
     where: { id: entryId },
     include: { team: true, auction: { include: { tournament: true } } },
   });
   if (!entry || entry.auctionId !== id) notFound();
+  assertInScope(leagueId, entry.auction.tournament.leagueId);
 
   const [confirmedPlayers, draftPicks] = await Promise.all([
     prisma.auctionPlayer.findMany({

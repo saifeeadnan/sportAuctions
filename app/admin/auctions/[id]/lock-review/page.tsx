@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
 import { lockPreAuctionAction } from "@/lib/actions/auction.actions";
 import { card, buttonPrimary, buttonSecondary } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
@@ -11,6 +12,7 @@ export default async function LockReviewPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const { leagueId } = await requireAdminOrLeagueAdmin();
 
   const auction = await prisma.auction.findUnique({
     where: { id },
@@ -20,6 +22,7 @@ export default async function LockReviewPage({
     },
   });
   if (!auction) notFound();
+  assertInScope(leagueId, auction.tournament.leagueId);
   if (auction.status !== "PRE_AUCTION_OPEN") notFound();
 
   const submissions = await prisma.preAuctionSubmission.findMany({

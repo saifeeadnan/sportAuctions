@@ -5,7 +5,8 @@ import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import { signOut } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { requireRole, type Role } from "@/lib/auth/guards";
+import { requireAdminOrLeagueAdmin, AuthError, type Role } from "@/lib/auth/guards";
+import { ValidationError } from "@/lib/errors";
 import { deleteUser } from "@/lib/services/user.service";
 
 export async function logoutAction() {
@@ -13,7 +14,7 @@ export async function logoutAction() {
 }
 
 export async function registerUserAction(formData: FormData) {
-  await requireRole("ADMIN");
+  const { leagueId: callerLeagueId } = await requireAdminOrLeagueAdmin();
 
   const loginId = String(formData.get("loginId") ?? "").trim().toLowerCase();
   const name = String(formData.get("name") ?? "").trim();
@@ -24,8 +25,24 @@ export async function registerUserAction(formData: FormData) {
   if (!loginId || !name || !password) {
     throw new Error("Login ID, name, and password are required");
   }
-  if (!["ADMIN", "TEAM_MANAGER", "AUCTIONEER", "VIEWER"].includes(role)) {
+  if (!["ADMIN", "LEAGUE_ADMIN", "TEAM_MANAGER", "AUCTIONEER", "VIEWER"].includes(role)) {
     throw new Error("Invalid role");
+  }
+
+  // A League Admin can never create an Admin or another League Admin — only
+  // the site Admin (callerLeagueId === null) can create those two roles.
+  if (callerLeagueId !== null && (role === "ADMIN" || role === "LEAGUE_ADMIN")) {
+    throw new AuthError("You do not have permission to create this role");
+  }
+
+  // An ADMIN account is always unscoped (leagueId null); every other role
+  // belongs to exactly one league — the caller's own if they're a League
+  // Admin, or one picked from a form field if the caller is the site Admin.
+  const targetLeagueId: string | null =
+    role === "ADMIN" ? null : callerLeagueId ?? String(formData.get("leagueId") ?? "");
+
+  if (role !== "ADMIN" && !targetLeagueId) {
+    throw new ValidationError("A league must be selected for this user");
   }
 
   const passwordHash = await bcrypt.hash(password, 10);
@@ -36,6 +53,7 @@ export async function registerUserAction(formData: FormData) {
       name,
       role,
       passwordHash,
+      leagueId: targetLeagueId,
       managerBasePrice:
         role === "TEAM_MANAGER" && managerBasePrice
           ? Number(managerBasePrice)
@@ -48,7 +66,22 @@ export async function registerUserAction(formData: FormData) {
 }
 
 export async function deleteUserAction(userId: string) {
-  const session = await requireRole("ADMIN");
+  const { session, leagueId } = await requireAdminOrLeagueAdmin();
+
+  if (leagueId !== null) {
+    const target = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true, leagueId: true },
+    });
+    if (!target) throw new ValidationError("User not found");
+    if (target.role === "ADMIN" || target.role === "LEAGUE_ADMIN") {
+      throw new AuthError("You do not have permission to delete this user");
+    }
+    if (target.leagueId !== leagueId) {
+      throw new AuthError("This user belongs to a different league");
+    }
+  }
+
   await deleteUser(userId, session.user.id);
   revalidatePath("/admin/users");
   revalidatePath("/");

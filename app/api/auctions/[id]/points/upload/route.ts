@@ -1,12 +1,14 @@
 import { NextResponse } from "next/server";
-import { requireRole } from "@/lib/auth/guards";
+import { requireAdminOrLeagueAdmin } from "@/lib/auth/guards";
+import { loadScopedAuction } from "@/lib/auth/scope";
 import { toErrorResponse } from "@/lib/api/errors";
 import { parsePointsFile, applyPointsToAuction } from "@/lib/services/playerPoints.service";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requireRole("ADMIN");
+    const { leagueId } = await requireAdminOrLeagueAdmin();
     const { id: auctionId } = await params;
+    await loadScopedAuction(auctionId, leagueId);
 
     const formData = await req.formData();
     const file = formData.get("file") as File | null;

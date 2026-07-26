@@ -34,13 +34,14 @@ async function findSelfAuctionPlayer(auctionId: string, rosterId: string, loginI
 }
 
 /** Completed auctions this viewer was actually part of (i.e. eligible for a fantasy team). */
-export async function listEligibleCompletedAuctionsForViewer(userId: string) {
+export async function listEligibleCompletedAuctionsForViewer(userId: string, leagueId: string | null) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user?.loginId) return [];
 
   return prisma.auction.findMany({
     where: {
       status: "COMPLETED",
+      tournament: leagueId ? { leagueId } : undefined,
       auctionPlayers: {
         some: { player: { loginId: { equals: user.loginId, mode: "insensitive" } } },
       },
@@ -50,12 +51,15 @@ export async function listEligibleCompletedAuctionsForViewer(userId: string) {
   });
 }
 
-export async function getFantasyEligibility(auctionId: string, userId: string) {
+export async function getFantasyEligibility(auctionId: string, userId: string, leagueId: string | null) {
   const auction = await prisma.auction.findUnique({
     where: { id: auctionId },
     include: { tournament: true },
   });
   if (!auction) return { eligible: false as const, reason: "Auction not found" };
+  if (leagueId !== null && auction.tournament.leagueId !== leagueId) {
+    return { eligible: false as const, reason: "Auction not found" };
+  }
   if (auction.status !== "COMPLETED") {
     return { eligible: false as const, reason: "This auction hasn't completed yet" };
   }
@@ -131,13 +135,17 @@ export async function listFantasyPlayerPool(auctionId: string) {
 export async function submitFantasyTeam(
   auctionId: string,
   userId: string,
-  auctionPlayerIds: string[]
+  auctionPlayerIds: string[],
+  leagueId: string | null
 ) {
   const auction = await prisma.auction.findUnique({
     where: { id: auctionId },
     include: { tournament: true },
   });
   if (!auction) throw new ValidationError("Auction not found");
+  if (leagueId !== null && auction.tournament.leagueId !== leagueId) {
+    throw new ValidationError("Auction not found");
+  }
   if (auction.status !== "COMPLETED") {
     throw new InvalidStateTransitionError(
       "Fantasy teams can only be built once the auction is completed"

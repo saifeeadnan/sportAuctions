@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
 import { openPreAuctionAction, startBiddingAction } from "@/lib/actions/auction.actions";
 import { AssignPlayerForm } from "@/components/admin/AssignPlayerForm";
 import { card, cardInteractive, buttonPrimary, buttonSecondary } from "@/lib/ui";
@@ -19,6 +20,7 @@ export default async function AuctionDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const { leagueId } = await requireAdminOrLeagueAdmin();
 
   const auction = await prisma.auction.findUnique({
     where: { id },
@@ -30,6 +32,7 @@ export default async function AuctionDetailPage({
     },
   });
   if (!auction) notFound();
+  assertInScope(leagueId, auction.tournament.leagueId);
 
   const statusCounts = auction.auctionPlayers.reduce<Record<string, number>>((acc, ap) => {
     acc[ap.status] = (acc[ap.status] ?? 0) + 1;

@@ -13,13 +13,15 @@ const assert = (cond: boolean, msg: string) => {
 
 async function main() {
   const admin = await prisma.user.findFirstOrThrow({ where: { role: "ADMIN" } });
+  const league = await prisma.league.findFirstOrThrow();
 
   // Case 1: roster with no tournaments -> should delete cleanly, players cascade.
   await prisma.playerRoster.deleteMany({ where: { name: "Deletable Test Roster" } });
   const roster = await createRosterFromUpload(
     "Deletable Test Roster",
     [{ name: "Test Player A" }, { name: "Test Player B" }],
-    admin.id
+    admin.id,
+    league.id
   );
   const playerCountBefore = await prisma.player.count({ where: { rosterId: roster.id } });
   assert(playerCountBefore === 2, "Roster created with 2 players");

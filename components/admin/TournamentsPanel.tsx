@@ -1,13 +1,17 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { requireAdminOrLeagueAdmin } from "@/lib/auth/guards";
 import { DeleteTournamentButton } from "@/components/admin/DeleteTournamentButton";
 import { createTournamentAction } from "@/lib/actions/tournament.actions";
 import { card, cardInteractive, buttonPrimary, inputClass } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 
 export async function TournamentsPanel() {
+  const { leagueId } = await requireAdminOrLeagueAdmin();
+
   const [tournaments, rosters] = await Promise.all([
     prisma.tournament.findMany({
+      where: leagueId ? { leagueId } : {},
       orderBy: { createdAt: "desc" },
       include: {
         roster: true,
@@ -15,7 +19,11 @@ export async function TournamentsPanel() {
         auctions: { select: { status: true } },
       },
     }),
-    prisma.playerRoster.findMany({ orderBy: { name: "asc" } }),
+    prisma.playerRoster.findMany({
+      where: leagueId ? { leagueId } : {},
+      include: { league: true },
+      orderBy: { name: "asc" },
+    }),
   ]);
 
   return (
@@ -43,11 +51,27 @@ export async function TournamentsPanel() {
               <label className="flex flex-col gap-1 text-sm">
                 Player roster
                 <select name="rosterId" required className={inputClass}>
-                  {rosters.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name}
-                    </option>
-                  ))}
+                  {leagueId
+                    ? rosters.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.name}
+                        </option>
+                      ))
+                    : Object.entries(
+                        rosters.reduce<Record<string, typeof rosters>>((acc, r) => {
+                          const key = r.league?.name ?? "No league";
+                          (acc[key] ??= []).push(r);
+                          return acc;
+                        }, {})
+                      ).map(([leagueName, group]) => (
+                        <optgroup key={leagueName} label={leagueName}>
+                          {group.map((r) => (
+                            <option key={r.id} value={r.id}>
+                              {r.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
                 </select>
               </label>
             </div>

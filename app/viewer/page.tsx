@@ -1,20 +1,27 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { scopeLeagueId } from "@/lib/auth/guards";
 import { cardInteractive } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 import { listEligibleCompletedAuctionsForViewer } from "@/lib/services/fantasyTeam.service";
 
 export default async function ViewerHomePage() {
   const session = await auth();
+  const leagueId = session?.user ? scopeLeagueId(session) : null;
 
   const [auctions, fantasyEligibleAuctions] = await Promise.all([
     prisma.auction.findMany({
-      where: { status: { in: ["BIDDING", "COMPLETED"] } },
+      where: {
+        status: { in: ["BIDDING", "COMPLETED"] },
+        tournament: leagueId ? { leagueId } : undefined,
+      },
       include: { tournament: true },
       orderBy: { createdAt: "desc" },
     }),
-    session?.user ? listEligibleCompletedAuctionsForViewer(session.user.id) : Promise.resolve([]),
+    session?.user
+      ? listEligibleCompletedAuctionsForViewer(session.user.id, leagueId)
+      : Promise.resolve([]),
   ]);
 
   const submittedFantasyTeams = session?.user

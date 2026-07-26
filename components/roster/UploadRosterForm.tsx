@@ -20,9 +20,16 @@ async function readErrorMessage(res: Response, fallback: string): Promise<string
   }
 }
 
-export function UploadRosterForm() {
+export function UploadRosterForm({
+  leagues,
+}: {
+  /** Non-null only for a site ADMIN (unrestricted) — shows a league picker.
+   * A League Admin's roster is always scoped to their own league server-side. */
+  leagues?: { id: string; name: string }[] | null;
+}) {
   const router = useRouter();
   const [rosterName, setRosterName] = useState("");
+  const [leagueId, setLeagueId] = useState(leagues?.[0]?.id ?? "");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<PreviewResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -60,6 +67,7 @@ export function UploadRosterForm() {
       formData.set("file", file);
       formData.set("rosterName", rosterName);
       formData.set("mode", "commit");
+      if (leagues) formData.set("leagueId", leagueId);
       const res = await fetch("/api/rosters/upload", {
         method: "POST",
         body: formData,
@@ -86,6 +94,24 @@ export function UploadRosterForm() {
             className={inputClass}
           />
         </label>
+        {leagues && (
+          <label className="flex flex-col gap-1 text-sm">
+            League
+            <select
+              required
+              value={leagueId}
+              onChange={(e) => setLeagueId(e.target.value)}
+              className={inputClass}
+            >
+              {leagues.length === 0 && <option value="">— No leagues yet —</option>}
+              {leagues.map((l) => (
+                <option key={l.id} value={l.id}>
+                  {l.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="flex flex-col gap-1 text-sm">
           CSV or Excel file
           <input

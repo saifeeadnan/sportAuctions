@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { requireRole } from "@/lib/auth/guards";
+import { requireRole, scopeLeagueId } from "@/lib/auth/guards";
 import {
   getFantasyEligibility,
   getFantasyTeam,
@@ -34,7 +34,7 @@ export default async function FantasyTeamPage({
   const { id } = await params;
   const session = await requireRole("VIEWER");
 
-  const eligibility = await getFantasyEligibility(id, session.user.id);
+  const eligibility = await getFantasyEligibility(id, session.user.id, scopeLeagueId(session));
   if (!eligibility.eligible) {
     if (eligibility.reason === "Auction not found") notFound();
     return (

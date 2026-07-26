@@ -71,10 +71,16 @@ async function main() {
   );
   console.log(`Viewer: ${viewer.loginId} (password: viewer123)`);
 
+  let league = await prisma.league.findUnique({ where: { name: "Demo League" } });
+  if (!league) {
+    league = await prisma.league.create({ data: { name: "Demo League", type: "Cricket" } });
+    console.log(`Created league "Demo League"`);
+  }
+
   let roster = await prisma.playerRoster.findFirst({ where: { name: "Demo Season Roster" } });
   if (!roster) {
     roster = await prisma.playerRoster.create({
-      data: { name: "Demo Season Roster", createdById: admin.id },
+      data: { name: "Demo Season Roster", createdById: admin.id, leagueId: league.id },
     });
     await prisma.player.createMany({
       data: SAMPLE_PLAYERS.map((p) => ({ ...p, rosterId: roster!.id })),
@@ -95,6 +101,7 @@ async function main() {
         startDate: new Date("2026-08-01"),
         endDate: new Date("2026-08-10"),
         createdById: admin.id,
+        leagueId: league.id,
       },
     });
     console.log(`Created tournament "Demo Tournament"`);

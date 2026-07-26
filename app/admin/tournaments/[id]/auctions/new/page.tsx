@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
 import { NewAuctionForm } from "@/components/admin/NewAuctionForm";
 
 export default async function NewAuctionPage({
@@ -8,11 +9,13 @@ export default async function NewAuctionPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const { leagueId } = await requireAdminOrLeagueAdmin();
   const tournament = await prisma.tournament.findUnique({
     where: { id },
     include: { roster: { include: { players: { orderBy: { name: "asc" } } } } },
   });
   if (!tournament) notFound();
+  assertInScope(leagueId, tournament.leagueId);
 
   return (
     <div>

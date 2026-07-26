@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
 import { createPlayerAction } from "@/lib/actions/roster.actions";
 import { PlayerFormFields } from "@/components/roster/PlayerFormFields";
 import { DeletePlayerButton } from "@/components/admin/DeletePlayerButton";
@@ -41,6 +42,7 @@ export default async function RosterDetailPage({
   const { sort, dir } = await searchParams;
   const sortField = resolveSortField(sort);
   const sortDir = resolveSortDir(dir);
+  const { leagueId } = await requireAdminOrLeagueAdmin();
 
   const orderByValue =
     sortField === "name" ? sortDir : { sort: sortDir, nulls: "last" as const };
@@ -55,6 +57,7 @@ export default async function RosterDetailPage({
   });
 
   if (!roster) notFound();
+  assertInScope(leagueId, roster.leagueId);
 
   const columns: { field: SortField; label: string }[] = [
     { field: "name", label: "Name" },

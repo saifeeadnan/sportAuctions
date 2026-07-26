@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
 import { listFantasyTeamsForAuction } from "@/lib/services/fantasyTeam.service";
 import { computeTeamStrength, type RatedPlayer } from "@/lib/teamStrength";
 import { RosterRibbon } from "@/components/roster/RosterRibbon";
@@ -30,12 +31,14 @@ export default async function FantasyTeamsPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const { leagueId } = await requireAdminOrLeagueAdmin();
 
   const auction = await prisma.auction.findUnique({
     where: { id },
     include: { tournament: true },
   });
   if (!auction) notFound();
+  assertInScope(leagueId, auction.tournament.leagueId);
 
   const [fantasyTeams, pointsUploadedCount] = await Promise.all([
     listFantasyTeamsForAuction(id),

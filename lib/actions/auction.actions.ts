@@ -2,7 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { requireRole } from "@/lib/auth/guards";
+import { requireRole, requireAdminOrLeagueAdmin, scopeLeagueId } from "@/lib/auth/guards";
+import { loadScopedTournament, loadScopedAuction } from "@/lib/auth/scope";
 import { ValidationError } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import {
@@ -19,46 +20,48 @@ import { submitDraft, removeDraftPick } from "@/lib/services/preAuctionDraft.ser
 export async function createAuctionAction(
   input: Omit<CreateAuctionInput, "createdById">
 ): Promise<{ auctionId: string }> {
-  const session = await requireRole("ADMIN");
+  const { session, leagueId } = await requireAdminOrLeagueAdmin();
+  await loadScopedTournament(input.tournamentId, leagueId);
   const auction = await createAuction({ ...input, createdById: session.user.id });
   return { auctionId: auction.id };
 }
 
 export async function openPreAuctionAction(auctionId: string) {
-  await requireRole("ADMIN");
+  const { leagueId } = await requireAdminOrLeagueAdmin();
+  await loadScopedAuction(auctionId, leagueId);
   await openPreAuction(auctionId);
   revalidatePath(`/admin/auctions/${auctionId}`);
 }
 
 export async function lockPreAuctionAction(auctionId: string, force: boolean) {
-  await requireRole("ADMIN");
+  const { leagueId } = await requireAdminOrLeagueAdmin();
+  await loadScopedAuction(auctionId, leagueId);
   await lockPreAuction(auctionId, force);
   revalidatePath(`/admin/auctions/${auctionId}`);
   redirect(`/admin/auctions/${auctionId}`);
 }
 
 export async function startBiddingAction(auctionId: string) {
-  await requireRole("ADMIN", "AUCTIONEER");
+  const session = await requireRole("ADMIN", "AUCTIONEER");
+  await loadScopedAuction(auctionId, scopeLeagueId(session));
   await startBidding(auctionId);
   revalidatePath(`/admin/auctions/${auctionId}`);
   revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
 }
 
 export async function resetAuctionAction(auctionId: string) {
-  await requireRole("ADMIN", "AUCTIONEER");
+  const session = await requireRole("ADMIN", "AUCTIONEER");
+  await loadScopedAuction(auctionId, scopeLeagueId(session));
   await resetAuctionToPreBidding(auctionId);
   revalidatePath(`/admin/auctions/${auctionId}`);
   revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
 }
 
 export async function deleteAuctionAction(auctionId: string) {
-  await requireRole("ADMIN");
-  const auction = await prisma.auction.findUnique({
-    where: { id: auctionId },
-    select: { tournamentId: true },
-  });
+  const { leagueId } = await requireAdminOrLeagueAdmin();
+  const auction = await loadScopedAuction(auctionId, leagueId);
   await deleteAuction(auctionId);
-  if (auction) revalidatePath(`/admin/tournaments/${auction.tournamentId}`);
+  revalidatePath(`/admin/tournaments/${auction.tournamentId}`);
 }
 
 export async function submitDraftAction(
@@ -84,7 +87,8 @@ export async function adminRemoveDraftPickAction(
   teamAuctionEntryId: string,
   auctionPlayerId: string
 ) {
-  await requireRole("ADMIN");
+  const { leagueId } = await requireAdminOrLeagueAdmin();
+  await loadScopedAuction(auctionId, leagueId);
   await removeDraftPick(teamAuctionEntryId, auctionPlayerId);
   revalidatePath(`/admin/auctions/${auctionId}/teams/${teamAuctionEntryId}`);
 }

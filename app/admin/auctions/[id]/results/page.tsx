@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
 import { TeamStrengthSummary } from "@/components/manager/TeamStrengthSummary";
 import { card, buttonSecondary } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
@@ -11,6 +12,7 @@ export default async function AuctionResultsPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const { leagueId } = await requireAdminOrLeagueAdmin();
 
   const auction = await prisma.auction.findUnique({
     where: { id },
@@ -27,6 +29,7 @@ export default async function AuctionResultsPage({
     },
   });
   if (!auction) notFound();
+  assertInScope(leagueId, auction.tournament.leagueId);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 flex flex-col gap-8">

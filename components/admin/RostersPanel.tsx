@@ -1,14 +1,22 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { requireAdminOrLeagueAdmin } from "@/lib/auth/guards";
+import { listLeagues } from "@/lib/services/league.service";
 import { DeleteRosterButton } from "@/components/admin/DeleteRosterButton";
 import { UploadRosterForm } from "@/components/roster/UploadRosterForm";
 import { card, cardInteractive } from "@/lib/ui";
 
 export async function RostersPanel() {
-  const rosters = await prisma.playerRoster.findMany({
-    orderBy: { createdAt: "desc" },
-    include: { _count: { select: { players: true, tournaments: true } } },
-  });
+  const { leagueId } = await requireAdminOrLeagueAdmin();
+
+  const [rosters, leagues] = await Promise.all([
+    prisma.playerRoster.findMany({
+      where: leagueId ? { leagueId } : {},
+      orderBy: { createdAt: "desc" },
+      include: { _count: { select: { players: true, tournaments: true } } },
+    }),
+    leagueId ? Promise.resolve(null) : listLeagues(),
+  ]);
 
   return (
     <div>
@@ -18,7 +26,7 @@ export async function RostersPanel() {
         <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
           Upload roster
         </summary>
-        <UploadRosterForm />
+        <UploadRosterForm leagues={leagues} />
       </details>
 
       {rosters.length === 0 ? (

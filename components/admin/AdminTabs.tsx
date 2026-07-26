@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { tabsTrack, tabItem } from "@/lib/ui";
 
-export function AdminTabs() {
+export function AdminTabs({ showLeagues = false }: { showLeagues?: boolean }) {
   const pathname = usePathname();
 
   const tabs = [
@@ -12,6 +12,7 @@ export function AdminTabs() {
     { href: "/admin/tournaments", label: "Tournaments" },
     { href: "/admin/fantasy-teams", label: "Fantasy Teams" },
     { href: "/admin/users", label: "Users" },
+    ...(showLeagues ? [{ href: "/admin/leagues", label: "Leagues" }] : []),
   ];
 
   function isActive(href: string) {

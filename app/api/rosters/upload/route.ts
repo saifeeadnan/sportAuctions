@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
-import { requireRole } from "@/lib/auth/guards";
+import { requireAdminOrLeagueAdmin } from "@/lib/auth/guards";
 import { toErrorResponse } from "@/lib/api/errors";
+import { ValidationError } from "@/lib/errors";
 import { parseRosterFile, createRosterFromUpload } from "@/lib/services/roster.service";
 
 export async function POST(req: Request) {
   try {
-    const session = await requireRole("ADMIN");
+    const { session, leagueId } = await requireAdminOrLeagueAdmin();
 
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
@@ -20,7 +21,18 @@ export async function POST(req: Request) {
     const { validRows, errors } = parseRosterFile(buffer, file.name);
 
     if (mode === "commit") {
-      const roster = await createRosterFromUpload(rosterName, validRows, session.user.id);
+      // A League Admin's roster always belongs to their own league; only a site
+      // Admin (unrestricted, leagueId === null) picks a league via the form.
+      const targetLeagueId = leagueId ?? String(formData.get("leagueId") ?? "");
+      if (!targetLeagueId) {
+        throw new ValidationError("A league must be selected for this roster");
+      }
+      const roster = await createRosterFromUpload(
+        rosterName,
+        validRows,
+        session.user.id,
+        targetLeagueId
+      );
       return NextResponse.json({
         rosterId: roster.id,
         validCount: validRows.length,

@@ -6,11 +6,11 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  await requireRole("ADMIN");
+  const session = await requireRole("ADMIN", "LEAGUE_ADMIN");
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8">
-      <AdminTabs />
+      <AdminTabs showLeagues={session.user.role === "ADMIN"} />
       {children}
     </div>
   );

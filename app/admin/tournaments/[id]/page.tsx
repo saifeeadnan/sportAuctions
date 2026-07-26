@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
 import { createTeamAction } from "@/lib/actions/tournament.actions";
 import { DeleteAuctionButton } from "@/components/admin/DeleteAuctionButton";
 import { card, cardInteractive, buttonPrimary, buttonSecondary, inputClass } from "@/lib/ui";
@@ -19,17 +20,24 @@ export default async function TournamentDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
+  const { leagueId } = await requireAdminOrLeagueAdmin();
 
-  const [tournament, managers, auctions] = await Promise.all([
-    prisma.tournament.findUnique({
-      where: { id },
-      include: { roster: true, teams: { include: { manager: true }, orderBy: { createdAt: "asc" } } },
+  const tournament = await prisma.tournament.findUnique({
+    where: { id },
+    include: { roster: true, teams: { include: { manager: true }, orderBy: { createdAt: "asc" } } },
+  });
+  if (!tournament) notFound();
+  assertInScope(leagueId, tournament.leagueId);
+
+  // Filtered by the tournament's own league (not the caller's) — a site ADMIN
+  // editing one specific tournament should only see that league's managers.
+  const [managers, auctions] = await Promise.all([
+    prisma.user.findMany({
+      where: { role: "TEAM_MANAGER", leagueId: tournament.leagueId },
+      orderBy: { name: "asc" },
     }),
-    prisma.user.findMany({ where: { role: "TEAM_MANAGER" }, orderBy: { name: "asc" } }),
     prisma.auction.findMany({ where: { tournamentId: id }, orderBy: { createdAt: "desc" } }),
   ]);
-
-  if (!tournament) notFound();
 
   const canAddTeam = tournament.teams.length < tournament.numTeams;
 

@@ -1,6 +1,6 @@
 import { auth } from "@/auth";
 
-export type Role = "ADMIN" | "TEAM_MANAGER" | "AUCTIONEER" | "VIEWER";
+export type Role = "ADMIN" | "LEAGUE_ADMIN" | "TEAM_MANAGER" | "AUCTIONEER" | "VIEWER";
 
 export class AuthError extends Error {
   constructor(message: string) {
@@ -23,4 +23,20 @@ export async function requireRole(...roles: Role[]) {
     throw new AuthError(`Requires role: ${roles.join(" or ")}`);
   }
   return session;
+}
+
+/** null = unrestricted (site ADMIN). Non-null = caller is confined to this league. */
+export function scopeLeagueId(session: Awaited<ReturnType<typeof requireSession>>): string | null {
+  return session.user.role === "ADMIN" ? null : (session.user.leagueId ?? null);
+}
+
+export function assertInScope(leagueId: string | null, resourceLeagueId: string) {
+  if (leagueId !== null && leagueId !== resourceLeagueId) {
+    throw new AuthError("This resource belongs to a different league");
+  }
+}
+
+export async function requireAdminOrLeagueAdmin() {
+  const session = await requireRole("ADMIN", "LEAGUE_ADMIN");
+  return { session, leagueId: scopeLeagueId(session) };
 }

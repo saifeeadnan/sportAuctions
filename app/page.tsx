@@ -16,7 +16,7 @@ export default async function Home() {
     return <LandingHero />;
   }
 
-  if (session.user.role === "ADMIN") {
+  if (session.user.role === "ADMIN" || session.user.role === "LEAGUE_ADMIN") {
     redirect("/admin/rosters");
   }
 

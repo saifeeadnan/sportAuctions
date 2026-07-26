@@ -139,7 +139,8 @@ export function parseRosterFile(buffer: Buffer, filename: string): ParseResult {
 export async function createRosterFromUpload(
   name: string,
   rows: ParsedPlayerRow[],
-  createdById: string
+  createdById: string,
+  leagueId: string
 ) {
   if (!name.trim()) {
     throw new ValidationError("Roster name is required");
@@ -150,7 +151,7 @@ export async function createRosterFromUpload(
 
   return prisma.$transaction(async (tx) => {
     const roster = await tx.playerRoster.create({
-      data: { name: name.trim(), createdById },
+      data: { name: name.trim(), createdById, leagueId },
     });
 
     await tx.player.createMany({

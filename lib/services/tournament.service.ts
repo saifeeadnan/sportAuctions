@@ -31,6 +31,9 @@ export async function createTournament(input: CreateTournamentInput) {
       startDate: input.startDate,
       endDate: input.endDate,
       createdById: input.createdById,
+      // A tournament always inherits its league from its roster, so it can
+      // never disagree with the roster it's built on.
+      leagueId: roster.leagueId,
     },
   });
 }
@@ -61,6 +64,9 @@ export async function createTeam(input: CreateTeamInput) {
     const manager = await prisma.user.findUnique({ where: { id: input.managerId } });
     if (!manager || manager.role !== "TEAM_MANAGER") {
       throw new ValidationError("Selected manager is not a valid team manager account");
+    }
+    if (manager.leagueId !== tournament.leagueId) {
+      throw new ValidationError("Selected manager does not belong to this tournament's league");
     }
   }
 

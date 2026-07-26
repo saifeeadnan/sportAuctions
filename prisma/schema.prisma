@@ -12,6 +12,7 @@ datasource db {
 
 enum Role {
   ADMIN
+  LEAGUE_ADMIN
   TEAM_MANAGER
   AUCTIONEER
   VIEWER
@@ -67,6 +68,8 @@ model User {
   name             String
   role             Role
   managerBasePrice Decimal? @db.Decimal(10, 2)
+  leagueId         String?
+  league           League?  @relation(fields: [leagueId], references: [id])
   createdAt        DateTime @default(now())
 
   createdRosters     PlayerRoster[]
@@ -75,7 +78,21 @@ model User {
   createdAuctions    Auction[]
   fantasyTeams       FantasyTeam[]
 
+  @@index([leagueId])
   @@map("users")
+}
+
+model League {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  type      String
+  createdAt DateTime @default(now())
+
+  users       User[]
+  rosters     PlayerRoster[]
+  tournaments Tournament[]
+
+  @@map("leagues")
 }
 
 model PlayerRoster {
@@ -83,11 +100,14 @@ model PlayerRoster {
   name        String
   createdById String
   createdBy   User     @relation(fields: [createdById], references: [id])
+  leagueId    String
+  league      League   @relation(fields: [leagueId], references: [id])
   createdAt   DateTime @default(now())
 
   players     Player[]
   tournaments Tournament[]
 
+  @@index([leagueId])
   @@map("player_rosters")
 }
 
@@ -127,12 +147,15 @@ model Tournament {
   status     TournamentStatus @default(DRAFT)
   createdById String
   createdBy  User             @relation(fields: [createdById], references: [id])
+  leagueId   String
+  league     League           @relation(fields: [leagueId], references: [id])
   createdAt  DateTime         @default(now())
 
   teams    Team[]
   auctions Auction[]
 
   @@index([rosterId])
+  @@index([leagueId])
   @@map("tournaments")
 }
 

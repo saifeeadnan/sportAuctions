@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
 import { ConfirmedRosterTable } from "@/components/roster/ConfirmedRosterTable";
 
 export default async function TournamentTeamRosterPage({
@@ -9,6 +10,7 @@ export default async function TournamentTeamRosterPage({
   params: Promise<{ id: string; teamId: string }>;
 }) {
   const { id, teamId } = await params;
+  const { leagueId } = await requireAdminOrLeagueAdmin();
 
   const team = await prisma.team.findUnique({
     where: { id: teamId },
@@ -25,6 +27,7 @@ export default async function TournamentTeamRosterPage({
     },
   });
   if (!team || team.tournamentId !== id) notFound();
+  assertInScope(leagueId, team.tournament.leagueId);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 flex flex-col gap-6">
