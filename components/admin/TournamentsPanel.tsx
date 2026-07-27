@@ -43,7 +43,7 @@ export async function TournamentsPanel({ selectedLeagueId }: { selectedLeagueId?
             action={createTournamentAction}
             className="flex flex-col gap-3 max-w-xl px-4 pb-4"
           >
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <label className="flex flex-col gap-1 text-sm">
                 Tournament name
                 <input name="name" required className={inputClass} />
@@ -75,7 +75,7 @@ export async function TournamentsPanel({ selectedLeagueId }: { selectedLeagueId?
                 </select>
               </label>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <label className="flex flex-col gap-1 text-sm">
                 Number of teams
                 <input name="numTeams" type="number" min={2} required className={inputClass} />
@@ -85,7 +85,7 @@ export async function TournamentsPanel({ selectedLeagueId }: { selectedLeagueId?
                 <input name="squadSize" type="number" min={1} required className={inputClass} />
               </label>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <label className="flex flex-col gap-1 text-sm">
                 Start date
                 <input name="startDate" type="date" required className={inputClass} />

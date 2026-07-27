@@ -15,11 +15,11 @@ export async function Nav() {
           <LogoMark className="h-6 w-6" />
           <span>LeagueForge</span>
         </Link>
-        <div className="flex items-center gap-3 text-sm">
+        <div className="flex items-center gap-2 sm:gap-3 text-sm">
           {session?.user ? (
             <>
               <span className="flex items-center gap-2 text-black/60 dark:text-white/60">
-                {session.user.name}
+                <span className="hidden sm:inline truncate max-w-[10rem]">{session.user.name}</span>
                 <Badge variant="info">{session.user.role}</Badge>
               </span>
               <form action={logoutAction}>

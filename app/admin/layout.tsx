@@ -15,7 +15,7 @@ export default async function AdminLayout({
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8">
-      <div className="flex items-start gap-8">
+      <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-8">
         {leagues && <AdminLeagueSidebar leagues={leagues} />}
         <div className="flex-1 min-w-0">
           {leagues && <ActiveLeagueBanner leagues={leagues} />}

@@ -68,7 +68,7 @@ export async function UsersPanel({
         </summary>
         <form action={registerUserAction} className="flex flex-col gap-3 max-w-xl px-4 pb-4">
           <NameLoginIdFields />
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label className="flex flex-col gap-1 text-sm">
               Password
               <input name="password" type="password" required className={inputClass} />

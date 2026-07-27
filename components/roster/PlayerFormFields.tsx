@@ -17,7 +17,7 @@ export type PlayerFormDefaults = {
 export function PlayerFormFields({ defaultValues = {} }: { defaultValues?: PlayerFormDefaults }) {
   return (
     <>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <label className="flex flex-col gap-1 text-sm">
           Name
           <input name="name" required defaultValue={defaultValues.name ?? ""} className={inputClass} />
@@ -27,7 +27,7 @@ export function PlayerFormFields({ defaultValues = {} }: { defaultValues?: Playe
           <input name="position" defaultValue={defaultValues.position ?? ""} className={inputClass} />
         </label>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <label className="flex flex-col gap-1 text-sm">
           Age
           <input
@@ -42,7 +42,7 @@ export function PlayerFormFields({ defaultValues = {} }: { defaultValues?: Playe
           <input name="loginId" defaultValue={defaultValues.loginId ?? ""} className={inputClass} />
         </label>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <label className="flex flex-col gap-1 text-sm">
           Default category
           <input
@@ -64,7 +64,7 @@ export function PlayerFormFields({ defaultValues = {} }: { defaultValues?: Playe
         Photo URL
         <input name="photoUrl" defaultValue={defaultValues.photoUrl ?? ""} className={inputClass} />
       </label>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <label className="flex flex-col gap-1 text-sm">
           Rating
           <input
@@ -86,7 +86,7 @@ export function PlayerFormFields({ defaultValues = {} }: { defaultValues?: Playe
           />
         </label>
       </div>
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <label className="flex flex-col gap-1 text-sm">
           Bowling rating
           <input

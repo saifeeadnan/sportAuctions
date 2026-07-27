@@ -14,7 +14,7 @@ export async function LeaguesPanel() {
           New league
         </summary>
         <form action={createLeagueAction} className="flex flex-col gap-3 max-w-xl px-4 pb-4">
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label className="flex flex-col gap-1 text-sm">
               League name
               <input name="name" required className={inputClass} />
