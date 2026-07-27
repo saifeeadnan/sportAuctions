@@ -72,11 +72,12 @@ model User {
   league           League?  @relation(fields: [leagueId], references: [id])
   createdAt        DateTime @default(now())
 
-  createdRosters     PlayerRoster[]
-  managedTeams       Team[]
-  createdTournaments Tournament[]
-  createdAuctions    Auction[]
-  fantasyTeams       FantasyTeam[]
+  createdRosters       PlayerRoster[]
+  managedTeams         Team[]
+  createdTournaments   Tournament[]
+  createdAuctions      Auction[]
+  fantasyTeams         FantasyTeam[]
+  uploadedRulesDocs    TournamentDocument[]
 
   @@index([leagueId])
   @@map("users")
@@ -151,12 +152,27 @@ model Tournament {
   league     League           @relation(fields: [leagueId], references: [id])
   createdAt  DateTime         @default(now())
 
-  teams    Team[]
-  auctions Auction[]
+  teams        Team[]
+  auctions     Auction[]
+  rulesDocument TournamentDocument?
 
   @@index([rosterId])
   @@index([leagueId])
   @@map("tournaments")
+}
+
+model TournamentDocument {
+  id           String     @id @default(cuid())
+  tournamentId String     @unique
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  fileName     String
+  mimeType     String
+  data         Bytes
+  uploadedById String
+  uploadedBy   User       @relation(fields: [uploadedById], references: [id])
+  uploadedAt   DateTime   @default(now())
+
+  @@map("tournament_documents")
 }
 
 model Team {

@@ -6,6 +6,7 @@ import {
   getFantasyStandings,
   listFantasyPlayerPool,
 } from "@/lib/services/fantasyTeam.service";
+import { getRulesDocumentIfViewable } from "@/lib/services/tournamentDocument.service";
 import { FantasyTeamForm } from "@/components/viewer/FantasyTeamForm";
 import { RosterRibbon } from "@/components/roster/RosterRibbon";
 import { TeamStrengthSummary } from "@/components/manager/TeamStrengthSummary";
@@ -51,6 +52,7 @@ export default async function FantasyTeamPage({
   const existingTeam = await getFantasyTeam(id, session.user.id);
   const standings = existingTeam ? await getFantasyStandings(id) : null;
   const myStanding = standings?.standings.find((s) => s.team.userId === session.user.id);
+  const rulesDocument = await getRulesDocumentIfViewable(auction.tournament.id, session.user);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 flex flex-col gap-6">
@@ -60,6 +62,16 @@ export default async function FantasyTeamPage({
           {auction.tournament.name} &middot; {auction.name} &middot; budget:{" "}
           {String(auction.teamBudget)}
         </p>
+        {rulesDocument && (
+          <a
+            href={`/tournaments/${auction.tournament.id}/rules`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm underline underline-offset-2"
+          >
+            View tournament rules
+          </a>
+        )}
       </div>
 
       {existingTeam ? (

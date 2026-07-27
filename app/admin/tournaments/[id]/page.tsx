@@ -3,7 +3,10 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
 import { createTeamAction } from "@/lib/actions/tournament.actions";
+import { getRulesDocumentMeta } from "@/lib/services/tournamentDocument.service";
 import { DeleteAuctionButton } from "@/components/admin/DeleteAuctionButton";
+import { UploadRulesDocumentForm } from "@/components/admin/UploadRulesDocumentForm";
+import { DeleteRulesDocumentButton } from "@/components/admin/DeleteRulesDocumentButton";
 import { card, cardInteractive, buttonPrimary, buttonSecondary, inputClass } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 
@@ -31,12 +34,13 @@ export default async function TournamentDetailPage({
 
   // Filtered by the tournament's own league (not the caller's) — a site ADMIN
   // editing one specific tournament should only see that league's managers.
-  const [managers, auctions] = await Promise.all([
+  const [managers, auctions, rulesDocument] = await Promise.all([
     prisma.user.findMany({
       where: { role: "TEAM_MANAGER", leagueId: tournament.leagueId },
       orderBy: { name: "asc" },
     }),
     prisma.auction.findMany({ where: { tournamentId: id }, orderBy: { createdAt: "desc" } }),
+    getRulesDocumentMeta(id),
   ]);
 
   const canAddTeam = tournament.teams.length < tournament.numTeams;
@@ -51,6 +55,44 @@ export default async function TournamentDetailPage({
           {tournament.startDate.toDateString()} – {tournament.endDate.toDateString()}
         </p>
       </div>
+
+      <section>
+        <h2 className="text-lg font-medium mb-3">Rules document</h2>
+        <div className={`${card} px-4 py-3 flex items-center justify-between gap-4 flex-wrap mb-3`}>
+          {rulesDocument ? (
+            <>
+              <div className="text-sm">
+                <a
+                  href={`/tournaments/${tournament.id}/rules`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline underline-offset-2"
+                >
+                  {rulesDocument.fileName}
+                </a>
+                <span className="text-black/50 dark:text-white/50">
+                  {" "}
+                  &middot; uploaded {rulesDocument.uploadedAt.toDateString()}
+                </span>
+              </div>
+              <DeleteRulesDocumentButton tournamentId={tournament.id} />
+            </>
+          ) : (
+            <p className="text-sm text-black/60 dark:text-white/60">
+              No rules document uploaded yet. Players on this tournament&apos;s roster will be
+              able to view it once uploaded.
+            </p>
+          )}
+        </div>
+        <details className={card}>
+          <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
+            {rulesDocument ? "Replace rules document" : "Upload rules document"}
+          </summary>
+          <div className="px-4 pb-4">
+            <UploadRulesDocumentForm tournamentId={tournament.id} />
+          </div>
+        </details>
+      </section>
 
       <section>
         <h2 className="text-lg font-medium mb-3">Teams</h2>
