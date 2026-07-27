@@ -5,8 +5,7 @@ import { LogoMark } from "@/components/ui/LogoMark";
 const FEATURES: { title: string; description: string; icon: React.ReactNode }[] = [
   {
     title: "Roster management",
-    description:
-      "Upload player rosters with batting, bowling, and fielding ratings, then reuse them across seasons.",
+    description: "Upload player rosters with ratings, then reuse them across seasons.",
     icon: (
       <path
         strokeLinecap="round"
@@ -30,7 +29,7 @@ const FEATURES: { title: string; description: string; icon: React.ReactNode }[] 
   {
     title: "Live bidding console",
     description:
-      "Run the auction with budget and squad-slot guardrails, random pick order, and instant updates everywhere.",
+      "Run different auction types with budget and squad-slot guardrails, random pick order, and instant updates everywhere.",
     icon: (
       <path
         strokeLinecap="round"

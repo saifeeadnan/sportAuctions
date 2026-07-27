@@ -53,7 +53,7 @@ export default async function FantasyTeamsPage({
               ? "Ranked by total points."
               : "Points haven't been uploaded yet — ranked by team strength in the meantime."}
           </p>
-          {standings.map(({ team, strength, totalSpend, totalPoints, selfAuctionPlayerId, rank }) => (
+          {standings.map(({ team, totalSpend, totalPoints, selfAuctionPlayerId, rank }) => (
             <details key={team.id} className={card}>
               <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium flex items-center justify-between gap-3 flex-wrap">
                 <span>
@@ -71,19 +71,11 @@ export default async function FantasyTeamsPage({
                       &middot;{" "}
                     </>
                   )}
-                  spent {totalSpend} &middot; strength {strength.teamStrength.toFixed(1)}/10
+                  spent {totalSpend}
                 </span>
               </summary>
               <div className="px-4 pb-4 flex flex-col gap-3">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="text-xs text-black/50 dark:text-white/50">
-                    Batsmen: {strength.positionCounts.Batsmen} &middot; Bowlers:{" "}
-                    {strength.positionCounts.Bowlers} &middot; All-rounders:{" "}
-                    {strength.positionCounts["All-rounders"]}
-                    {strength.positionCounts.Other > 0
-                      ? ` · Other: ${strength.positionCounts.Other}`
-                      : ""}
-                  </p>
+                <div className="flex items-center justify-end gap-3">
                   <DeleteFantasyTeamButton
                     auctionId={auction.id}
                     fantasyTeamId={team.id}

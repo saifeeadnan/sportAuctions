@@ -113,7 +113,21 @@ export default async function RosterDetailPage({
           <tbody>
             {roster.players.map((player) => (
               <tr key={player.id} className="border-b border-black/5 dark:border-white/5 last:border-0">
-                <td className="py-2 pl-4 pr-4">{player.name}</td>
+                <td className="py-2 pl-4 pr-4">
+                  <div className="flex items-center gap-2">
+                    {player.photoUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={player.photoUrl}
+                        alt={player.name}
+                        className="h-7 w-7 rounded-full object-cover shrink-0"
+                      />
+                    ) : (
+                      <span className="h-7 w-7 rounded-full bg-black/5 dark:bg-white/10 shrink-0" />
+                    )}
+                    {player.name}
+                  </div>
+                </td>
                 <td className="py-2 pr-4">{player.position ?? "—"}</td>
                 <td className="py-2 pr-4">{player.defaultCategory ?? "—"}</td>
                 <td className="py-2 pr-4">

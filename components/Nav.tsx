@@ -4,6 +4,7 @@ import { logoutAction } from "@/lib/actions/auth.actions";
 import { buttonSecondary } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 import { LogoMark } from "@/components/ui/LogoMark";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 export async function Nav() {
   const session = await auth();
@@ -16,6 +17,7 @@ export async function Nav() {
           <span>LeagueForge</span>
         </Link>
         <div className="flex items-center gap-2 sm:gap-3 text-sm">
+          <ThemeToggle />
           {session?.user ? (
             <>
               <span className="flex items-center gap-2 text-black/60 dark:text-white/60">

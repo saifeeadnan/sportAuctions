@@ -114,7 +114,7 @@ export async function TournamentsPanel({ selectedLeagueId }: { selectedLeagueId?
                 className={`${cardInteractive} flex items-center justify-between gap-4 px-4 py-3`}
               >
                 <Link
-                  href={`/admin/tournaments/${t.id}`}
+                  href={`/admin/tournaments/${t.id}${selectedLeagueId ? `?league=${selectedLeagueId}` : ""}`}
                   className="flex-1 flex items-center gap-3 hover:underline"
                 >
                   <span className="flex-1 flex items-center justify-between">

@@ -90,6 +90,7 @@ export default async function TournamentTeamRosterPage({
               players={entry.playersWon.map((ap) => ({
                 id: ap.id,
                 playerName: ap.player.name,
+                photoUrl: ap.player.photoUrl,
                 categoryName: ap.category.name,
                 soldPrice: ap.soldPrice != null ? String(ap.soldPrice) : null,
                 soldVia: ap.soldVia,

@@ -35,7 +35,7 @@ export default async function AdminFantasyTeamsIndexPage({
           {auctions.map((a) => (
             <li key={a.id}>
               <Link
-                href={`/admin/auctions/${a.id}/fantasy-teams`}
+                href={`/admin/auctions/${a.id}/fantasy-teams${league ? `?league=${league}` : ""}`}
                 className={`${cardInteractive} flex items-center justify-between gap-4 px-4 py-3`}
               >
                 <span>

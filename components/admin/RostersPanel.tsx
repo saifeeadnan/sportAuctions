@@ -36,7 +36,7 @@ export async function RostersPanel({ selectedLeagueId }: { selectedLeagueId?: st
           {rosters.map((roster) => (
             <li key={roster.id} className={`${cardInteractive} flex items-center justify-between gap-4 px-4 py-3`}>
               <Link
-                href={`/admin/rosters/${roster.id}`}
+                href={`/admin/rosters/${roster.id}${selectedLeagueId ? `?league=${selectedLeagueId}` : ""}`}
                 className="flex-1 flex items-center justify-between hover:underline"
               >
                 <span>{roster.name}</span>
