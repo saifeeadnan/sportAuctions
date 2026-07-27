@@ -17,6 +17,7 @@ export default async function ManagerHomePage() {
     where: { managerId: session!.user.id },
     include: {
       tournament: true,
+      sponsorImage: { select: { id: true } },
       entries: { include: { auction: true } },
     },
     orderBy: { createdAt: "desc" },
@@ -31,21 +32,31 @@ export default async function ManagerHomePage() {
           You haven&apos;t been assigned to a team yet.
         </p>
       ) : (
-        <ul className="flex flex-col gap-3">
+        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {teams.map((team) => (
-            <li key={team.id} className={`${cardInteractive} px-4 py-3`}>
-              <p className="font-medium">
+            <li key={team.id} className={`${cardInteractive} flex flex-col items-center gap-2 p-4`}>
+              {team.sponsorImage ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={`/api/teams/${team.id}/sponsor-image`}
+                  alt={`${team.name} sponsor`}
+                  className="h-[200px] w-[200px] rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-2"
+                />
+              ) : (
+                <div className="h-[200px] w-[200px] rounded border border-dashed border-black/10 dark:border-white/10 flex items-center justify-center text-xs text-black/30 dark:text-white/30">
+                  No logo
+                </div>
+              )}
+              <p className="font-medium text-center">
                 {team.name} &middot;{" "}
                 <span className="text-black/60 dark:text-white/60">
                   {team.tournament.name}
                 </span>
               </p>
               {team.entries.length === 0 ? (
-                <p className="text-sm text-black/60 dark:text-white/60 mt-1">
-                  No active draft yet.
-                </p>
+                <p className="text-sm text-black/60 dark:text-white/60">No active draft yet.</p>
               ) : (
-                <ul className="mt-1 text-sm flex flex-col gap-1.5">
+                <ul className="text-sm flex flex-col items-center gap-1.5">
                   {team.entries.map((entry) => (
                     <li key={entry.id} className="flex items-center gap-2">
                       <span className="text-black/60 dark:text-white/60">{entry.auction.name}</span>

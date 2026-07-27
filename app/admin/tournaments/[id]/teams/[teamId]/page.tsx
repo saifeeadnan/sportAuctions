@@ -3,6 +3,9 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
 import { ConfirmedRosterTable } from "@/components/roster/ConfirmedRosterTable";
+import { UploadTeamSponsorImageForm } from "@/components/admin/UploadTeamSponsorImageForm";
+import { DeleteTeamSponsorImageButton } from "@/components/admin/DeleteTeamSponsorImageButton";
+import { card } from "@/lib/ui";
 
 export default async function TournamentTeamRosterPage({
   params,
@@ -17,6 +20,7 @@ export default async function TournamentTeamRosterPage({
     include: {
       tournament: true,
       manager: true,
+      sponsorImage: { select: { id: true } },
       entries: {
         include: {
           auction: true,
@@ -38,6 +42,37 @@ export default async function TournamentTeamRosterPage({
           {team.manager ? `Manager: ${team.manager.name}` : "No manager assigned"}
         </p>
       </div>
+
+      <section>
+        <h2 className="text-lg font-medium mb-3">Sponsor picture</h2>
+        <div className={`${card} px-4 py-3 flex items-center justify-between gap-4 flex-wrap mb-3`}>
+          {team.sponsorImage ? (
+            <>
+              <div className="flex items-center gap-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`/api/teams/${team.id}/sponsor-image`}
+                  alt={`${team.name} sponsor`}
+                  className="h-16 w-16 rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-1"
+                />
+              </div>
+              <DeleteTeamSponsorImageButton teamId={team.id} />
+            </>
+          ) : (
+            <p className="text-sm text-black/60 dark:text-white/60">
+              No sponsor picture uploaded yet.
+            </p>
+          )}
+        </div>
+        <details className={card}>
+          <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
+            {team.sponsorImage ? "Replace sponsor picture" : "Upload sponsor picture"}
+          </summary>
+          <div className="px-4 pb-4">
+            <UploadTeamSponsorImageForm teamId={team.id} />
+          </div>
+        </details>
+      </section>
 
       {team.entries.length === 0 ? (
         <p className="text-black/60 dark:text-white/60">

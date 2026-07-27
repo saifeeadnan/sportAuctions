@@ -85,6 +85,22 @@ export async function createTeam(input: CreateTeamInput) {
   });
 }
 
+export async function deleteTeam(teamId: string) {
+  const team = await prisma.team.findUnique({
+    where: { id: teamId },
+    include: { _count: { select: { entries: true } } },
+  });
+  if (!team) throw new ValidationError("Team not found");
+
+  if (team._count.entries > 0) {
+    throw new ValidationError(
+      `Cannot delete "${team.name}" — it has participated in ${team._count.entries} auction(s). Remove those first.`
+    );
+  }
+
+  await prisma.team.delete({ where: { id: teamId } });
+}
+
 export async function deleteTournament(tournamentId: string) {
   const tournament = await prisma.tournament.findUnique({
     where: { id: tournamentId },

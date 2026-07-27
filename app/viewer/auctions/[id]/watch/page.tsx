@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
 import { scopeLeagueId } from "@/lib/auth/guards";
 import { loadScopedAuction } from "@/lib/auth/scope";
-import { getAuctionState } from "@/lib/services/auctionState.service";
+import { getAuctionState, findSoldTeamEntryIdForLoginId } from "@/lib/services/auctionState.service";
 import { getRulesDocumentIfViewable } from "@/lib/services/tournamentDocument.service";
 import { LiveAuctionView } from "@/components/auction/LiveAuctionView";
 
@@ -18,6 +19,15 @@ export default async function WatchPage({
   if (!state) notFound();
 
   const rulesDocument = await getRulesDocumentIfViewable(auction.tournamentId, session!.user);
+
+  // If this viewer is themselves a player who was sold to a team in this
+  // auction, highlight that team the same way a manager's live view does —
+  // this is what surfaces the team's sponsor image to "any player belonging
+  // to the team", not just its manager.
+  const account = await prisma.user.findUnique({ where: { id: session!.user.id } });
+  const myTeamEntryId = account?.loginId
+    ? await findSoldTeamEntryIdForLoginId(id, account.loginId)
+    : null;
 
   return (
     <div>
@@ -35,7 +45,7 @@ export default async function WatchPage({
           </a>
         )}
       </div>
-      <LiveAuctionView initialState={state} />
+      <LiveAuctionView initialState={state} highlightTeamEntryId={myTeamEntryId ?? undefined} />
     </div>
   );
 }

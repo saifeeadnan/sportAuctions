@@ -175,6 +175,17 @@ model TournamentDocument {
   @@map("tournament_documents")
 }
 
+model TeamSponsorImage {
+  id         String   @id @default(cuid())
+  teamId     String   @unique
+  team       Team     @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  mimeType   String
+  data       Bytes
+  uploadedAt DateTime @default(now())
+
+  @@map("team_sponsor_images")
+}
+
 model Team {
   id                  String     @id @default(cuid())
   tournamentId        String
@@ -185,7 +196,8 @@ model Team {
   managerOccupiesSlot Boolean    @default(true)
   createdAt           DateTime   @default(now())
 
-  entries TeamAuctionEntry[]
+  entries      TeamAuctionEntry[]
+  sponsorImage TeamSponsorImage?
 
   @@unique([tournamentId, name])
   @@index([managerId])

@@ -2,12 +2,13 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
-import { createTeamAction } from "@/lib/actions/tournament.actions";
 import { getRulesDocumentMeta } from "@/lib/services/tournamentDocument.service";
 import { DeleteAuctionButton } from "@/components/admin/DeleteAuctionButton";
 import { UploadRulesDocumentForm } from "@/components/admin/UploadRulesDocumentForm";
 import { DeleteRulesDocumentButton } from "@/components/admin/DeleteRulesDocumentButton";
-import { card, cardInteractive, buttonPrimary, buttonSecondary, inputClass } from "@/lib/ui";
+import { AddTeamForm } from "@/components/admin/AddTeamForm";
+import { DeleteTeamButton } from "@/components/admin/DeleteTeamButton";
+import { card, cardInteractive } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 
 const AUCTION_STATUS_VARIANT: Record<string, "neutral" | "info" | "success" | "warning"> = {
@@ -27,7 +28,17 @@ export default async function TournamentDetailPage({
 
   const tournament = await prisma.tournament.findUnique({
     where: { id },
-    include: { roster: true, teams: { include: { manager: true }, orderBy: { createdAt: "asc" } } },
+    include: {
+      roster: true,
+      teams: {
+        include: {
+          manager: true,
+          sponsorImage: { select: { id: true } },
+          _count: { select: { entries: true } },
+        },
+        orderBy: { createdAt: "asc" },
+      },
+    },
   });
   if (!tournament) notFound();
   assertInScope(leagueId, tournament.leagueId);
@@ -57,8 +68,42 @@ export default async function TournamentDetailPage({
       </div>
 
       <section>
+        <h2 className="text-lg font-medium mb-3">Actions</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <details className={card}>
+            <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
+              {rulesDocument ? "Replace rules document" : "Upload rules document"}
+            </summary>
+            <div className="px-4 pb-4">
+              <UploadRulesDocumentForm tournamentId={tournament.id} />
+            </div>
+          </details>
+
+          {canAddTeam ? (
+            <details className={card}>
+              <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
+                Add team
+              </summary>
+              <AddTeamForm tournamentId={tournament.id} managers={managers} />
+            </details>
+          ) : (
+            <div className={`${card} px-4 py-3 text-sm text-black/60 dark:text-white/60`}>
+              Maximum number of teams reached.
+            </div>
+          )}
+
+          <Link
+            href={`/admin/tournaments/${tournament.id}/auctions/new`}
+            className={`${card} flex items-center px-4 py-3 text-sm font-medium hover:border-black/15 dark:hover:border-white/20 transition-colors`}
+          >
+            New auction
+          </Link>
+        </div>
+      </section>
+
+      <section>
         <h2 className="text-lg font-medium mb-3">Rules document</h2>
-        <div className={`${card} px-4 py-3 flex items-center justify-between gap-4 flex-wrap mb-3`}>
+        <div className={`${card} px-4 py-3 flex items-center justify-between gap-4 flex-wrap`}>
           {rulesDocument ? (
             <>
               <div className="text-sm">
@@ -84,14 +129,6 @@ export default async function TournamentDetailPage({
             </p>
           )}
         </div>
-        <details className={card}>
-          <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
-            {rulesDocument ? "Replace rules document" : "Upload rules document"}
-          </summary>
-          <div className="px-4 pb-4">
-            <UploadRulesDocumentForm tournamentId={tournament.id} />
-          </div>
-        </details>
       </section>
 
       <section>
@@ -99,19 +136,38 @@ export default async function TournamentDetailPage({
         {tournament.teams.length === 0 ? (
           <p className="text-black/60 dark:text-white/60 mb-4">No teams yet.</p>
         ) : (
-          <ul className="flex flex-col gap-2 mb-4">
+          <ul className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
             {tournament.teams.map((team) => (
-              <li
-                key={team.id}
-                className={`${cardInteractive} flex items-center justify-between px-4 py-3`}
-              >
+              <li key={team.id} className={`${cardInteractive} relative flex flex-col items-center gap-2 p-4`}>
+                <div className="absolute top-2 right-2">
+                  <DeleteTeamButton
+                    teamId={team.id}
+                    teamName={team.name}
+                    entryCount={team._count.entries}
+                    compact
+                  />
+                </div>
                 <Link
                   href={`/admin/tournaments/${tournament.id}/teams/${team.id}`}
-                  className="underline underline-offset-2"
+                  className="flex flex-col items-center gap-2"
                 >
-                  {team.name}
+                  {team.sponsorImage ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={`/api/teams/${team.id}/sponsor-image`}
+                      alt={`${team.name} sponsor`}
+                      className="h-[200px] w-[200px] rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-2"
+                    />
+                  ) : (
+                    <div className="h-[200px] w-[200px] rounded border border-dashed border-black/10 dark:border-white/10 flex items-center justify-center text-xs text-black/30 dark:text-white/30">
+                      No logo
+                    </div>
+                  )}
+                  <span className="font-medium underline underline-offset-2 text-center">
+                    {team.name}
+                  </span>
                 </Link>
-                <span className="text-sm text-black/60 dark:text-white/60">
+                <span className="text-sm text-black/60 dark:text-white/60 text-center">
                   {team.manager ? team.manager.name : "No manager assigned"}
                   {team.managerOccupiesSlot ? " (occupies a slot)" : ""}
                 </span>
@@ -119,52 +175,10 @@ export default async function TournamentDetailPage({
             ))}
           </ul>
         )}
-
-        {canAddTeam ? (
-          <details className={card}>
-            <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
-              Add team
-            </summary>
-            <form action={createTeamAction} className="flex flex-col gap-3 max-w-sm px-4 pb-4">
-              <input type="hidden" name="tournamentId" value={tournament.id} />
-              <label className="flex flex-col gap-1 text-sm">
-                Team name
-                <input name="name" required className={inputClass} />
-              </label>
-              <label className="flex flex-col gap-1 text-sm">
-                Manager
-                <select name="managerId" className={inputClass}>
-                  <option value="">— None yet —</option>
-                  {managers.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name} ({m.loginId})
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <input type="hidden" name="managerOccupiesSlot" value="off" />
-              <button type="submit" className={`${buttonPrimary} mt-2 self-start`}>
-                Add team
-              </button>
-            </form>
-          </details>
-        ) : (
-          <p className="text-sm text-black/60 dark:text-white/60">
-            Maximum number of teams reached.
-          </p>
-        )}
       </section>
 
       <section>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-medium">Auctions</h2>
-          <Link
-            href={`/admin/tournaments/${tournament.id}/auctions/new`}
-            className={`${buttonSecondary} px-3 py-2 text-sm`}
-          >
-            New auction
-          </Link>
-        </div>
+        <h2 className="text-lg font-medium mb-3">Auctions</h2>
         {auctions.length === 0 ? (
           <p className="text-black/60 dark:text-white/60">No auctions yet.</p>
         ) : (

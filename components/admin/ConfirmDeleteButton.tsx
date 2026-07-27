@@ -7,10 +7,16 @@ export function ConfirmDeleteButton({
   confirmMessage,
   action,
   disabledReason,
+  label = "Delete",
+  loadingLabel = "Deleting…",
+  className,
 }: {
   confirmMessage: string;
   action: () => Promise<void>;
   disabledReason?: string;
+  label?: string;
+  loadingLabel?: string;
+  className?: string;
 }) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -18,8 +24,11 @@ export function ConfirmDeleteButton({
 
   if (disabledReason) {
     return (
-      <span className="text-xs text-black/40 dark:text-white/40" title={disabledReason}>
-        Delete
+      <span
+        className={className ?? "text-xs text-black/40 dark:text-white/40"}
+        title={disabledReason}
+      >
+        {label}
       </span>
     );
   }
@@ -43,9 +52,12 @@ export function ConfirmDeleteButton({
         type="button"
         onClick={handleDelete}
         disabled={loading}
-        className="text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 underline underline-offset-2 transition-colors disabled:opacity-50"
+        className={
+          className ??
+          "text-xs text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 underline underline-offset-2 transition-colors disabled:opacity-50"
+        }
       >
-        {loading ? "Deleting…" : "Delete"}
+        {loading ? loadingLabel : label}
       </button>
       {error && <span className="text-xs text-red-600 max-w-[16rem] text-right">{error}</span>}
     </div>

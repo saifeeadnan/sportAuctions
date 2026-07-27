@@ -3,8 +3,8 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireAdminOrLeagueAdmin } from "@/lib/auth/guards";
-import { loadScopedRoster, loadScopedTournament } from "@/lib/auth/scope";
-import { createTournament, createTeam, deleteTournament } from "@/lib/services/tournament.service";
+import { loadScopedRoster, loadScopedTournament, loadScopedTeam } from "@/lib/auth/scope";
+import { createTournament, deleteTournament, deleteTeam } from "@/lib/services/tournament.service";
 
 export async function createTournamentAction(formData: FormData) {
   const { session, leagueId } = await requireAdminOrLeagueAdmin();
@@ -25,27 +25,17 @@ export async function createTournamentAction(formData: FormData) {
   redirect(`/admin/tournaments/${tournament.id}`);
 }
 
-export async function createTeamAction(formData: FormData) {
-  const { leagueId } = await requireAdminOrLeagueAdmin();
-
-  const tournamentId = String(formData.get("tournamentId") ?? "");
-  const managerId = String(formData.get("managerId") ?? "");
-  await loadScopedTournament(tournamentId, leagueId);
-
-  await createTeam({
-    tournamentId,
-    name: String(formData.get("name") ?? ""),
-    managerId: managerId || undefined,
-    managerOccupiesSlot: formData.get("managerOccupiesSlot") === "on",
-  });
-
-  redirect(`/admin/tournaments/${tournamentId}`);
-}
-
 export async function deleteTournamentAction(tournamentId: string) {
   const { leagueId } = await requireAdminOrLeagueAdmin();
   await loadScopedTournament(tournamentId, leagueId);
   await deleteTournament(tournamentId);
   revalidatePath("/admin/tournaments");
   revalidatePath("/");
+}
+
+export async function deleteTeamAction(teamId: string) {
+  const { leagueId } = await requireAdminOrLeagueAdmin();
+  const team = await loadScopedTeam(teamId, leagueId);
+  await deleteTeam(teamId);
+  revalidatePath(`/admin/tournaments/${team.tournamentId}`);
 }

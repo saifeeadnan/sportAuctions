@@ -22,11 +22,13 @@ export type AuctionStatePlayer = {
 
 export type AuctionStateTeam = {
   id: string;
+  teamId: string;
   teamName: string;
   status: string;
   budgetRemaining: string;
   slotsFilled: number;
   slotsTotal: number;
+  hasSponsorImage: boolean;
 };
 
 export type AuctionState = {
@@ -47,7 +49,10 @@ export async function getAuctionState(auctionId: string): Promise<AuctionState |
         include: { player: true, category: true, soldToEntry: { include: { team: true } } },
         orderBy: { player: { name: "asc" } },
       },
-      entries: { include: { team: true }, orderBy: { team: { name: "asc" } } },
+      entries: {
+        include: { team: { include: { sponsorImage: { select: { id: true } } } } },
+        orderBy: { team: { name: "asc" } },
+      },
     },
   });
   if (!auction) return null;
@@ -78,11 +83,32 @@ export async function getAuctionState(auctionId: string): Promise<AuctionState |
     })),
     teams: auction.entries.map((e) => ({
       id: e.id,
+      teamId: e.teamId,
       teamName: e.team.name,
       status: e.status,
       budgetRemaining: String(e.budgetRemaining),
       slotsFilled: e.slotsFilled,
       slotsTotal: e.slotsTotal,
+      hasSponsorImage: !!e.team.sponsorImage,
     })),
   };
+}
+
+/** The team-auction-entry a player (matched by login ID) was sold to in this
+ * auction, if any — lets a player's own watch view highlight "their" team the
+ * same way a manager's live view already does. */
+export async function findSoldTeamEntryIdForLoginId(
+  auctionId: string,
+  loginId: string
+): Promise<string | null> {
+  const soldAuctionPlayer = await prisma.auctionPlayer.findFirst({
+    where: {
+      auctionId,
+      status: "SOLD",
+      soldToEntryId: { not: null },
+      player: { loginId: { equals: loginId, mode: "insensitive" } },
+    },
+    select: { soldToEntryId: true },
+  });
+  return soldAuctionPlayer?.soldToEntryId ?? null;
 }

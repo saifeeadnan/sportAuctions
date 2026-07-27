@@ -36,7 +36,17 @@ export function LiveAuctionView({
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <section className="rounded border border-black/20 dark:border-white/20 px-4 py-3 flex flex-col gap-2">
-              <p className="font-medium">{myTeam.teamName} (your team)</p>
+              <div className="flex items-center gap-3">
+                {myTeam.hasSponsorImage && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={`/api/teams/${myTeam.teamId}/sponsor-image`}
+                    alt={`${myTeam.teamName} sponsor`}
+                    className="h-12 w-12 rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-1 shrink-0"
+                  />
+                )}
+                <p className="font-medium">{myTeam.teamName} (your team)</p>
+              </div>
               <p className="text-sm text-black/60 dark:text-white/60">
                 Budget remaining: {myTeam.budgetRemaining} &middot; Slots: {myTeam.slotsFilled}/
                 {myTeam.slotsTotal}

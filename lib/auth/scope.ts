@@ -39,3 +39,13 @@ export async function loadScopedAuction(auctionId: string, leagueId: string | nu
   assertInScope(leagueId, auction.tournament.leagueId);
   return auction;
 }
+
+export async function loadScopedTeam(teamId: string, leagueId: string | null) {
+  const team = await prisma.team.findUnique({
+    where: { id: teamId },
+    include: { tournament: true },
+  });
+  if (!team) throw new ValidationError("Team not found");
+  assertInScope(leagueId, team.tournament.leagueId);
+  return team;
+}
