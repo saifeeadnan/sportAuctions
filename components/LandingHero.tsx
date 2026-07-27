@@ -50,6 +50,17 @@ const FEATURES: { title: string; description: string; icon: React.ReactNode }[] 
       />
     ),
   },
+  {
+    title: "Fantasy teams",
+    description: "Build your team from auction prices and climb the leaderboard.",
+    icon: (
+      <path
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M12 3.5 14.5 9l5.5.6-4.1 4 1 6-5.9-3.4-5.9 3.4 1-6-4.1-4L9.5 9 12 3.5Z"
+      />
+    ),
+  },
 ];
 
 export function LandingHero() {
@@ -107,7 +118,7 @@ export function LandingHero() {
           </div>
         </div>
 
-        <div className="mt-20 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-20 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           {FEATURES.map((f) => (
             <div key={f.title} className={`${card} p-5`}>
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 mb-3">
