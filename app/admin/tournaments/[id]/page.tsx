@@ -11,6 +11,7 @@ import { AddTeamForm } from "@/components/admin/AddTeamForm";
 import { DeleteTeamButton } from "@/components/admin/DeleteTeamButton";
 import { AddTournamentSponsorForm } from "@/components/admin/AddTournamentSponsorForm";
 import { DeleteTournamentSponsorButton } from "@/components/admin/DeleteTournamentSponsorButton";
+import { SponsorLink } from "@/components/tournament/SponsorLink";
 import { card, cardInteractive } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 
@@ -149,14 +150,13 @@ export default async function TournamentDetailPage({
                     className="h-20 w-20 rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-2"
                   />
                   {sponsor.websiteUrl ? (
-                    <a
-                      href={sponsor.websiteUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <SponsorLink
+                      sponsorId={sponsor.id}
+                      websiteUrl={sponsor.websiteUrl}
                       className="text-sm font-medium underline underline-offset-2 text-center"
                     >
                       {sponsor.name}
-                    </a>
+                    </SponsorLink>
                   ) : (
                     <span className="text-sm font-medium text-center">{sponsor.name}</span>
                   )}
