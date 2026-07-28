@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { requireRole } from "@/lib/auth/guards";
 import { listLeagues } from "@/lib/services/league.service";
 import { AdminTabs } from "@/components/admin/AdminTabs";
@@ -20,17 +19,7 @@ export default async function AdminLayout({
         {leagues && <AdminLeagueSidebar leagues={leagues} />}
         <div className="flex-1 min-w-0">
           {leagues && <ActiveLeagueBanner leagues={leagues} />}
-          <div className="flex items-center justify-between gap-4 mb-4">
-            <AdminTabs />
-            {isSiteAdmin && (
-              <Link
-                href="/admin/analytics"
-                className="shrink-0 text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:underline underline-offset-2"
-              >
-                Analytics
-              </Link>
-            )}
-          </div>
+          <AdminTabs />
           {children}
         </div>
       </div>
