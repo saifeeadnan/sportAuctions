@@ -103,15 +103,25 @@ export function DraftForm({
   ];
 
   return (
-    <div className="flex flex-col gap-4">
-      <p className="text-sm">
-        Selected {selected.size}/{cap} &middot; Total base price: {formatAmount(totalBasePrice)}{" "}
-        &middot; Budget remaining after selection:{" "}
-        <span className={budgetRemainingAfterSelection < 0 ? "text-red-600 dark:text-red-400" : ""}>
-          {formatAmount(budgetRemainingAfterSelection)}
-        </span>
-      </p>
-      <TeamStrengthSummary players={teamSoFar} />
+    <div className="flex flex-col gap-3">
+      {/* Pinned just below the nav bar so the running budget total is always
+          on screen while scrolling through the player pool, no matter how
+          long the confirmed-roster column next to it gets. */}
+      <div className="sticky top-14 z-10 -mx-1 px-1 pt-1 pb-2 bg-white/95 dark:bg-black/70 backdrop-blur-sm rounded-lg flex flex-col gap-2">
+        <p className="text-sm">
+          Selected {selected.size}/{cap} &middot; Budget remaining:{" "}
+          <span
+            className={
+              budgetRemainingAfterSelection < 0
+                ? "text-red-600 dark:text-red-400 font-medium"
+                : "font-medium"
+            }
+          >
+            {formatAmount(budgetRemainingAfterSelection)}
+          </span>
+        </p>
+        <TeamStrengthSummary players={teamSoFar} />
+      </div>
 
       <div className={tabsTrack}>
         {categories.map((cat) => {
@@ -132,33 +142,37 @@ export function DraftForm({
         })}
       </div>
 
-      <ul className="flex flex-col gap-1.5">
-        {visiblePlayers.map((p) => {
-          const isLocked = p.id === lockedPlayerId;
-          const wouldExceedBudget =
-            !selected.has(p.id) && totalBasePrice + Number(p.basePrice) > budget;
-          return (
-            <li key={p.id}>
-              <label className={`${card} flex items-center gap-2 text-sm px-3 py-2`}>
-                <input
-                  type="checkbox"
-                  checked={selected.has(p.id)}
-                  onChange={() => toggle(p.id)}
-                  disabled={
-                    isLocked ||
-                    (!selected.has(p.id) && (selected.size >= cap || wouldExceedBudget))
-                  }
-                />
-                <span className="flex-1">
-                  {p.name} {p.position ? `(${p.position})` : ""}
-                  {isLocked ? " — you (locked in)" : ""}
-                </span>
-                <span className="text-black/60 dark:text-white/60">base {p.basePrice}</span>
-              </label>
-            </li>
-          );
-        })}
-      </ul>
+      {/* ~15 rows: each row is 36px (text-sm + py-2) plus a 6px gap between
+          them and 16px of container padding — 15*36 + 14*6 + 16 = 640px. */}
+      <div className={`${card} max-h-[640px] overflow-y-auto`}>
+        <ul className="flex flex-col gap-1.5 p-2">
+          {visiblePlayers.map((p) => {
+            const isLocked = p.id === lockedPlayerId;
+            const wouldExceedBudget =
+              !selected.has(p.id) && totalBasePrice + Number(p.basePrice) > budget;
+            return (
+              <li key={p.id}>
+                <label className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={selected.has(p.id)}
+                    onChange={() => toggle(p.id)}
+                    disabled={
+                      isLocked ||
+                      (!selected.has(p.id) && (selected.size >= cap || wouldExceedBudget))
+                    }
+                  />
+                  <span className="flex-1">
+                    {p.name} {p.position ? `(${p.position})` : ""}
+                    {isLocked ? " — you (locked in)" : ""}
+                  </span>
+                  <span className="text-black/60 dark:text-white/60">base {p.basePrice}</span>
+                </label>
+              </li>
+            );
+          })}
+        </ul>
+      </div>
 
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
       {saved && <p className="text-sm text-emerald-600 dark:text-emerald-400">Draft submitted.</p>}
