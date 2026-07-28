@@ -15,6 +15,18 @@ function formatDuration(ms: number) {
   return `${hours}h ${minutes}m`;
 }
 
+// "America/New_York" (not a fixed "EST" offset) so this stays correct across
+// the EST/EDT daylight-saving switch instead of drifting an hour off twice a year.
+function formatEastern(date: Date) {
+  return (
+    date.toLocaleString("en-US", {
+      timeZone: "America/New_York",
+      dateStyle: "medium",
+      timeStyle: "short",
+    }) + " ET"
+  );
+}
+
 export default async function AdminAnalyticsPage() {
   await requireRole("ADMIN");
 
@@ -59,7 +71,7 @@ export default async function AdminAnalyticsPage() {
                     <td className="py-2 pr-4">
                       <Badge variant="info">{event.user.role}</Badge>
                     </td>
-                    <td className="py-2 pr-4 whitespace-nowrap">{event.loginAt.toLocaleString()}</td>
+                    <td className="py-2 pr-4 whitespace-nowrap">{formatEastern(event.loginAt)}</td>
                     <td className="py-2 pr-4 text-black/50 dark:text-white/50">{event.ipAddress ?? "—"}</td>
                   </tr>
                 ))}
