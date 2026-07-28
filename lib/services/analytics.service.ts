@@ -38,12 +38,25 @@ export async function recordSponsorClick(input: RecordSponsorClickInput) {
   });
 }
 
-export async function getLoginSummary(take = 50) {
-  const [total, recent] = await Promise.all([
+export type PaginationParams = { page?: number; pageSize?: number };
+export type PaginatedResult<T> = { items: T[]; total: number; page: number; pageSize: number };
+
+export async function getLoginSummary({
+  page = 1,
+  pageSize = 10,
+}: PaginationParams = {}): Promise<PaginatedResult<{
+  id: string;
+  loginAt: Date;
+  ipAddress: string | null;
+  userAgent: string | null;
+  user: { id: string; name: string; loginId: string; role: string };
+}>> {
+  const [total, items] = await Promise.all([
     prisma.loginEvent.count(),
     prisma.loginEvent.findMany({
       orderBy: { loginAt: "desc" },
-      take,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
       select: {
         id: true,
         loginAt: true,
@@ -53,10 +66,22 @@ export async function getLoginSummary(take = 50) {
       },
     }),
   ]);
-  return { total, recent };
+  return { items, total, page, pageSize };
 }
 
-export async function getTimeSpentSummary() {
+export async function getTimeSpentSummary({
+  page = 1,
+  pageSize = 10,
+}: PaginationParams = {}): Promise<
+  PaginatedResult<{
+    userId: string;
+    name: string;
+    loginId: string;
+    role: string;
+    totalMs: number;
+    sessionCount: number;
+  }>
+> {
   const sessions = await prisma.analyticsSession.findMany({
     select: {
       userId: true,
@@ -85,15 +110,30 @@ export async function getTimeSpentSummary() {
     byUser.set(s.userId, entry);
   }
 
-  return Array.from(byUser.values()).sort((a, b) => b.totalMs - a.totalMs);
+  // Aggregated across ALL sessions first (there's no way to sort/page this at
+  // the DB level since totals are only known after grouping by user in JS),
+  // then paginated same as the other two summaries.
+  const sorted = Array.from(byUser.values()).sort((a, b) => b.totalMs - a.totalMs);
+  const start = (page - 1) * pageSize;
+  return { items: sorted.slice(start, start + pageSize), total: sorted.length, page, pageSize };
 }
 
-export async function getSponsorClickSummary() {
+export async function getSponsorClickSummary({
+  page = 1,
+  pageSize = 10,
+}: PaginationParams = {}): Promise<
+  PaginatedResult<{
+    sponsorId: string;
+    clicks: number;
+    sponsorName: string;
+    tournamentName: string | null;
+  }>
+> {
   const grouped = await prisma.sponsorClickEvent.groupBy({
     by: ["sponsorId"],
     _count: { _all: true },
   });
-  if (grouped.length === 0) return [];
+  if (grouped.length === 0) return { items: [], total: 0, page, pageSize };
 
   const sponsors = await prisma.tournamentSponsor.findMany({
     where: { id: { in: grouped.map((g) => g.sponsorId) } },
@@ -101,7 +141,7 @@ export async function getSponsorClickSummary() {
   });
   const sponsorById = new Map(sponsors.map((s) => [s.id, s]));
 
-  return grouped
+  const sorted = grouped
     .map((g) => ({
       sponsorId: g.sponsorId,
       clicks: g._count._all,
@@ -109,4 +149,7 @@ export async function getSponsorClickSummary() {
       tournamentName: sponsorById.get(g.sponsorId)?.tournament.name ?? null,
     }))
     .sort((a, b) => b.clicks - a.clicks);
+
+  const start = (page - 1) * pageSize;
+  return { items: sorted.slice(start, start + pageSize), total: sorted.length, page, pageSize };
 }
