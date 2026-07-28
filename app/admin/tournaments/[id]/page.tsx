@@ -3,11 +3,14 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
 import { getRulesDocumentMeta } from "@/lib/services/tournamentDocument.service";
+import { listTournamentSponsors } from "@/lib/services/tournamentSponsor.service";
 import { DeleteAuctionButton } from "@/components/admin/DeleteAuctionButton";
 import { UploadRulesDocumentForm } from "@/components/admin/UploadRulesDocumentForm";
 import { DeleteRulesDocumentButton } from "@/components/admin/DeleteRulesDocumentButton";
 import { AddTeamForm } from "@/components/admin/AddTeamForm";
 import { DeleteTeamButton } from "@/components/admin/DeleteTeamButton";
+import { AddTournamentSponsorForm } from "@/components/admin/AddTournamentSponsorForm";
+import { DeleteTournamentSponsorButton } from "@/components/admin/DeleteTournamentSponsorButton";
 import { card, cardInteractive } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 
@@ -45,13 +48,14 @@ export default async function TournamentDetailPage({
 
   // Filtered by the tournament's own league (not the caller's) — a site ADMIN
   // editing one specific tournament should only see that league's managers.
-  const [managers, auctions, rulesDocument] = await Promise.all([
+  const [managers, auctions, rulesDocument, sponsors] = await Promise.all([
     prisma.user.findMany({
       where: { role: "TEAM_MANAGER", leagueId: tournament.leagueId },
       orderBy: { name: "asc" },
     }),
     prisma.auction.findMany({ where: { tournamentId: id }, orderBy: { createdAt: "desc" } }),
     getRulesDocumentMeta(id),
+    listTournamentSponsors(id),
   ]);
 
   const canAddTeam = tournament.teams.length < tournament.numTeams;
@@ -69,12 +73,25 @@ export default async function TournamentDetailPage({
 
       <section>
         <h2 className="text-lg font-medium mb-3">Actions</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <details className={card}>
             <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
               {rulesDocument ? "Replace rules document" : "Upload rules document"}
             </summary>
-            <div className="px-4 pb-4">
+            <div className="px-4 pb-4 flex flex-col gap-3">
+              {rulesDocument && (
+                <div className="text-sm flex items-center justify-between gap-3 flex-wrap">
+                  <a
+                    href={`/tournaments/${tournament.id}/rules`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline underline-offset-2"
+                  >
+                    {rulesDocument.fileName}
+                  </a>
+                  <DeleteRulesDocumentButton tournamentId={tournament.id} />
+                </div>
+              )}
               <UploadRulesDocumentForm tournamentId={tournament.id} />
             </div>
           </details>
@@ -92,6 +109,13 @@ export default async function TournamentDetailPage({
             </div>
           )}
 
+          <details className={card}>
+            <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
+              Add sponsor
+            </summary>
+            <AddTournamentSponsorForm tournamentId={tournament.id} />
+          </details>
+
           <Link
             href={`/admin/tournaments/${tournament.id}/auctions/new`}
             className={`${card} flex items-center px-4 py-3 text-sm font-medium hover:border-black/15 dark:hover:border-white/20 transition-colors`}
@@ -101,35 +125,47 @@ export default async function TournamentDetailPage({
         </div>
       </section>
 
-      <section>
-        <h2 className="text-lg font-medium mb-3">Rules document</h2>
-        <div className={`${card} px-4 py-3 flex items-center justify-between gap-4 flex-wrap`}>
-          {rulesDocument ? (
-            <>
-              <div className="text-sm">
-                <a
-                  href={`/tournaments/${tournament.id}/rules`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline underline-offset-2"
-                >
-                  {rulesDocument.fileName}
-                </a>
-                <span className="text-black/50 dark:text-white/50">
-                  {" "}
-                  &middot; uploaded {rulesDocument.uploadedAt.toDateString()}
-                </span>
-              </div>
-              <DeleteRulesDocumentButton tournamentId={tournament.id} />
-            </>
+      <details className={card}>
+        <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
+          Sponsors ({sponsors.length})
+        </summary>
+        <div className="px-4 pb-4">
+          {sponsors.length === 0 ? (
+            <p className="text-sm text-black/60 dark:text-white/60">No sponsors added yet.</p>
           ) : (
-            <p className="text-sm text-black/60 dark:text-white/60">
-              No rules document uploaded yet. Players on this tournament&apos;s roster will be
-              able to view it once uploaded.
-            </p>
+            <ul className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              {sponsors.map((sponsor) => (
+                <li
+                  key={sponsor.id}
+                  className={`${cardInteractive} relative flex flex-col items-center gap-2 p-3`}
+                >
+                  <div className="absolute top-2 right-2">
+                    <DeleteTournamentSponsorButton sponsorId={sponsor.id} sponsorName={sponsor.name} />
+                  </div>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={`/api/tournament-sponsors/${sponsor.id}`}
+                    alt={sponsor.name}
+                    className="h-20 w-20 rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-2"
+                  />
+                  {sponsor.websiteUrl ? (
+                    <a
+                      href={sponsor.websiteUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm font-medium underline underline-offset-2 text-center"
+                    >
+                      {sponsor.name}
+                    </a>
+                  ) : (
+                    <span className="text-sm font-medium text-center">{sponsor.name}</span>
+                  )}
+                </li>
+              ))}
+            </ul>
           )}
         </div>
-      </section>
+      </details>
 
       <section>
         <h2 className="text-lg font-medium mb-3">Teams</h2>
@@ -156,10 +192,10 @@ export default async function TournamentDetailPage({
                     <img
                       src={`/api/teams/${team.id}/sponsor-image`}
                       alt={`${team.name} sponsor`}
-                      className="h-[200px] w-[200px] rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-2"
+                      className="h-20 w-20 rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-2"
                     />
                   ) : (
-                    <div className="h-[200px] w-[200px] rounded border border-dashed border-black/10 dark:border-white/10 flex items-center justify-center text-xs text-black/30 dark:text-white/30">
+                    <div className="h-20 w-20 rounded border border-dashed border-black/10 dark:border-white/10 flex items-center justify-center text-xs text-black/30 dark:text-white/30">
                       No logo
                     </div>
                   )}

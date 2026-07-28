@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { inputClass, buttonPrimary, buttonSecondary } from "@/lib/ui";
+import { inputClass, selectClass, buttonPrimary, buttonSecondary } from "@/lib/ui";
 
 type RowError = { rowNumber: number; message: string };
 type PreviewResult = {
@@ -101,7 +101,7 @@ export function UploadRosterForm({
               required
               value={leagueId}
               onChange={(e) => setLeagueId(e.target.value)}
-              className={inputClass}
+              className={selectClass}
             >
               {leagues.length === 0 && <option value="">— No leagues yet —</option>}
               {leagues.map((l) => (

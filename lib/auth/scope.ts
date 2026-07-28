@@ -49,3 +49,13 @@ export async function loadScopedTeam(teamId: string, leagueId: string | null) {
   assertInScope(leagueId, team.tournament.leagueId);
   return team;
 }
+
+export async function loadScopedTournamentSponsor(sponsorId: string, leagueId: string | null) {
+  const sponsor = await prisma.tournamentSponsor.findUnique({
+    where: { id: sponsorId },
+    include: { tournament: true },
+  });
+  if (!sponsor) throw new ValidationError("Sponsor not found");
+  assertInScope(leagueId, sponsor.tournament.leagueId);
+  return sponsor;
+}

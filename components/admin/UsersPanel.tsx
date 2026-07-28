@@ -5,7 +5,7 @@ import { listLeagues } from "@/lib/services/league.service";
 import { registerUserAction } from "@/lib/actions/auth.actions";
 import { DeleteUserButton } from "@/components/admin/DeleteUserButton";
 import { NameLoginIdFields } from "@/components/admin/NameLoginIdFields";
-import { card, buttonPrimary, inputClass, tabsTrack, tabItem } from "@/lib/ui";
+import { card, buttonPrimary, inputClass, selectClass, tabsTrack, tabItem } from "@/lib/ui";
 
 const ROLES = ["ADMIN", "LEAGUE_ADMIN", "TEAM_MANAGER", "AUCTIONEER", "VIEWER"] as const;
 export type RoleTab = (typeof ROLES)[number];
@@ -79,7 +79,7 @@ export async function UsersPanel({
                 name="role"
                 required
                 defaultValue={creatableRoles.includes(activeRole) ? activeRole : creatableRoles[0]}
-                className={inputClass}
+                className={selectClass}
               >
                 {creatableRoles
                   .filter((r) => r !== "ADMIN")
@@ -97,7 +97,7 @@ export async function UsersPanel({
               League (not used for Admin accounts)
               <select
                 name="leagueId"
-                className={inputClass}
+                className={selectClass}
                 defaultValue={displayLeagueId ?? leagues[0]?.id ?? ""}
               >
                 {leagues.length === 0 && <option value="">— No leagues yet —</option>}

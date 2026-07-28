@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { resolveAdminScope } from "@/lib/auth/scope";
 import { DeleteTournamentButton } from "@/components/admin/DeleteTournamentButton";
 import { createTournamentAction } from "@/lib/actions/tournament.actions";
-import { card, cardInteractive, buttonPrimary, inputClass } from "@/lib/ui";
+import { card, cardInteractive, buttonPrimary, inputClass, selectClass } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 
 export async function TournamentsPanel({ selectedLeagueId }: { selectedLeagueId?: string }) {
@@ -50,7 +50,7 @@ export async function TournamentsPanel({ selectedLeagueId }: { selectedLeagueId?
               </label>
               <label className="flex flex-col gap-1 text-sm">
                 Player roster
-                <select name="rosterId" required className={inputClass}>
+                <select name="rosterId" required className={selectClass}>
                   {leagueId
                     ? rosters.map((r) => (
                         <option key={r.id} value={r.id}>

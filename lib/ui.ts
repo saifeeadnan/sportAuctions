@@ -19,6 +19,14 @@ export const buttonDanger =
 export const inputClass =
   "rounded-lg border border-black/15 dark:border-white/15 bg-transparent px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/60 transition-colors";
 
+// <select>'s open dropdown popup is drawn by the OS on Windows, not the
+// browser — Chromium there doesn't reliably apply color-scheme/dark: to it,
+// which left option text unreadable (light text inherited from the page,
+// against a popup that stayed OS white). Forcing the control itself to
+// always render light sidesteps that platform limitation entirely.
+export const selectClass =
+  "rounded-lg border border-black/15 bg-white text-black px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-500/60 transition-colors [color-scheme:light]";
+
 export const tabsTrack = "inline-flex flex-wrap gap-1 rounded-lg bg-black/[0.04] dark:bg-white/[0.06] p-1";
 
 export function tabItem(active: boolean) {

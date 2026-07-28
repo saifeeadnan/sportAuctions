@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createAuctionAction } from "@/lib/actions/auction.actions";
-import { card, buttonPrimary, inputClass, tabsTrack, tabItem } from "@/lib/ui";
+import { card, buttonPrimary, inputClass, selectClass, tabsTrack, tabItem } from "@/lib/ui";
 import {
   AUCTION_TYPES,
   AUCTION_TYPE_LABELS,
@@ -183,7 +183,7 @@ export function NewAuctionForm({
             <select
               value={auctionType}
               onChange={(e) => setAuctionType(e.target.value as AuctionType)}
-              className={inputClass}
+              className={selectClass}
             >
               {AUCTION_TYPES.map((type) => (
                 <option key={type} value={type}>
@@ -291,7 +291,7 @@ export function NewAuctionForm({
                       <select
                         value={assignments[p.id] ?? ""}
                         onChange={(e) => assignPlayer(p.id, e.target.value)}
-                        className={`${inputClass} py-1`}
+                        className={`${selectClass} py-1`}
                       >
                         <option value="">— Exclude —</option>
                         {categoryNames.map((name) => (

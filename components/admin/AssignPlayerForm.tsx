@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { adminAssignPlayerAction } from "@/lib/actions/bidding.actions";
-import { buttonPrimary, inputClass } from "@/lib/ui";
+import { buttonPrimary, inputClass, selectClass } from "@/lib/ui";
 
 type PlayerOption = { id: string; name: string; categoryName: string; basePrice: string };
 type TeamOption = {
@@ -67,7 +67,7 @@ export function AssignPlayerForm({
         <select
           value={playerId}
           onChange={(e) => handlePlayerChange(e.target.value)}
-          className={inputClass}
+          className={selectClass}
         >
           <option value="">Select player…</option>
           {players.map((p) => (
@@ -83,7 +83,7 @@ export function AssignPlayerForm({
         <select
           value={teamEntryId}
           onChange={(e) => setTeamEntryId(e.target.value)}
-          className={inputClass}
+          className={selectClass}
         >
           <option value="">Select team…</option>
           {teams

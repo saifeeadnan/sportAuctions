@@ -7,9 +7,11 @@ import {
   listFantasyPlayerPool,
 } from "@/lib/services/fantasyTeam.service";
 import { getRulesDocumentIfViewable } from "@/lib/services/tournamentDocument.service";
+import { listTournamentSponsors } from "@/lib/services/tournamentSponsor.service";
 import { FantasyTeamForm } from "@/components/viewer/FantasyTeamForm";
 import { RosterRibbon } from "@/components/roster/RosterRibbon";
 import { TeamStrengthSummary } from "@/components/manager/TeamStrengthSummary";
+import { SponsorRow } from "@/components/tournament/SponsorRow";
 import { Badge } from "@/components/ui/Badge";
 import { card } from "@/lib/ui";
 import type { RatedPlayer } from "@/lib/teamStrength";
@@ -53,6 +55,7 @@ export default async function FantasyTeamPage({
   const standings = existingTeam ? await getFantasyStandings(id) : null;
   const myStanding = standings?.standings.find((s) => s.team.userId === session.user.id);
   const rulesDocument = await getRulesDocumentIfViewable(auction.tournament.id, session.user);
+  const sponsors = await listTournamentSponsors(auction.tournament.id);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 flex flex-col gap-6">
@@ -72,6 +75,7 @@ export default async function FantasyTeamPage({
             View tournament rules
           </a>
         )}
+        <SponsorRow sponsors={sponsors} />
       </div>
 
       {existingTeam ? (

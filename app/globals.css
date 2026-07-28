@@ -4,6 +4,12 @@
    not just the OS `prefers-color-scheme` media query. */
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* color-scheme (which theme native widgets like <select> popups render in)
+   is set directly as an inline style on <html> by the theme-init script and
+   the toggle — not here. A :root/.dark CSS pair for the same property gets
+   silently rewritten by the build's CSS processor into its own light-dark()
+   representation, which wasn't taking effect for native form controls. */
+
 :root {
   --background: #ffffff;
   --foreground: #171717;

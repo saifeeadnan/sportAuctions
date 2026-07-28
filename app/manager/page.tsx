@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
+import { getRulesDocumentIfViewable } from "@/lib/services/tournamentDocument.service";
 import { cardInteractive } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 
@@ -22,6 +23,18 @@ export default async function ManagerHomePage() {
     },
     orderBy: { createdAt: "desc" },
   });
+
+  // Checked once per distinct tournament (a manager could have teams across
+  // several) so the rules link shows up as soon as they're assigned a team —
+  // no auction needs to exist yet.
+  const uniqueTournamentIds = Array.from(new Set(teams.map((t) => t.tournamentId)));
+  const rulesByTournamentId = new Map<string, { fileName: string } | null>();
+  await Promise.all(
+    uniqueTournamentIds.map(async (tournamentId) => {
+      const doc = await getRulesDocumentIfViewable(tournamentId, session!.user);
+      rulesByTournamentId.set(tournamentId, doc);
+    })
+  );
 
   return (
     <div>
@@ -53,6 +66,16 @@ export default async function ManagerHomePage() {
                   {team.tournament.name}
                 </span>
               </p>
+              {rulesByTournamentId.get(team.tournamentId) && (
+                <a
+                  href={`/tournaments/${team.tournamentId}/rules`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm underline underline-offset-2"
+                >
+                  View tournament rules
+                </a>
+              )}
               {team.entries.length === 0 ? (
                 <p className="text-sm text-black/60 dark:text-white/60">No active draft yet.</p>
               ) : (

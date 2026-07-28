@@ -3,7 +3,9 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
 import { openPreAuctionAction, startBiddingAction } from "@/lib/actions/auction.actions";
+import { listTournamentSponsors } from "@/lib/services/tournamentSponsor.service";
 import { AssignPlayerForm } from "@/components/admin/AssignPlayerForm";
+import { SponsorRibbon } from "@/components/tournament/SponsorRibbon";
 import { card, cardInteractive, buttonPrimary, buttonSecondary } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 import { AUCTION_TYPE_LABELS } from "@/lib/auctionTypes";
@@ -33,6 +35,8 @@ export default async function AuctionDetailPage({
   });
   if (!auction) notFound();
   assertInScope(leagueId, auction.tournament.leagueId);
+
+  const sponsors = await listTournamentSponsors(auction.tournamentId);
 
   const statusCounts = auction.auctionPlayers.reduce<Record<string, number>>((acc, ap) => {
     acc[ap.status] = (acc[ap.status] ?? 0) + 1;
@@ -212,6 +216,8 @@ export default async function AuctionDetailPage({
           </>
         )}
       </section>
+
+      <SponsorRibbon sponsors={sponsors} />
     </div>
   );
 }

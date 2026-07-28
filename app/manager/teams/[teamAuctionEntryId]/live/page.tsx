@@ -2,7 +2,9 @@ import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { getAuctionState } from "@/lib/services/auctionState.service";
+import { listTournamentSponsors } from "@/lib/services/tournamentSponsor.service";
 import { LiveAuctionView } from "@/components/auction/LiveAuctionView";
+import { SponsorRibbon } from "@/components/tournament/SponsorRibbon";
 
 export default async function ManagerLivePage({
   params,
@@ -21,11 +23,14 @@ export default async function ManagerLivePage({
   const state = await getAuctionState(entry.auctionId);
   if (!state) notFound();
 
+  const sponsors = await listTournamentSponsors(entry.team.tournamentId);
+
   return (
     <div>
       <h1 className="text-xl font-semibold mb-1">{state.name}</h1>
       <p className="text-sm text-black/60 dark:text-white/60 mb-6">{state.tournamentName}</p>
       <LiveAuctionView initialState={state} highlightTeamEntryId={entry.id} />
+      <SponsorRibbon sponsors={sponsors} />
     </div>
   );
 }

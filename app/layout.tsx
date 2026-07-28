@@ -13,6 +13,11 @@ const THEME_INIT_SCRIPT = `
     var stored = localStorage.getItem("theme");
     var isDark = stored === "dark" || (!stored && window.matchMedia("(prefers-color-scheme: dark)").matches);
     document.documentElement.classList.toggle("dark", isDark);
+    // Set directly as an inline style (highest cascade priority, no
+    // build-tool CSS transform involved) so native form controls — select
+    // dropdowns, checkboxes, date pickers — actually render in the right
+    // theme instead of the OS default.
+    document.documentElement.style.colorScheme = isDark ? "dark" : "light";
   } catch (e) {}
 })();
 `;

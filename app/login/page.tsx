@@ -1,6 +1,7 @@
 import { loginAction } from "./actions";
 import { card, buttonPrimary, inputClass } from "@/lib/ui";
 import { LogoMark } from "@/components/ui/LogoMark";
+import { PoweredByBytzSport } from "@/components/ui/PoweredByBytzSport";
 
 export default async function LoginPage({
   searchParams,
@@ -12,7 +13,10 @@ export default async function LoginPage({
   return (
     <div className="mx-auto max-w-sm px-4 py-16">
       <LogoMark className="h-10 w-10 mx-auto mb-3 text-black dark:text-white" />
-      <p className="text-center font-semibold tracking-tight mb-6">LeagueForge</p>
+      <p className="text-center font-semibold tracking-tight mb-1">LeagueForge</p>
+      <div className="flex justify-center mb-6">
+        <PoweredByBytzSport />
+      </div>
       <div className={`${card} p-6`}>
         <h1 className="text-xl font-semibold mb-6">Log in</h1>
         {error === "invalid" && (

@@ -17,7 +17,7 @@ import {
   removePlayerFromTeamAction,
 } from "@/lib/actions/bidding.actions";
 import { resetAuctionAction } from "@/lib/actions/auction.actions";
-import { card, cardInteractive, buttonPrimary, buttonSecondary, buttonDanger, inputClass, tabsTrack, tabItem } from "@/lib/ui";
+import { card, cardInteractive, buttonPrimary, buttonSecondary, buttonDanger, inputClass, selectClass, tabsTrack, tabItem } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 
 // "Abdulqadir Zumkhawala" -> "Abdulqadir Z." — keeps allocation columns compact.
@@ -331,7 +331,7 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
                 <select
                   value={selectedTeamId}
                   onChange={(e) => setSelectedTeamId(e.target.value)}
-                  className={inputClass}
+                  className={selectClass}
                 >
                   <option value="">Select winning team…</option>
                   {state.teams

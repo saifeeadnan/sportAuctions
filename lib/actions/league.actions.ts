@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireRole } from "@/lib/auth/guards";
-import { createLeague } from "@/lib/services/league.service";
+import { createLeague, deleteLeague } from "@/lib/services/league.service";
 
 export async function createLeagueAction(formData: FormData) {
   await requireRole("ADMIN");
@@ -12,5 +12,11 @@ export async function createLeagueAction(formData: FormData) {
     type: String(formData.get("type") ?? ""),
   });
 
+  revalidatePath("/admin/leagues");
+}
+
+export async function deleteLeagueAction(leagueId: string) {
+  await requireRole("ADMIN");
+  await deleteLeague(leagueId);
   revalidatePath("/admin/leagues");
 }

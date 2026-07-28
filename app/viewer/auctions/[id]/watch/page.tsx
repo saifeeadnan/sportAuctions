@@ -5,7 +5,9 @@ import { scopeLeagueId } from "@/lib/auth/guards";
 import { loadScopedAuction } from "@/lib/auth/scope";
 import { getAuctionState, findSoldTeamEntryIdForLoginId } from "@/lib/services/auctionState.service";
 import { getRulesDocumentIfViewable } from "@/lib/services/tournamentDocument.service";
+import { listTournamentSponsors } from "@/lib/services/tournamentSponsor.service";
 import { LiveAuctionView } from "@/components/auction/LiveAuctionView";
+import { SponsorRow } from "@/components/tournament/SponsorRow";
 
 export default async function WatchPage({
   params,
@@ -19,6 +21,7 @@ export default async function WatchPage({
   if (!state) notFound();
 
   const rulesDocument = await getRulesDocumentIfViewable(auction.tournamentId, session!.user);
+  const sponsors = await listTournamentSponsors(auction.tournamentId);
 
   // If this viewer is themselves a player who was sold to a team in this
   // auction, highlight that team the same way a manager's live view does —
@@ -44,6 +47,7 @@ export default async function WatchPage({
             View tournament rules
           </a>
         )}
+        <SponsorRow sponsors={sponsors} />
       </div>
       <LiveAuctionView initialState={state} highlightTeamEntryId={myTeamEntryId ?? undefined} />
     </div>

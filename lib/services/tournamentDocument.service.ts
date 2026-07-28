@@ -66,11 +66,22 @@ export async function getRulesDocumentContent(tournamentId: string) {
 type ViewerUser = { id: string; role: string; leagueId: string | null };
 
 async function resolveCanView(
-  tournament: { rosterId: string; leagueId: string },
+  tournament: { id: string; rosterId: string; leagueId: string },
   user: ViewerUser
 ): Promise<boolean> {
   if (user.role === "ADMIN") return true;
   if (user.role === "LEAGUE_ADMIN") return user.leagueId === tournament.leagueId;
+
+  if (user.role === "TEAM_MANAGER") {
+    // A manager should see a tournament's rules as soon as they're assigned a
+    // team in it — well before any auction exists to draft/bid in, since
+    // that's exactly when rules matter most.
+    const managedTeam = await prisma.team.findFirst({
+      where: { tournamentId: tournament.id, managerId: user.id },
+      select: { id: true },
+    });
+    if (managedTeam) return true;
+  }
 
   const account = await prisma.user.findUnique({ where: { id: user.id } });
   if (!account?.loginId) return false;
@@ -86,8 +97,9 @@ async function resolveCanView(
 
 /**
  * True if the caller may view a tournament's rules document: the Admin/League
- * Admin who manages it, or any user whose login ID matches a player on the
- * tournament's own roster — the "on the roster" criterion, independent of role.
+ * Admin who manages it, a manager of one of its teams, or any user whose
+ * login ID matches a player on the tournament's own roster — the "on the
+ * roster" criterion, independent of role.
  */
 export async function canViewRulesDocument(
   tournamentId: string,

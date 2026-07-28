@@ -1,5 +1,6 @@
 import { listLeagues } from "@/lib/services/league.service";
 import { createLeagueAction } from "@/lib/actions/league.actions";
+import { DeleteLeagueButton } from "@/components/admin/DeleteLeagueButton";
 import { card, cardInteractive, buttonPrimary, inputClass } from "@/lib/ui";
 
 export async function LeaguesPanel() {
@@ -43,9 +44,18 @@ export async function LeaguesPanel() {
                 {league.name}{" "}
                 <span className="text-black/50 dark:text-white/50">({league.type})</span>
               </span>
-              <span className="text-sm text-black/60 dark:text-white/60">
-                {league._count.users} users &middot; {league._count.rosters} rosters &middot;{" "}
-                {league._count.tournaments} tournaments
+              <span className="flex items-center gap-3">
+                <span className="text-sm text-black/60 dark:text-white/60">
+                  {league._count.users} users &middot; {league._count.rosters} rosters &middot;{" "}
+                  {league._count.tournaments} tournaments
+                </span>
+                <DeleteLeagueButton
+                  leagueId={league.id}
+                  leagueName={league.name}
+                  userCount={league._count.users}
+                  rosterCount={league._count.rosters}
+                  tournamentCount={league._count.tournaments}
+                />
               </span>
             </li>
           ))}

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { card, buttonPrimary } from "@/lib/ui";
 import { LogoMark } from "@/components/ui/LogoMark";
+import { PoweredByBytzSport } from "@/components/ui/PoweredByBytzSport";
 
 const FEATURES: { title: string; description: string; icon: React.ReactNode }[] = [
   {
@@ -116,6 +117,7 @@ export function LandingHero() {
               Log in to get started
             </Link>
           </div>
+          <PoweredByBytzSport className="mt-4" />
         </div>
 
         <div className="mt-20 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
