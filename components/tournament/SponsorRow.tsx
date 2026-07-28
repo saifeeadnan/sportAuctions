@@ -1,3 +1,5 @@
+import { SponsorLink } from "@/components/tournament/SponsorLink";
+
 type Sponsor = { id: string; name: string; websiteUrl: string | null };
 
 export function SponsorRow({ sponsors }: { sponsors: Sponsor[] }) {
@@ -17,9 +19,9 @@ export function SponsorRow({ sponsors }: { sponsors: Sponsor[] }) {
           />
         );
         return sponsor.websiteUrl ? (
-          <a key={sponsor.id} href={sponsor.websiteUrl} target="_blank" rel="noopener noreferrer">
+          <SponsorLink key={sponsor.id} sponsorId={sponsor.id} websiteUrl={sponsor.websiteUrl}>
             {logo}
-          </a>
+          </SponsorLink>
         ) : (
           <span key={sponsor.id}>{logo}</span>
         );

@@ -4,6 +4,7 @@ import { requireAdminOrLeagueAdmin } from "@/lib/auth/guards";
 import { listLeagues } from "@/lib/services/league.service";
 import { registerUserAction } from "@/lib/actions/auth.actions";
 import { DeleteUserButton } from "@/components/admin/DeleteUserButton";
+import { ResetPasswordButton } from "@/components/admin/ResetPasswordButton";
 import { NameLoginIdFields } from "@/components/admin/NameLoginIdFields";
 import { card, buttonPrimary, inputClass, selectClass, tabsTrack, tabItem } from "@/lib/ui";
 
@@ -146,12 +147,15 @@ export async function UsersPanel({
                 <tr key={user.id} className="border-b border-black/5 dark:border-white/5 last:border-0">
                   <td className="py-2 pl-4 pr-4">{user.name}</td>
                   <td className="py-2 pr-4">{user.loginId}</td>
-                  <td className="py-2 pr-4 text-right">
-                    <DeleteUserButton
-                      userId={user.id}
-                      userName={user.name}
-                      isSelf={user.id === session.user.id}
-                    />
+                  <td className="py-2 pr-4">
+                    <div className="flex items-center justify-end gap-3">
+                      <ResetPasswordButton userId={user.id} />
+                      <DeleteUserButton
+                        userId={user.id}
+                        userName={user.name}
+                        isSelf={user.id === session.user.id}
+                      />
+                    </div>
                   </td>
                 </tr>
               ))}

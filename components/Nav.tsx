@@ -20,10 +20,13 @@ export async function Nav() {
           <ThemeToggle />
           {session?.user ? (
             <>
-              <span className="flex items-center gap-2 text-black/60 dark:text-white/60">
+              <Link
+                href="/profile"
+                className="flex items-center gap-2 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white transition-colors"
+              >
                 <span className="hidden sm:inline truncate max-w-[10rem]">{session.user.name}</span>
                 <Badge variant="info">{session.user.role}</Badge>
-              </span>
+              </Link>
               <form action={logoutAction}>
                 <button type="submit" className={`${buttonSecondary} px-3 py-1.5 text-xs`}>
                   Sign out

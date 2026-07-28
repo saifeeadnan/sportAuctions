@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import Script from "next/script";
 import "./globals.css";
+import { auth } from "@/auth";
 import { Nav } from "@/components/Nav";
+import { AnalyticsHeartbeat } from "@/components/analytics/AnalyticsHeartbeat";
 
 // Runs before paint so the page never flashes the wrong theme: honors an
 // explicit choice from the toggle (localStorage), or falls back to the OS
@@ -37,15 +39,18 @@ export const metadata: Metadata = {
   description: "Form leagues, run the auction, forge the team.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const session = await auth();
+
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">
         <Script id="theme-init" strategy="beforeInteractive">
@@ -53,6 +58,7 @@ export default function RootLayout({
         </Script>
         <Nav />
         <main className="flex-1">{children}</main>
+        {session?.user && <AnalyticsHeartbeat />}
       </body>
     </html>
   );

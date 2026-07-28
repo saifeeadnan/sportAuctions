@@ -1,3 +1,5 @@
+import { SponsorLink } from "@/components/tournament/SponsorLink";
+
 type Sponsor = { id: string; name: string; websiteUrl: string | null };
 
 /** A horizontal strip of sponsor logos for the bottom of a page — larger and
@@ -20,15 +22,14 @@ export function SponsorRibbon({ sponsors }: { sponsors: Sponsor[] }) {
             />
           );
           return sponsor.websiteUrl ? (
-            <a
+            <SponsorLink
               key={sponsor.id}
-              href={sponsor.websiteUrl}
-              target="_blank"
-              rel="noopener noreferrer"
+              sponsorId={sponsor.id}
+              websiteUrl={sponsor.websiteUrl}
               className="shrink-0"
             >
               {logo}
-            </a>
+            </SponsorLink>
           ) : (
             <span key={sponsor.id} className="shrink-0">
               {logo}

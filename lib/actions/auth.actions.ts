@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import { signOut } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { requireAdminOrLeagueAdmin, AuthError, type Role } from "@/lib/auth/guards";
+import { requireSession, requireAdminOrLeagueAdmin, AuthError, type Role } from "@/lib/auth/guards";
 import { ValidationError } from "@/lib/errors";
 import { deleteUser } from "@/lib/services/user.service";
 
@@ -85,4 +85,52 @@ export async function deleteUserAction(userId: string) {
   await deleteUser(userId, session.user.id);
   revalidatePath("/admin/users");
   revalidatePath("/");
+}
+
+export async function changePasswordAction(formData: FormData) {
+  const session = await requireSession();
+  const currentPassword = String(formData.get("currentPassword") ?? "");
+  const newPassword = String(formData.get("newPassword") ?? "");
+  const confirmPassword = String(formData.get("confirmPassword") ?? "");
+
+  try {
+    if (!currentPassword || !newPassword) throw new ValidationError("missing-fields");
+    if (newPassword.length < 8) throw new ValidationError("short");
+    if (newPassword !== confirmPassword) throw new ValidationError("mismatch");
+
+    const user = await prisma.user.findUniqueOrThrow({ where: { id: session.user.id } });
+    const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+    if (!valid) throw new ValidationError("wrong-current");
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({ where: { id: session.user.id }, data: { passwordHash } });
+  } catch (error) {
+    const code = error instanceof ValidationError ? error.message : "system";
+    redirect(`/profile?error=${code}`);
+  }
+  redirect("/profile?success=1");
+}
+
+export async function resetUserPasswordAction(userId: string, formData: FormData) {
+  const { leagueId } = await requireAdminOrLeagueAdmin();
+  const newPassword = String(formData.get("newPassword") ?? "");
+  if (newPassword.length < 8) throw new ValidationError("Password must be at least 8 characters");
+
+  if (leagueId !== null) {
+    const target = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true, leagueId: true },
+    });
+    if (!target) throw new ValidationError("User not found");
+    if (target.role === "ADMIN" || target.role === "LEAGUE_ADMIN") {
+      throw new AuthError("You do not have permission to reset this user's password");
+    }
+    if (target.leagueId !== leagueId) {
+      throw new AuthError("This user belongs to a different league");
+    }
+  }
+
+  const passwordHash = await bcrypt.hash(newPassword, 10);
+  await prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+  revalidatePath("/admin/users");
 }

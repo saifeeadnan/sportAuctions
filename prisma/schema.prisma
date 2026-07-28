@@ -78,6 +78,9 @@ model User {
   createdAuctions      Auction[]
   fantasyTeams         FantasyTeam[]
   uploadedRulesDocs    TournamentDocument[]
+  loginEvents          LoginEvent[]
+  analyticsSessions    AnalyticsSession[]
+  sponsorClicks        SponsorClickEvent[]
 
   @@index([leagueId])
   @@map("users")
@@ -185,6 +188,8 @@ model TournamentSponsor {
   mimeType     String
   data         Bytes
   createdAt    DateTime   @default(now())
+
+  clicks SponsorClickEvent[]
 
   @@index([tournamentId])
   @@map("tournament_sponsors")
@@ -338,4 +343,43 @@ model PreAuctionSubmission {
 
   @@unique([teamAuctionEntryId, auctionPlayerId])
   @@map("pre_auction_submissions")
+}
+
+model LoginEvent {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  loginAt   DateTime @default(now())
+  ipAddress String?
+  userAgent String?
+
+  @@index([userId])
+  @@index([loginAt])
+  @@map("login_events")
+}
+
+model AnalyticsSession {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  startedAt  DateTime @default(now())
+  lastSeenAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([lastSeenAt])
+  @@map("analytics_sessions")
+}
+
+model SponsorClickEvent {
+  id        String            @id @default(cuid())
+  sponsorId String
+  sponsor   TournamentSponsor @relation(fields: [sponsorId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clickedAt DateTime          @default(now())
+
+  @@index([sponsorId])
+  @@index([userId])
+  @@index([clickedAt])
+  @@map("sponsor_click_events")
 }

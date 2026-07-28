@@ -11,6 +11,7 @@ export const authConfig: NextAuthConfig = {
         token.id = user.id;
         token.role = (user as { role: string }).role;
         token.leagueId = (user as { leagueId: string | null }).leagueId;
+        token.analyticsSessionId = (user as { analyticsSessionId: string }).analyticsSessionId;
       }
       return token;
     },
@@ -19,6 +20,7 @@ export const authConfig: NextAuthConfig = {
         session.user.id = token.id as string;
         session.user.role = token.role as string;
         session.user.leagueId = token.leagueId as string | null;
+        session.user.analyticsSessionId = token.analyticsSessionId as string;
       }
       return session;
     },
