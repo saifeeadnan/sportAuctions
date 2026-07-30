@@ -215,6 +215,14 @@ export default async function AuctionDetailPage({
             </Link>
           </>
         )}
+
+        {(auction.status === "PRE_AUCTION_LOCKED" ||
+          auction.status === "BIDDING" ||
+          auction.status === "COMPLETED") && (
+          <Link href={`/admin/auctions/${auction.id}/lock-review`} className={buttonSecondary}>
+            Submitted drafts
+          </Link>
+        )}
       </section>
 
       <SponsorRibbon sponsors={sponsors} />
