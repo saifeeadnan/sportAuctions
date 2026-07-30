@@ -1,6 +1,7 @@
 import { listLeagues } from "@/lib/services/league.service";
 import { createLeagueAction } from "@/lib/actions/league.actions";
 import { DeleteLeagueButton } from "@/components/admin/DeleteLeagueButton";
+import { CopyInviteLinkButton } from "@/components/admin/CopyInviteLinkButton";
 import { card, cardInteractive, buttonPrimary, inputClass } from "@/lib/ui";
 
 export async function LeaguesPanel() {
@@ -38,17 +39,18 @@ export async function LeaguesPanel() {
           {leagues.map((league) => (
             <li
               key={league.id}
-              className={`${cardInteractive} flex items-center justify-between gap-4 px-4 py-3`}
+              className={`${cardInteractive} flex items-center justify-between gap-4 px-4 py-3 flex-wrap`}
             >
               <span>
                 {league.name}{" "}
                 <span className="text-black/50 dark:text-white/50">({league.type})</span>
               </span>
-              <span className="flex items-center gap-3">
+              <span className="flex items-center gap-3 flex-wrap">
                 <span className="text-sm text-black/60 dark:text-white/60">
                   {league._count.users} users &middot; {league._count.rosters} rosters &middot;{" "}
                   {league._count.tournaments} tournaments
                 </span>
+                <CopyInviteLinkButton path={`/register?league=${league.id}`} />
                 <DeleteLeagueButton
                   leagueId={league.id}
                   leagueName={league.name}
