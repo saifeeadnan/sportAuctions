@@ -7,7 +7,7 @@ import { signOut } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { requireSession, requireAdminOrLeagueAdmin, AuthError, type Role } from "@/lib/auth/guards";
 import { ValidationError } from "@/lib/errors";
-import { deleteUser } from "@/lib/services/user.service";
+import { deleteUser, setUserActive } from "@/lib/services/user.service";
 
 export async function logoutAction() {
   await signOut({ redirectTo: "/login" });
@@ -132,5 +132,26 @@ export async function resetUserPasswordAction(userId: string, formData: FormData
 
   const passwordHash = await bcrypt.hash(newPassword, 10);
   await prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+  revalidatePath("/admin/users");
+}
+
+export async function setUserActiveAction(userId: string, isActive: boolean) {
+  const { session, leagueId } = await requireAdminOrLeagueAdmin();
+
+  if (leagueId !== null) {
+    const target = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { role: true, leagueId: true },
+    });
+    if (!target) throw new ValidationError("User not found");
+    if (target.role === "ADMIN" || target.role === "LEAGUE_ADMIN") {
+      throw new AuthError("You do not have permission to change this user's access");
+    }
+    if (target.leagueId !== leagueId) {
+      throw new AuthError("This user belongs to a different league");
+    }
+  }
+
+  await setUserActive(userId, session.user.id, isActive);
   revalidatePath("/admin/users");
 }

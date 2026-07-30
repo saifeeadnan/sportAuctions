@@ -35,3 +35,14 @@ export async function deleteUser(userId: string, requestingUserId: string) {
 
   await prisma.user.delete({ where: { id: userId } });
 }
+
+export async function setUserActive(userId: string, requestingUserId: string, isActive: boolean) {
+  if (userId === requestingUserId && !isActive) {
+    throw new ValidationError("You cannot disable your own account while logged in.");
+  }
+
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) throw new ValidationError("User not found");
+
+  await prisma.user.update({ where: { id: userId }, data: { isActive } });
+}

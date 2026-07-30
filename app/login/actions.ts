@@ -16,7 +16,7 @@ export async function loginAction(formData: FormData) {
     });
   } catch (error) {
     if (error instanceof CredentialsSignin) {
-      redirect("/login?error=invalid");
+      redirect(`/login?error=${error.code === "account_disabled" ? "disabled" : "invalid"}`);
     }
     if (error instanceof AuthError) {
       console.error("Login failed due to a system error:", error.cause ?? error);

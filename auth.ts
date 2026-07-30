@@ -1,9 +1,16 @@
-import NextAuth from "next-auth";
+import NextAuth, { CredentialsSignin } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { authConfig } from "@/auth.config";
 import { createAnalyticsSession, recordLogin } from "@/lib/services/analytics.service";
+
+// A distinct `code` (surfaced via the thrown error, not the generic "wrong
+// credentials" case) so the login page can show a specific message instead
+// of implying the password was wrong.
+export class AccountDisabledSignin extends CredentialsSignin {
+  code = "account_disabled";
+}
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
@@ -23,6 +30,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         const valid = await bcrypt.compare(password, user.passwordHash);
         if (!valid) return null;
+
+        // Checked only after the password is confirmed correct, so a
+        // brute-force attempt against an unknown password can't be used to
+        // probe whether an account has been disabled.
+        if (!user.isActive) throw new AccountDisabledSignin();
 
         // Analytics writes are best-effort — a hiccup here must never block a
         // legitimate login.

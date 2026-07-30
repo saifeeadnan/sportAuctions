@@ -30,6 +30,11 @@ export default async function LoginPage({
             database is temporarily unavailable. Please try again in a moment.
           </p>
         )}
+        {error === "disabled" && (
+          <p className="mb-4 text-sm text-red-600 dark:text-red-400">
+            This account has been disabled. Contact your league administrator.
+          </p>
+        )}
         <form action={loginAction} className="flex flex-col gap-3">
           <label className="flex flex-col gap-1 text-sm">
             Login ID

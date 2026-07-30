@@ -5,8 +5,10 @@ import { listLeagues } from "@/lib/services/league.service";
 import { registerUserAction } from "@/lib/actions/auth.actions";
 import { DeleteUserButton } from "@/components/admin/DeleteUserButton";
 import { ResetPasswordButton } from "@/components/admin/ResetPasswordButton";
+import { ToggleUserActiveButton } from "@/components/admin/ToggleUserActiveButton";
 import { NameLoginIdFields } from "@/components/admin/NameLoginIdFields";
 import { card, buttonPrimary, inputClass, selectClass, tabsTrack, tabItem } from "@/lib/ui";
+import { Badge } from "@/components/ui/Badge";
 
 const ROLES = ["ADMIN", "LEAGUE_ADMIN", "TEAM_MANAGER", "AUCTIONEER", "VIEWER"] as const;
 export type RoleTab = (typeof ROLES)[number];
@@ -145,10 +147,21 @@ export async function UsersPanel({
             <tbody>
               {visibleUsers.map((user) => (
                 <tr key={user.id} className="border-b border-black/5 dark:border-white/5 last:border-0">
-                  <td className="py-2 pl-4 pr-4">{user.name}</td>
+                  <td className="py-2 pl-4 pr-4">
+                    <div className="flex items-center gap-2">
+                      {user.name}
+                      {!user.isActive && <Badge variant="danger">Disabled</Badge>}
+                    </div>
+                  </td>
                   <td className="py-2 pr-4">{user.loginId}</td>
                   <td className="py-2 pr-4">
                     <div className="flex items-center justify-end gap-3">
+                      <ToggleUserActiveButton
+                        userId={user.id}
+                        userName={user.name}
+                        isActive={user.isActive}
+                        isSelf={user.id === session.user.id}
+                      />
                       <ResetPasswordButton userId={user.id} />
                       <DeleteUserButton
                         userId={user.id}

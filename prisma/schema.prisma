@@ -70,6 +70,7 @@ model User {
   managerBasePrice Decimal? @db.Decimal(10, 2)
   leagueId         String?
   league           League?  @relation(fields: [leagueId], references: [id])
+  isActive         Boolean  @default(true)
   createdAt        DateTime @default(now())
 
   createdRosters       PlayerRoster[]
