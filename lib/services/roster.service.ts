@@ -2,6 +2,7 @@ import Papa from "papaparse";
 import * as XLSX from "xlsx";
 import { prisma } from "@/lib/prisma";
 import { ValidationError } from "@/lib/errors";
+import type { Player } from "@/app/generated/prisma/client";
 
 export type ParsedPlayerRow = {
   name: string;
@@ -233,6 +234,42 @@ export async function deletePlayer(playerId: string) {
   }
 
   await prisma.player.delete({ where: { id: playerId } });
+}
+
+// Header names deliberately match `HEADER_ALIASES` above (once spaces are
+// stripped/lowercased), so a file exported here re-imports cleanly through
+// `parseRosterFile`.
+export const ROSTER_EXPORT_COLUMNS: { header: string; get: (p: Player) => string | number }[] = [
+  { header: "Name", get: (p) => p.name },
+  { header: "Position", get: (p) => p.position ?? "" },
+  { header: "Age", get: (p) => p.age ?? "" },
+  { header: "Login ID", get: (p) => p.loginId ?? "" },
+  { header: "Default Category", get: (p) => p.defaultCategory ?? "" },
+  { header: "Previous Team", get: (p) => p.previousTeam ?? "" },
+  { header: "Photo URL", get: (p) => p.photoUrl ?? "" },
+  { header: "Rating", get: (p) => (p.rating != null ? Number(p.rating) : "") },
+  { header: "Batting Rating", get: (p) => (p.battingRating != null ? Number(p.battingRating) : "") },
+  { header: "Bowling Rating", get: (p) => (p.bowlingRating != null ? Number(p.bowlingRating) : "") },
+  { header: "Fielding Rating", get: (p) => (p.fieldingRating != null ? Number(p.fieldingRating) : "") },
+];
+
+export function rosterExportRows(players: Player[]): (string | number)[][] {
+  return players.map((p) => ROSTER_EXPORT_COLUMNS.map((col) => col.get(p)));
+}
+
+export async function renameRoster(rosterId: string, name: string) {
+  if (!name.trim()) {
+    throw new ValidationError("Roster name is required");
+  }
+  const roster = await prisma.playerRoster.findUnique({ where: { id: rosterId } });
+  if (!roster) {
+    throw new ValidationError("Roster not found");
+  }
+
+  return prisma.playerRoster.update({
+    where: { id: rosterId },
+    data: { name: name.trim() },
+  });
 }
 
 export async function deleteRoster(rosterId: string) {

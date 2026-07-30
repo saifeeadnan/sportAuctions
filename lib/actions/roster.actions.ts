@@ -6,6 +6,7 @@ import { requireAdminOrLeagueAdmin } from "@/lib/auth/guards";
 import { loadScopedRoster } from "@/lib/auth/scope";
 import {
   deleteRoster,
+  renameRoster,
   createPlayer,
   updatePlayer,
   deletePlayer,
@@ -18,6 +19,14 @@ export async function deleteRosterAction(rosterId: string) {
   await deleteRoster(rosterId);
   revalidatePath("/admin/rosters");
   revalidatePath("/");
+}
+
+export async function renameRosterAction(rosterId: string, name: string) {
+  const { leagueId } = await requireAdminOrLeagueAdmin();
+  await loadScopedRoster(rosterId, leagueId);
+  await renameRoster(rosterId, name);
+  revalidatePath(`/admin/rosters/${rosterId}`);
+  revalidatePath("/admin/rosters");
 }
 
 function parsePlayerInput(formData: FormData): PlayerInput {

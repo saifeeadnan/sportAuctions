@@ -5,6 +5,7 @@ import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
 import { createPlayerAction } from "@/lib/actions/roster.actions";
 import { PlayerFormFields } from "@/components/roster/PlayerFormFields";
 import { DeletePlayerButton } from "@/components/admin/DeletePlayerButton";
+import { RenameRosterForm } from "@/components/admin/RenameRosterForm";
 import { card, buttonPrimary } from "@/lib/ui";
 
 const SORT_FIELDS = ["name", "position", "category", "rating"] as const;
@@ -69,9 +70,24 @@ export default async function RosterDetailPage({
   return (
     <div>
       <h1 className="text-xl font-semibold mb-1">{roster.name}</h1>
-      <p className="text-sm text-black/60 dark:text-white/60 mb-5">
+      <p className="text-sm text-black/60 dark:text-white/60">
         {roster.players.length} players
       </p>
+      <div className="flex items-center gap-4 flex-wrap mb-5">
+        <RenameRosterForm rosterId={roster.id} name={roster.name} />
+        <a
+          href={`/api/rosters/${roster.id}/export.csv`}
+          className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline underline-offset-2"
+        >
+          Export CSV
+        </a>
+        <a
+          href={`/api/rosters/${roster.id}/export.xlsx`}
+          className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline underline-offset-2"
+        >
+          Export XLSX
+        </a>
+      </div>
 
       <details className={`${card} mb-6`}>
         <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
