@@ -8,7 +8,7 @@ export const authConfig: NextAuthConfig = {
   callbacks: {
     jwt: async ({ token, user }) => {
       if (user) {
-        token.id = user.id;
+        token.id = (user as { id: string }).id;
         token.role = (user as { role: string }).role;
         token.leagueId = (user as { leagueId: string | null }).leagueId;
         token.analyticsSessionId = (user as { analyticsSessionId: string }).analyticsSessionId;
