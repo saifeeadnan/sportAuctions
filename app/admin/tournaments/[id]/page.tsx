@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
 import { getRulesDocumentMeta } from "@/lib/services/tournamentDocument.service";
-import { listTournamentSponsors } from "@/lib/services/tournamentSponsor.service";
+import { listTournamentSponsors, listKnownSponsors } from "@/lib/services/tournamentSponsor.service";
 import { DeleteAuctionButton } from "@/components/admin/DeleteAuctionButton";
 import { UploadRulesDocumentForm } from "@/components/admin/UploadRulesDocumentForm";
 import { DeleteRulesDocumentButton } from "@/components/admin/DeleteRulesDocumentButton";
@@ -49,7 +49,7 @@ export default async function TournamentDetailPage({
 
   // Filtered by the tournament's own league (not the caller's) — a site ADMIN
   // editing one specific tournament should only see that league's managers.
-  const [managers, auctions, rulesDocument, sponsors] = await Promise.all([
+  const [managers, auctions, rulesDocument, sponsors, knownSponsors] = await Promise.all([
     prisma.user.findMany({
       where: { role: "TEAM_MANAGER", leagueId: tournament.leagueId },
       orderBy: { name: "asc" },
@@ -57,6 +57,7 @@ export default async function TournamentDetailPage({
     prisma.auction.findMany({ where: { tournamentId: id }, orderBy: { createdAt: "desc" } }),
     getRulesDocumentMeta(id),
     listTournamentSponsors(id),
+    listKnownSponsors(id, leagueId),
   ]);
 
   const canAddTeam = tournament.teams.length < tournament.numTeams;
@@ -114,7 +115,7 @@ export default async function TournamentDetailPage({
             <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
               Add sponsor
             </summary>
-            <AddTournamentSponsorForm tournamentId={tournament.id} />
+            <AddTournamentSponsorForm tournamentId={tournament.id} knownSponsors={knownSponsors} />
           </details>
 
           <Link

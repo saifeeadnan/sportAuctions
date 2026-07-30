@@ -70,3 +70,55 @@ export async function getTournamentSponsorLogoContent(sponsorId: string) {
     select: { mimeType: true, data: true },
   });
 }
+
+export type KnownSponsor = { id: string; name: string; websiteUrl: string | null };
+
+/** Distinct-by-name sponsors already used somewhere in scope, for the
+ * "choose existing" picker — excludes names already attached to `tournamentId`
+ * so the picker doesn't offer obvious duplicates. */
+export async function listKnownSponsors(
+  tournamentId: string,
+  leagueId: string | null
+): Promise<KnownSponsor[]> {
+  const existing = await prisma.tournamentSponsor.findMany({
+    where: { tournamentId },
+    select: { name: true },
+  });
+  const existingNames = new Set(existing.map((s) => s.name.toLowerCase()));
+
+  const rows = await prisma.tournamentSponsor.findMany({
+    where: leagueId ? { tournament: { leagueId } } : {},
+    select: { id: true, name: true, websiteUrl: true },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const seen = new Set<string>();
+  const distinct: KnownSponsor[] = [];
+  for (const row of rows) {
+    const key = row.name.toLowerCase();
+    if (seen.has(key) || existingNames.has(key)) continue;
+    seen.add(key);
+    distinct.push({ id: row.id, name: row.name, websiteUrl: row.websiteUrl });
+  }
+  return distinct;
+}
+
+export async function addExistingTournamentSponsor(tournamentId: string, sourceSponsorId: string) {
+  const tournament = await prisma.tournament.findUnique({ where: { id: tournamentId } });
+  if (!tournament) throw new ValidationError("Tournament not found");
+
+  const source = await prisma.tournamentSponsor.findUnique({ where: { id: sourceSponsorId } });
+  if (!source) throw new ValidationError("Sponsor not found");
+
+  return prisma.tournamentSponsor.create({
+    data: {
+      tournamentId,
+      name: source.name,
+      websiteUrl: source.websiteUrl,
+      mimeType: source.mimeType,
+      // Re-wrap the driver-read Bytes value — same Uint8Array<ArrayBuffer>
+      // gotcha as writing freshly-uploaded bytes.
+      data: new Uint8Array(source.data),
+    },
+  });
+}
