@@ -1,5 +1,4 @@
 import Papa from "papaparse";
-import * as XLSX from "xlsx";
 import { prisma } from "@/lib/prisma";
 import { ValidationError } from "@/lib/errors";
 
@@ -73,18 +72,12 @@ function rowsFromRecords(records: Record<string, unknown>[]): ParsePointsResult 
 }
 
 export function parsePointsFile(buffer: Buffer, filename: string): ParsePointsResult {
-  const isExcel = /\.xlsx?$/i.test(filename);
-
-  if (isExcel) {
-    const workbook = XLSX.read(buffer, { type: "buffer" });
-    const firstSheet = workbook.SheetNames[0];
-    if (!firstSheet) {
-      throw new ValidationError("Workbook has no sheets");
-    }
-    const records = XLSX.utils.sheet_to_json<Record<string, unknown>>(
-      workbook.Sheets[firstSheet]
-    );
-    return rowsFromRecords(records);
+  // Excel import intentionally isn't supported: the `xlsx` (SheetJS) parser
+  // has unpatched prototype-pollution and ReDoS advisories with no fix
+  // available on npm, and this function runs it directly against
+  // user-uploaded bytes. CSV via PapaParse doesn't carry that risk.
+  if (!/\.csv$/i.test(filename)) {
+    throw new ValidationError("Only CSV files are supported for points import — export your sheet as .csv and try again");
   }
 
   const parsed = Papa.parse<Record<string, unknown>>(buffer.toString("utf-8"), {

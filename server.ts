@@ -2,7 +2,9 @@ import "dotenv/config";
 import { createServer } from "http";
 import next from "next";
 import { Server } from "socket.io";
+import { getToken } from "next-auth/jwt";
 import { setIO } from "./server/ws/broadcaster";
+import { prisma } from "./lib/prisma";
 
 const dev = process.env.NODE_ENV !== "production";
 const port = Number(process.env.PORT) || 3000;
@@ -15,7 +17,31 @@ app.prepare().then(() => {
 
   const io = new Server(httpServer, { path: "/socket.io" });
   io.on("connection", (socket) => {
-    socket.on("join", (auctionId: string) => {
+    // Mirrors the same role/league scoping every other read path enforces
+    // (lib/auth/scope.ts's assertInScope) — without this, anyone who can
+    // open a raw Socket.IO connection and knows/guesses an auctionId could
+    // listen in on another league's live bids and budgets.
+    socket.on("join", async (auctionId: string) => {
+      if (typeof auctionId !== "string" || !auctionId) return;
+
+      const token = await getToken({
+        req: socket.request as unknown as { headers: Record<string, string> },
+        secret: process.env.NEXTAUTH_SECRET,
+        secureCookie: !dev,
+      }).catch(() => null);
+      if (!token) return;
+
+      const auction = await prisma.auction.findUnique({
+        where: { id: auctionId },
+        select: { tournament: { select: { leagueId: true } } },
+      });
+      if (!auction) return;
+
+      const role = token.role as string | undefined;
+      const leagueId = token.leagueId as string | null | undefined;
+      const inScope = role === "ADMIN" || leagueId === auction.tournament.leagueId;
+      if (!inScope) return;
+
       socket.join(`auction:${auctionId}`);
     });
   });

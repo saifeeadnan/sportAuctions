@@ -23,7 +23,7 @@ fantasy leagues, sponsor placements, and basic usage analytics — all scoped to
 | ORM | Prisma 7 (`prisma-client` generator, `@prisma/adapter-pg`) | Client generated into `app/generated/prisma` (not hand-edited) |
 | Auth | NextAuth v5 (beta), Credentials provider, JWT sessions | No OAuth providers — username/password only |
 | Real-time | Socket.IO 4, server-authoritative | Custom Node HTTP server (`server.ts`) wraps Next's request handler so Socket.IO can share the same port |
-| File parsing | PapaParse (CSV), `xlsx` (Excel) | Used for roster bulk-import and CSV/XLSX exports |
+| File parsing | PapaParse (CSV) | Roster and points *import* accept CSV only — deliberately, since the `xlsx` (SheetJS) parser has unpatched prototype-pollution/ReDoS advisories with no npm fix; `xlsx` is still used one-way for *exporting* roster data, which doesn't parse untrusted input |
 | Validation | Zod (present in deps; most mutation validation is hand-written in the service layer) | |
 
 **Why a custom server:** Next.js's default `next start` has no place to attach a long-lived
@@ -235,9 +235,12 @@ call, same rules, only the authorization differs — for a manager without a wor
 
 ### 5.5 Real-time transport
 
-`server.ts` attaches a Socket.IO server to the same HTTP server as Next. Clients join a room
-per auction (`auction:<id>`) on connect; every domain mutation that changes shared auction
-state calls `emitAuctionEvent(auctionId, event, payload)`
+`server.ts` attaches a Socket.IO server to the same HTTP server as Next. On `join`, the server
+decodes the caller's session JWT from the handshake cookie (`next-auth/jwt`'s `getToken`) and
+checks the same role/league scope as every other read path (`ADMIN`, or the auction's
+tournament `leagueId` matching the caller's) before adding the socket to that auction's room
+(`auction:<id>`) — a bare `auctionId` alone isn't enough to listen in. Every domain mutation
+that changes shared auction state calls `emitAuctionEvent(auctionId, event, payload)`
 (`server/ws/broadcaster.ts`), which is a thin wrapper around
 `io.to(room).emit(...)`. The client hook (`hooks/useAuctionSocket.ts`) applies each event as
 a local, incremental patch to an initially server-rendered `AuctionState` — except

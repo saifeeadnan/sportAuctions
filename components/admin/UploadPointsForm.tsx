@@ -87,7 +87,7 @@ export function UploadPointsForm({ auctionId }: { auctionId: string }) {
           <input
             required
             type="file"
-            accept=".csv,.xlsx,.xls"
+            accept=".csv"
             onChange={(e) => {
               setFile(e.target.files?.[0] ?? null);
               setPreview(null);

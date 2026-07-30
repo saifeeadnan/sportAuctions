@@ -113,11 +113,11 @@ export function UploadRosterForm({
           </label>
         )}
         <label className="flex flex-col gap-1 text-sm">
-          CSV or Excel file
+          CSV file
           <input
             required
             type="file"
-            accept=".csv,.xlsx,.xls"
+            accept=".csv"
             onChange={(e) => {
               setFile(e.target.files?.[0] ?? null);
               setPreview(null);
