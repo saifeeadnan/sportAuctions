@@ -37,7 +37,12 @@ export async function selectNextPlayer(auctionId: string, auctionPlayerId: strin
 
   const updated = await prisma.auctionPlayer.update({
     where: { id: auctionPlayerId },
-    data: { status: "IN_BIDDING" },
+    data: {
+      status: "IN_BIDDING",
+      currentBidAmount: null,
+      currentBidderEntryId: null,
+      bidCooldownUntil: null,
+    },
     include: { player: true, category: true },
   });
 
@@ -120,6 +125,9 @@ async function allocatePlayerToTeam(
         soldToEntryId: teamAuctionEntryId,
         soldPrice: priceDecimal,
         soldAt,
+        currentBidAmount: null,
+        currentBidderEntryId: null,
+        bidCooldownUntil: null,
       },
       include: { player: true },
     }),
@@ -167,6 +175,11 @@ export async function recordSale(
       `Player must be on the clock to record a sale (current status: ${auctionPlayer.status})`
     );
   }
+  if (auctionPlayer.currentBidAmount != null && new Prisma.Decimal(price).lessThan(auctionPlayer.currentBidAmount)) {
+    throw new ValidationError(
+      `Price cannot be below the current live bid (${String(auctionPlayer.currentBidAmount)})`
+    );
+  }
 
   return allocatePlayerToTeam(auctionId, auctionPlayerId, winningTeamAuctionEntryId, price, "LIVE_BID");
 }
@@ -203,6 +216,117 @@ export async function adminAssignPlayer(
   }
 
   return allocatePlayerToTeam(auctionId, auctionPlayerId, teamAuctionEntryId, price, "ADMIN_ASSIGNED");
+}
+
+/**
+ * A team manager's live competing bid on the player currently on the clock.
+ * A team can never re-raise its own standing bid — it can only bid again
+ * once another team has taken the lead. Uses an optimistic compare-and-swap
+ * (`updateMany` guarded by the exact `currentBidAmount` we read) so two
+ * concurrent bids on the same player can't both "win" — the loser gets
+ * `count: 0` and its whole transaction (including the Bid history row) rolls
+ * back, closing a race `allocatePlayerToTeam` doesn't otherwise guard against.
+ */
+export async function placeBid(
+  auctionId: string,
+  auctionPlayerId: string,
+  teamAuctionEntryId: string,
+  amount: number
+) {
+  const [auctionPlayer, entry] = await Promise.all([
+    prisma.auctionPlayer.findUnique({
+      where: { id: auctionPlayerId },
+      include: { category: true },
+    }),
+    prisma.teamAuctionEntry.findUnique({
+      where: { id: teamAuctionEntryId },
+      include: { team: true },
+    }),
+  ]);
+
+  if (!auctionPlayer || auctionPlayer.auctionId !== auctionId) {
+    throw new ValidationError("Player not found in this auction");
+  }
+  if (!entry || entry.auctionId !== auctionId) {
+    throw new ValidationError("Team is not part of this auction");
+  }
+  if (auctionPlayer.status !== "IN_BIDDING") {
+    throw new InvalidStateTransitionError("This player is not currently on the clock");
+  }
+  if (entry.slotsFilled >= entry.slotsTotal) {
+    throw new SquadCapExceededError(`Team "${entry.team.name}" has already filled its squad`);
+  }
+  if (entry.id === auctionPlayer.currentBidderEntryId) {
+    throw new ValidationError("You already hold the highest bid — wait for another team to outbid you");
+  }
+  if (auctionPlayer.bidCooldownUntil && auctionPlayer.bidCooldownUntil > new Date()) {
+    throw new ValidationError("A bid was just placed — please wait a moment before bidding again");
+  }
+
+  const amountDecimal = new Prisma.Decimal(amount);
+  const currentBid = auctionPlayer.currentBidAmount;
+  if (currentBid == null) {
+    if (amountDecimal.lessThan(auctionPlayer.category.basePrice)) {
+      throw new ValidationError(
+        `Bid must be at least the base price (${String(auctionPlayer.category.basePrice)})`
+      );
+    }
+  } else {
+    const minRequired = auctionPlayer.category.bidIncrement
+      ? new Prisma.Decimal(currentBid).plus(auctionPlayer.category.bidIncrement)
+      : null;
+    const isValid = minRequired
+      ? !amountDecimal.lessThan(minRequired)
+      : amountDecimal.greaterThan(currentBid);
+    if (!isValid) {
+      throw new ValidationError(
+        minRequired
+          ? `Bid must be at least ${minRequired.toString()} (current bid + this category's increment)`
+          : `Bid must be higher than the current bid (${String(currentBid)})`
+      );
+    }
+  }
+
+  // Same reserve-for-remaining-slots check allocatePlayerToTeam uses for a
+  // final sale — a team can bid up to what it could actually afford to WIN
+  // with. The bid itself never debits budget; only a completed sale does.
+  const categories = await prisma.auctionCategory.findMany({ where: { auctionId } });
+  const reserveUnit = computeReserveUnit(categories);
+  const slotsAfterThisWin = Math.max(entry.slotsTotal - entry.slotsFilled - 1, 0);
+  const maxAffordable = new Prisma.Decimal(entry.budgetRemaining).minus(
+    reserveUnit.times(slotsAfterThisWin)
+  );
+  if (amountDecimal.greaterThan(maxAffordable)) {
+    throw new InsufficientBudgetError(
+      `This bid would leave "${entry.team.name}" unable to fill its remaining slots`
+    );
+  }
+
+  const cooldownUntil = new Date(Date.now() + 10_000);
+  const bid = await prisma.$transaction(async (tx) => {
+    const updateResult = await tx.auctionPlayer.updateMany({
+      where: { id: auctionPlayerId, status: "IN_BIDDING", currentBidAmount: currentBid },
+      data: {
+        currentBidAmount: amountDecimal,
+        currentBidderEntryId: teamAuctionEntryId,
+        bidCooldownUntil: cooldownUntil,
+      },
+    });
+    if (updateResult.count === 0) {
+      throw new ValidationError("Someone else just bid on this player — refresh and try again");
+    }
+    return tx.bid.create({ data: { auctionPlayerId, teamAuctionEntryId, amount: amountDecimal } });
+  });
+
+  emitAuctionEvent(auctionId, "bid:placed", {
+    auctionPlayerId,
+    teamAuctionEntryId,
+    teamName: entry.team.name,
+    amount: amountDecimal.toString(),
+    cooldownUntil: cooldownUntil.toISOString(),
+  });
+
+  return bid;
 }
 
 export async function markUnsold(auctionId: string, auctionPlayerId: string) {

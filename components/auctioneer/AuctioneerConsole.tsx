@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { AuctionState } from "@/lib/services/auctionState.service";
@@ -12,11 +12,13 @@ import { SaleAnnouncement } from "@/components/auction/SaleAnnouncement";
 import {
   selectNextPlayerAction,
   recordSaleAction,
+  adminPlaceBidAction,
   markUnsoldAction,
   concludeAuctionAction,
   removePlayerFromTeamAction,
 } from "@/lib/actions/bidding.actions";
 import { resetAuctionAction } from "@/lib/actions/auction.actions";
+import { computeMaxBid } from "@/lib/auction/maxBid";
 import { card, cardInteractive, buttonPrimary, buttonSecondary, buttonDanger, inputClass, selectClass, tabsTrack, tabItem } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 
@@ -38,6 +40,16 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
   const [loading, setLoading] = useState(false);
 
   const onClock = state.players.find((p) => p.status === "IN_BIDDING");
+
+  // Clears the manual form whenever a *new* player comes on the clock — the
+  // "record sale to leader" button below reads onClock.currentBid/currentBidderEntryId
+  // directly instead of mirroring them into this form, so it's always accurate
+  // even as bids keep coming in after the player was first put on the clock.
+  useEffect(() => {
+    setPrice("");
+    setSelectedTeamId("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onClock?.id]);
   const queue = state.players.filter(
     (p) =>
       p.status === "AVAILABLE" || p.status === "IN_PRE_AUCTION_POOL" || p.status === "UNSOLD"
@@ -87,30 +99,16 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
     return null;
   }
 
-  // Max bid a team can legally place on the player currently on the clock, without
-  // leaving itself unable to fill its remaining squad slots. Reserves the cheapest
-  // players actually left in the pool (excluding the one on the clock) for the
-  // slots that still need filling after this pick, rather than assuming a flat
-  // per-slot minimum — a category can dry up before a team's slots do.
+  // Excludes the on-clock player itself from the reserve calculation below.
   const remainingPoolBasePrices = onClock
     ? queue.filter((p) => p.id !== onClock.id).map((p) => Number(p.basePrice))
     : [];
-
-  function computeMaxBid(budgetRemaining: number, slotsRemaining: number): number {
-    if (slotsRemaining <= 0) return 0;
-    const slotsAfterThisPick = slotsRemaining - 1;
-    if (slotsAfterThisPick <= 0) return budgetRemaining;
-    const reserve = [...remainingPoolBasePrices]
-      .sort((a, b) => a - b)
-      .slice(0, slotsAfterThisPick)
-      .reduce((sum, p) => sum + p, 0);
-    return budgetRemaining - reserve;
-  }
 
   const maxBids: Record<string, string> | undefined = onClock
     ? Object.fromEntries(
         state.teams.map((t) => {
           const maxBid = computeMaxBid(
+            remainingPoolBasePrices,
             Number(t.budgetRemaining),
             t.slotsTotal - t.slotsFilled
           );
@@ -138,6 +136,38 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
       await recordSaleAction(state.id, onClock.id, selectedTeamId, Number(price));
       setSelectedTeamId("");
       setPrice("");
+      router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to record sale");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Places a live bid on a team's behalf (e.g. a manager who can't log in),
+  // sharing the same team/price fields as the manual sale form below.
+  async function handlePlaceBid() {
+    if (!onClock || !selectedTeamId || !price) return;
+    setLoading(true);
+    setError(null);
+    try {
+      await adminPlaceBidAction(state.id, onClock.id, selectedTeamId, Number(price));
+      setPrice("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to place bid");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // One click, no re-typing — reads the live leading bid directly rather
+  // than going through the manual price/team form fields at all.
+  async function handleRecordSaleToLeader() {
+    if (!onClock || !onClock.currentBid || !onClock.currentBidderEntryId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      await recordSaleAction(state.id, onClock.id, onClock.currentBidderEntryId, Number(onClock.currentBid));
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to record sale");
@@ -328,59 +358,101 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
             <OnClockCard player={onClock} photoWidth={200} photoHeight={300} />
             {onClock && (
               <div className="flex flex-col gap-3 w-full max-w-sm">
-                <select
-                  value={selectedTeamId}
-                  onChange={(e) => setSelectedTeamId(e.target.value)}
-                  className={selectClass}
-                >
-                  <option value="">Select winning team…</option>
-                  {state.teams
-                    .filter((t) => t.slotsFilled < t.slotsTotal)
-                    .map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.teamName} (budget {t.budgetRemaining})
-                      </option>
-                    ))}
-                </select>
-                <div className="flex gap-2">
-                  <input
-                    type="number"
-                    min={onClock.basePrice}
-                    step="0.01"
-                    placeholder={`Winning price (min ${onClock.basePrice})`}
-                    value={price}
-                    onChange={(e) => setPrice(e.target.value)}
-                    className={`${inputClass} flex-1`}
-                  />
-                  {onClock.bidIncrement && (
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setPrice(
-                          String(
-                            (Number(price) || Number(onClock.basePrice)) +
-                              Number(onClock.bidIncrement)
-                          )
-                        )
-                      }
-                      className={`${buttonSecondary} px-3 shrink-0`}
-                    >
-                      +{onClock.bidIncrement}
-                    </button>
+                <p className="text-sm text-center">
+                  {onClock.currentBid ? (
+                    <>
+                      Current bid: <span className="font-semibold">{onClock.currentBid}</span> by{" "}
+                      {onClock.currentBidderTeamName}
+                    </>
+                  ) : (
+                    <span className="text-black/60 dark:text-white/60">
+                      No live bids yet — base price {onClock.basePrice}
+                    </span>
                   )}
-                </div>
-                <div className="flex gap-2">
+                </p>
+
+                {onClock.currentBid && onClock.currentBidderEntryId && (
                   <button
-                    onClick={handleRecordSale}
-                    disabled={loading || !selectedTeamId || !price}
+                    onClick={handleRecordSaleToLeader}
+                    disabled={loading}
                     className={buttonPrimary}
                   >
-                    Record sale
+                    {loading
+                      ? "Recording…"
+                      : `Record sale to ${onClock.currentBidderTeamName} at ${onClock.currentBid}`}
                   </button>
-                  <button onClick={handleUnsold} disabled={loading} className={buttonSecondary}>
-                    Mark unsold
-                  </button>
-                </div>
+                )}
+
+                <details open={!onClock.currentBid}>
+                  <summary className="cursor-pointer select-none text-xs text-center text-black/50 dark:text-white/50">
+                    {onClock.currentBid
+                      ? "Place a bid on a team's behalf, or record the sale manually"
+                      : "Place a bid or record the sale manually"}
+                  </summary>
+                  <div className="flex flex-col gap-2 mt-2">
+                    <select
+                      value={selectedTeamId}
+                      onChange={(e) => setSelectedTeamId(e.target.value)}
+                      className={selectClass}
+                    >
+                      <option value="">Select team…</option>
+                      {state.teams
+                        .filter((t) => t.slotsFilled < t.slotsTotal)
+                        .map((t) => (
+                          <option key={t.id} value={t.id}>
+                            {t.teamName} (budget {t.budgetRemaining})
+                          </option>
+                        ))}
+                    </select>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        min={onClock.basePrice}
+                        step="0.01"
+                        placeholder={`Price (min ${onClock.basePrice})`}
+                        value={price}
+                        onChange={(e) => setPrice(e.target.value)}
+                        className={`${inputClass} flex-1`}
+                      />
+                      {onClock.bidIncrement && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setPrice(
+                              String(
+                                (Number(price) || Number(onClock.basePrice)) +
+                                  Number(onClock.bidIncrement)
+                              )
+                            )
+                          }
+                          className={`${buttonSecondary} px-3 shrink-0`}
+                        >
+                          +{onClock.bidIncrement}
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handlePlaceBid}
+                        disabled={loading || !selectedTeamId || !price}
+                        className={buttonSecondary}
+                      >
+                        Place bid
+                      </button>
+                      <button
+                        onClick={handleRecordSale}
+                        disabled={loading || !selectedTeamId || !price}
+                        className={buttonPrimary}
+                      >
+                        Record sale
+                      </button>
+                    </div>
+                  </div>
+                </details>
+
+                <button onClick={handleUnsold} disabled={loading} className={`${buttonSecondary} self-center`}>
+                  Mark unsold
+                </button>
               </div>
             )}
           </div>

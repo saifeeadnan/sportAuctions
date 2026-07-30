@@ -264,28 +264,46 @@ model AuctionCategory {
 }
 
 model AuctionPlayer {
-  id            String              @id @default(cuid())
-  auctionId     String
-  auction       Auction             @relation(fields: [auctionId], references: [id], onDelete: Cascade)
-  playerId      String
-  player        Player              @relation(fields: [playerId], references: [id])
-  categoryId    String
-  category      AuctionCategory     @relation(fields: [categoryId], references: [id])
-  status        AuctionPlayerStatus @default(AVAILABLE)
-  soldVia       SoldVia?
-  soldToEntryId String?
-  soldToEntry   TeamAuctionEntry?   @relation("SoldPlayers", fields: [soldToEntryId], references: [id])
-  soldPrice     Decimal?            @db.Decimal(12, 2)
-  soldAt        DateTime?
-  biddingOrder  Int?
-  points        Decimal?            @db.Decimal(10, 2)
+  id                  String              @id @default(cuid())
+  auctionId           String
+  auction             Auction             @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  playerId            String
+  player              Player              @relation(fields: [playerId], references: [id])
+  categoryId          String
+  category            AuctionCategory     @relation(fields: [categoryId], references: [id])
+  status              AuctionPlayerStatus @default(AVAILABLE)
+  soldVia             SoldVia?
+  soldToEntryId       String?
+  soldToEntry         TeamAuctionEntry?   @relation("SoldPlayers", fields: [soldToEntryId], references: [id])
+  soldPrice           Decimal?            @db.Decimal(12, 2)
+  soldAt              DateTime?
+  biddingOrder        Int?
+  points              Decimal?            @db.Decimal(10, 2)
+  currentBidAmount    Decimal?            @db.Decimal(12, 2)
+  currentBidderEntryId String?
+  currentBidderEntry  TeamAuctionEntry?   @relation("CurrentBidder", fields: [currentBidderEntryId], references: [id])
+  bidCooldownUntil    DateTime?
 
   draftPicks   PreAuctionSubmission[]
   fantasyPicks FantasyTeamPlayer[]
+  bids         Bid[]
 
   @@unique([auctionId, playerId])
   @@index([auctionId, status])
   @@map("auction_players")
+}
+
+model Bid {
+  id                 String           @id @default(cuid())
+  auctionPlayerId    String
+  auctionPlayer      AuctionPlayer    @relation(fields: [auctionPlayerId], references: [id], onDelete: Cascade)
+  teamAuctionEntryId String
+  teamAuctionEntry   TeamAuctionEntry @relation(fields: [teamAuctionEntryId], references: [id])
+  amount             Decimal          @db.Decimal(12, 2)
+  createdAt          DateTime         @default(now())
+
+  @@index([auctionPlayerId, createdAt])
+  @@map("bids")
 }
 
 model FantasyTeam {
@@ -327,8 +345,10 @@ model TeamAuctionEntry {
   slotsFilled          Int                     @default(0)
   slotsTotal           Int
 
-  draftSubmissions PreAuctionSubmission[]
-  playersWon       AuctionPlayer[]        @relation("SoldPlayers")
+  draftSubmissions   PreAuctionSubmission[]
+  playersWon         AuctionPlayer[]        @relation("SoldPlayers")
+  currentlyLeadingOn AuctionPlayer[]        @relation("CurrentBidder")
+  bids               Bid[]
 
   @@unique([teamId, auctionId])
   @@index([auctionId])

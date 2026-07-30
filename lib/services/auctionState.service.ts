@@ -15,6 +15,10 @@ export type AuctionStatePlayer = {
   soldToTeamName: string | null;
   soldVia: string | null;
   soldAt: string | null;
+  currentBid: string | null;
+  currentBidderEntryId: string | null;
+  currentBidderTeamName: string | null;
+  bidCooldownUntil: string | null;
   rating: string | null;
   battingRating: string | null;
   bowlingRating: string | null;
@@ -47,7 +51,12 @@ export async function getAuctionState(auctionId: string): Promise<AuctionState |
     include: {
       tournament: true,
       auctionPlayers: {
-        include: { player: true, category: true, soldToEntry: { include: { team: true } } },
+        include: {
+          player: true,
+          category: true,
+          soldToEntry: { include: { team: true } },
+          currentBidderEntry: { include: { team: true } },
+        },
         orderBy: { player: { name: "asc" } },
       },
       entries: {
@@ -78,6 +87,10 @@ export async function getAuctionState(auctionId: string): Promise<AuctionState |
       soldToTeamName: ap.soldToEntry?.team.name ?? null,
       soldVia: ap.soldVia,
       soldAt: ap.soldAt != null ? ap.soldAt.toISOString() : null,
+      currentBid: ap.currentBidAmount != null ? String(ap.currentBidAmount) : null,
+      currentBidderEntryId: ap.currentBidderEntryId,
+      currentBidderTeamName: ap.currentBidderEntry?.team.name ?? null,
+      bidCooldownUntil: ap.bidCooldownUntil != null ? ap.bidCooldownUntil.toISOString() : null,
       rating: ap.player.rating != null ? String(ap.player.rating) : null,
       battingRating: ap.player.battingRating != null ? String(ap.player.battingRating) : null,
       bowlingRating: ap.player.bowlingRating != null ? String(ap.player.bowlingRating) : null,

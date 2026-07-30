@@ -33,7 +33,44 @@ export function useAuctionSocket(auctionId: string, initialState: AuctionState) 
         setState((prev) => ({
           ...prev,
           players: prev.players.map((p) =>
-            p.id === payload.auctionPlayerId ? { ...p, status: "IN_BIDDING" } : p
+            p.id === payload.auctionPlayerId
+              ? {
+                  ...p,
+                  status: "IN_BIDDING",
+                  // Fresh start — any bid state is from a previous round this
+                  // same player might have been on the clock for.
+                  currentBid: null,
+                  currentBidderEntryId: null,
+                  currentBidderTeamName: null,
+                  bidCooldownUntil: null,
+                }
+              : p
+          ),
+        }));
+      }
+    );
+
+    socket.on(
+      "bid:placed",
+      (payload: {
+        auctionPlayerId: string;
+        teamAuctionEntryId: string;
+        teamName: string;
+        amount: string;
+        cooldownUntil: string;
+      }) => {
+        setState((prev) => ({
+          ...prev,
+          players: prev.players.map((p) =>
+            p.id === payload.auctionPlayerId
+              ? {
+                  ...p,
+                  currentBid: payload.amount,
+                  currentBidderEntryId: payload.teamAuctionEntryId,
+                  currentBidderTeamName: payload.teamName,
+                  bidCooldownUntil: payload.cooldownUntil,
+                }
+              : p
           ),
         }));
       }
@@ -60,6 +97,10 @@ export function useAuctionSocket(auctionId: string, initialState: AuctionState) 
                   soldToEntryId: payload.teamAuctionEntryId,
                   soldToTeamName: payload.teamName,
                   soldAt: payload.soldAt,
+                  currentBid: null,
+                  currentBidderEntryId: null,
+                  currentBidderTeamName: null,
+                  bidCooldownUntil: null,
                 }
               : p
           ),

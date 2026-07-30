@@ -304,12 +304,23 @@ export async function resetAuctionToPreBidding(auctionId: string) {
             soldToEntryId: null,
             soldPrice: null,
             soldAt: null,
+            currentBidAmount: null,
+            currentBidderEntryId: null,
+            bidCooldownUntil: null,
           },
         });
       } else if (ap.status === "UNSOLD" || ap.status === "IN_BIDDING") {
+        // Live-bid state (not the permanent Bid history, which is never
+        // deleted) is transient and doesn't make sense once back in a
+        // pre-bidding auction state.
         await tx.auctionPlayer.update({
           where: { id: ap.id },
-          data: { status: preBiddingStatus(ap.id) },
+          data: {
+            status: preBiddingStatus(ap.id),
+            currentBidAmount: null,
+            currentBidderEntryId: null,
+            bidCooldownUntil: null,
+          },
         });
       }
     }

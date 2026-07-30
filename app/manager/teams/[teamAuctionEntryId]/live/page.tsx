@@ -29,7 +29,7 @@ export default async function ManagerLivePage({
     <div>
       <h1 className="text-xl font-semibold mb-1">{state.name}</h1>
       <p className="text-sm text-black/60 dark:text-white/60 mb-6">{state.tournamentName}</p>
-      <LiveAuctionView initialState={state} highlightTeamEntryId={entry.id} />
+      <LiveAuctionView initialState={state} highlightTeamEntryId={entry.id} canPlaceBids />
       <SponsorRibbon sponsors={sponsors} />
     </div>
   );
