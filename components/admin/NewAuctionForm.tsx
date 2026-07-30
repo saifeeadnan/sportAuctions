@@ -17,7 +17,12 @@ type Player = {
   position: string | null;
   defaultCategory: string | null;
 };
-type Category = { name: string; basePrice: string; preAuctionEligible: boolean };
+type Category = {
+  name: string;
+  basePrice: string;
+  preAuctionEligible: boolean;
+  bidIncrement: string;
+};
 
 export function NewAuctionForm({
   tournamentId,
@@ -31,7 +36,7 @@ export function NewAuctionForm({
   const [teamBudget, setTeamBudget] = useState("");
   const [auctionType, setAuctionType] = useState<AuctionType>("LIVE");
   const [categories, setCategories] = useState<Category[]>([
-    { name: "", basePrice: "", preAuctionEligible: true },
+    { name: "", basePrice: "", preAuctionEligible: true, bidIncrement: "" },
   ]);
   const [assignments, setAssignments] = useState<Record<string, string>>({});
   const [overridden, setOverridden] = useState<Set<string>>(new Set());
@@ -84,7 +89,7 @@ export function NewAuctionForm({
     setAssignments((prev) => ({ ...prev, [playerId]: categoryName }));
   }
 
-  function updateCategory(index: number, field: "name" | "basePrice", value: string) {
+  function updateCategory(index: number, field: "name" | "basePrice" | "bidIncrement", value: string) {
     setCategories((prev) =>
       prev.map((c, i) => (i === index ? { ...c, [field]: value } : c))
     );
@@ -99,7 +104,10 @@ export function NewAuctionForm({
   }
 
   function addCategory() {
-    setCategories((prev) => [...prev, { name: "", basePrice: "", preAuctionEligible: true }]);
+    setCategories((prev) => [
+      ...prev,
+      { name: "", basePrice: "", preAuctionEligible: true, bidIncrement: "" },
+    ]);
   }
 
   function removeCategory(index: number) {
@@ -140,6 +148,7 @@ export function NewAuctionForm({
             name: c.name.trim(),
             basePrice: Number(c.basePrice),
             preAuctionEligible: c.preAuctionEligible,
+            bidIncrement: c.bidIncrement.trim() ? Number(c.bidIncrement) : undefined,
           })),
         playerAssignments,
       });
@@ -221,6 +230,15 @@ export function NewAuctionForm({
                     value={cat.basePrice}
                     onChange={(e) => updateCategory(i, "basePrice", e.target.value)}
                     className={`${inputClass} w-28`}
+                  />
+                  <input
+                    placeholder="Bid increment (optional)"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={cat.bidIncrement}
+                    onChange={(e) => updateCategory(i, "bidIncrement", e.target.value)}
+                    className={`${inputClass} w-36`}
                   />
                   {categories.length > 1 && (
                     <button

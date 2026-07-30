@@ -13,6 +13,7 @@ import {
   startBidding,
   resetAuctionToPreBidding,
   deleteAuction,
+  updateCategoryBidIncrement,
   type CreateAuctionInput,
 } from "@/lib/services/auction.service";
 import { submitDraft, removeDraftPick } from "@/lib/services/preAuctionDraft.service";
@@ -55,6 +56,17 @@ export async function resetAuctionAction(auctionId: string) {
   await resetAuctionToPreBidding(auctionId);
   revalidatePath(`/admin/auctions/${auctionId}`);
   revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
+}
+
+export async function updateCategoryBidIncrementAction(
+  auctionId: string,
+  categoryId: string,
+  bidIncrement: number | null
+) {
+  const { leagueId } = await requireAdminOrLeagueAdmin();
+  await loadScopedAuction(auctionId, leagueId);
+  await updateCategoryBidIncrement(categoryId, bidIncrement);
+  revalidatePath(`/admin/auctions/${auctionId}`);
 }
 
 export async function deleteAuctionAction(auctionId: string) {

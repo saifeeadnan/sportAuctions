@@ -8,6 +8,7 @@ export type AuctionStatePlayer = {
   previousTeam: string | null;
   categoryName: string;
   basePrice: string;
+  bidIncrement: string | null;
   status: string;
   soldPrice: string | null;
   soldToEntryId: string | null;
@@ -70,6 +71,7 @@ export async function getAuctionState(auctionId: string): Promise<AuctionState |
       previousTeam: ap.player.previousTeam,
       categoryName: ap.category.name,
       basePrice: String(ap.category.basePrice),
+      bidIncrement: ap.category.bidIncrement != null ? String(ap.category.bidIncrement) : null,
       status: ap.status,
       soldPrice: ap.soldPrice != null ? String(ap.soldPrice) : null,
       soldToEntryId: ap.soldToEntryId,

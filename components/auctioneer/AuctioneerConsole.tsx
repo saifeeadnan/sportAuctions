@@ -342,15 +342,33 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
                       </option>
                     ))}
                 </select>
-                <input
-                  type="number"
-                  min={onClock.basePrice}
-                  step="0.01"
-                  placeholder={`Winning price (min ${onClock.basePrice})`}
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                  className={inputClass}
-                />
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    min={onClock.basePrice}
+                    step="0.01"
+                    placeholder={`Winning price (min ${onClock.basePrice})`}
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                    className={`${inputClass} flex-1`}
+                  />
+                  {onClock.bidIncrement && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPrice(
+                          String(
+                            (Number(price) || Number(onClock.basePrice)) +
+                              Number(onClock.bidIncrement)
+                          )
+                        )
+                      }
+                      className={`${buttonSecondary} px-3 shrink-0`}
+                    >
+                      +{onClock.bidIncrement}
+                    </button>
+                  )}
+                </div>
                 <div className="flex gap-2">
                   <button
                     onClick={handleRecordSale}

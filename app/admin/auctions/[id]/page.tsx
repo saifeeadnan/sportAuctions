@@ -5,6 +5,7 @@ import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
 import { openPreAuctionAction, startBiddingAction } from "@/lib/actions/auction.actions";
 import { listTournamentSponsors } from "@/lib/services/tournamentSponsor.service";
 import { AssignPlayerForm } from "@/components/admin/AssignPlayerForm";
+import { EditCategoryBidIncrementForm } from "@/components/admin/EditCategoryBidIncrementForm";
 import { SponsorRibbon } from "@/components/tournament/SponsorRibbon";
 import { card, cardInteractive, buttonPrimary, buttonSecondary } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
@@ -79,6 +80,7 @@ export default async function AuctionDetailPage({
                 <th className="py-2 pr-4">Base price</th>
                 <th className="py-2 pr-4">Players</th>
                 <th className="py-2 pr-4">Pre-auction draft</th>
+                <th className="py-2 pr-4">Bid increment</th>
               </tr>
             </thead>
             <tbody>
@@ -91,6 +93,21 @@ export default async function AuctionDetailPage({
                     <Badge variant={c.preAuctionEligible ? "success" : "neutral"}>
                       {c.preAuctionEligible ? "Allowed" : "Live bidding only"}
                     </Badge>
+                  </td>
+                  <td className="py-2 pr-4">
+                    {auction.status === "BIDDING" ? (
+                      c.bidIncrement != null ? (
+                        `+${String(c.bidIncrement)}`
+                      ) : (
+                        "—"
+                      )
+                    ) : (
+                      <EditCategoryBidIncrementForm
+                        auctionId={auction.id}
+                        categoryId={c.id}
+                        bidIncrement={c.bidIncrement != null ? String(c.bidIncrement) : null}
+                      />
+                    )}
                   </td>
                 </tr>
               ))}

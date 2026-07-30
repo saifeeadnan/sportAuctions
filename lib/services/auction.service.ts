@@ -14,7 +14,12 @@ export type CreateAuctionInput = {
   teamBudget: number;
   createdById: string;
   auctionType?: AuctionType;
-  categories: { name: string; basePrice: number; preAuctionEligible?: boolean }[];
+  categories: {
+    name: string;
+    basePrice: number;
+    preAuctionEligible?: boolean;
+    bidIncrement?: number;
+  }[];
   playerAssignments: { playerId: string; categoryName: string }[];
 };
 
@@ -37,6 +42,9 @@ export async function createAuction(input: CreateAuctionInput) {
   for (const cat of input.categories) {
     if (cat.basePrice <= 0) {
       throw new ValidationError(`Category "${cat.name}" must have a base price greater than 0`);
+    }
+    if (cat.bidIncrement != null && cat.bidIncrement <= 0) {
+      throw new ValidationError(`Category "${cat.name}"'s bid increment must be greater than 0`);
     }
   }
 
@@ -83,6 +91,7 @@ export async function createAuction(input: CreateAuctionInput) {
             name: c.name.trim(),
             basePrice: c.basePrice,
             preAuctionEligible: c.preAuctionEligible ?? true,
+            bidIncrement: c.bidIncrement ?? null,
           },
         })
       )
@@ -98,6 +107,32 @@ export async function createAuction(input: CreateAuctionInput) {
     });
 
     return auction;
+  });
+}
+
+export async function updateCategoryBidIncrement(categoryId: string, bidIncrement: number | null) {
+  if (bidIncrement != null && bidIncrement <= 0) {
+    throw new ValidationError("Bid increment must be greater than 0");
+  }
+
+  const category = await prisma.auctionCategory.findUnique({
+    where: { id: categoryId },
+    include: { auction: true },
+  });
+  if (!category) throw new ValidationError("Category not found");
+
+  // Only blocked mid-live-bidding — changing a category's increment before or
+  // between bidding rounds (or after the auction has completed) is safe since
+  // it's a soft UI convenience, not something bids were validated against.
+  if (category.auction.status === "BIDDING") {
+    throw new InvalidStateTransitionError(
+      "Cannot change a bid increment while the auction is live — pause or finish bidding first"
+    );
+  }
+
+  return prisma.auctionCategory.update({
+    where: { id: categoryId },
+    data: { bidIncrement },
   });
 }
 
