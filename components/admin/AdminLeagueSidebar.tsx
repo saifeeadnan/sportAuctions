@@ -11,16 +11,16 @@ export function AdminLeagueSidebar({ leagues }: { leagues: League[] }) {
   const searchParams = useSearchParams();
   const selectedLeagueId = searchParams.get("league");
   const isAnalyticsPage = pathname.startsWith("/admin/analytics");
+  const isLeaguesManagementPage = pathname.startsWith("/admin/leagues");
 
-  function hrefFor(leagueId: string | null) {
+  function hrefFor(leagueId: string) {
+    // Selecting a league from /admin/leagues itself would be a no-op there
+    // (that page isn't league-filtered) — land on Tournaments instead, same
+    // as every other admin page's default landing spot for a league.
+    const targetPath = pathname === "/admin/leagues" ? "/admin/tournaments" : pathname;
     const params = new URLSearchParams(searchParams.toString());
-    if (leagueId) {
-      params.set("league", leagueId);
-    } else {
-      params.delete("league");
-    }
-    const qs = params.toString();
-    return qs ? `${pathname}?${qs}` : pathname;
+    params.set("league", leagueId);
+    return `${targetPath}?${params.toString()}`;
   }
 
   const itemClass = (active: boolean) =>
@@ -44,7 +44,11 @@ export function AdminLeagueSidebar({ leagues }: { leagues: League[] }) {
       <details open>
         <summary className={nodeSummaryClass}>All Leagues</summary>
         <div className="flex flex-col gap-0.5 mt-1 pl-2">
-          <Link href={hrefFor(null)} className={itemClass(!selectedLeagueId)}>
+          {/* Links to the league management page, not a filter-clear
+              shortcut — the individual league links below still set the
+              `?league=` filter, but there's no dedicated "clear it" link
+              anymore now that this slot points to /admin/leagues. */}
+          <Link href="/admin/leagues" className={itemClass(isLeaguesManagementPage)}>
             All leagues
           </Link>
           {leagues.map((league) => (
