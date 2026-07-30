@@ -38,6 +38,25 @@ export async function createTournament(input: CreateTournamentInput) {
   });
 }
 
+export type UpdateTournamentDatesInput = { startDate: Date; endDate: Date };
+
+export async function updateTournamentDates(tournamentId: string, input: UpdateTournamentDatesInput) {
+  if (Number.isNaN(input.startDate.getTime()) || Number.isNaN(input.endDate.getTime())) {
+    throw new ValidationError("Invalid date");
+  }
+  if (input.endDate < input.startDate) {
+    throw new ValidationError("End date cannot be before start date");
+  }
+
+  const tournament = await prisma.tournament.findUnique({ where: { id: tournamentId } });
+  if (!tournament) throw new ValidationError("Tournament not found");
+
+  return prisma.tournament.update({
+    where: { id: tournamentId },
+    data: { startDate: input.startDate, endDate: input.endDate },
+  });
+}
+
 export type CreateTeamInput = {
   tournamentId: string;
   name: string;

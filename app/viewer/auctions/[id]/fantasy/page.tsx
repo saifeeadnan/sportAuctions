@@ -5,6 +5,7 @@ import {
   getFantasyTeam,
   getFantasyStandings,
   listFantasyPlayerPool,
+  isFantasyEditingLocked,
 } from "@/lib/services/fantasyTeam.service";
 import { getRulesDocumentIfViewable } from "@/lib/services/tournamentDocument.service";
 import { listTournamentSponsors } from "@/lib/services/tournamentSponsor.service";
@@ -14,6 +15,7 @@ import { TeamStrengthSummary } from "@/components/manager/TeamStrengthSummary";
 import { SponsorRow } from "@/components/tournament/SponsorRow";
 import { Badge } from "@/components/ui/Badge";
 import { card } from "@/lib/ui";
+import { formatCalendarDate } from "@/lib/dates";
 import type { RatedPlayer } from "@/lib/teamStrength";
 
 function toRatedPlayer(player: {
@@ -51,6 +53,7 @@ export default async function FantasyTeamPage({
   }
 
   const { auction } = eligibility;
+  const locked = isFantasyEditingLocked(auction.tournament);
   const existingTeam = await getFantasyTeam(id, session.user.id);
   const standings = existingTeam ? await getFantasyStandings(id) : null;
   const myStanding = standings?.standings.find((s) => s.team.userId === session.user.id);
@@ -78,7 +81,21 @@ export default async function FantasyTeamPage({
         <SponsorRow sponsors={sponsors} />
       </div>
 
-      {existingTeam ? (
+      {!locked && (
+        <p className="text-sm text-black/60 dark:text-white/60">
+          You can keep editing your fantasy team until the tournament starts on{" "}
+          <span className="font-medium">{formatCalendarDate(auction.tournament.startDate)}</span> — after
+          that, whatever you've saved becomes final automatically.
+        </p>
+      )}
+
+      {locked && !existingTeam && (
+        <p className="text-black/60 dark:text-white/60">
+          The tournament has started and you didn&apos;t save a fantasy team in time.
+        </p>
+      )}
+
+      {locked && existingTeam ? (
         <>
           <p className="text-sm text-black/60 dark:text-white/60">
             Your fantasy team is locked in — {existingTeam.picks.length} player(s), total spend{" "}
@@ -127,15 +144,16 @@ export default async function FantasyTeamPage({
             }))}
           />
         </>
-      ) : (
+      ) : !locked ? (
         <FantasyTeamForm
           auctionId={auction.id}
           cap={auction.tournament.squadSize}
           budget={String(auction.teamBudget)}
           players={await listFantasyPlayerPool(auction.id)}
           lockedPlayerId={eligibility.selfAuctionPlayerId}
+          initialSelected={existingTeam?.picks.map((p) => p.auctionPlayerId) ?? []}
         />
-      )}
+      ) : null}
     </div>
   );
 }

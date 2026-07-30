@@ -11,7 +11,9 @@ import { AddTeamForm } from "@/components/admin/AddTeamForm";
 import { DeleteTeamButton } from "@/components/admin/DeleteTeamButton";
 import { AddTournamentSponsorForm } from "@/components/admin/AddTournamentSponsorForm";
 import { DeleteTournamentSponsorButton } from "@/components/admin/DeleteTournamentSponsorButton";
+import { EditTournamentDatesForm } from "@/components/admin/EditTournamentDatesForm";
 import { SponsorLink } from "@/components/tournament/SponsorLink";
+import { toDateInputValue, formatCalendarDate } from "@/lib/dates";
 import { card, cardInteractive } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 
@@ -69,8 +71,13 @@ export default async function TournamentDetailPage({
         <p className="text-sm text-black/60 dark:text-white/60">
           Roster: {tournament.roster.name} &middot; {tournament.teams.length}/
           {tournament.numTeams} teams &middot; squad size {tournament.squadSize} &middot;{" "}
-          {tournament.startDate.toDateString()} – {tournament.endDate.toDateString()}
+          {formatCalendarDate(tournament.startDate)} – {formatCalendarDate(tournament.endDate)}
         </p>
+        <EditTournamentDatesForm
+          tournamentId={tournament.id}
+          startDate={toDateInputValue(tournament.startDate)}
+          endDate={toDateInputValue(tournament.endDate)}
+        />
       </div>
 
       <section>

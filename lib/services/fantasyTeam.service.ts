@@ -181,6 +181,14 @@ export async function listFantasyPlayerPool(auctionId: string) {
   }));
 }
 
+/** A fantasy team is freely editable up until its tournament's start date —
+ * past that point, whatever was last saved becomes final automatically (no
+ * explicit "lock" action needed, and nothing needs to run at the deadline
+ * itself: `submitFantasyTeam` just starts rejecting further edits). */
+export function isFantasyEditingLocked(tournament: { startDate: Date }): boolean {
+  return new Date() >= tournament.startDate;
+}
+
 export async function submitFantasyTeam(
   auctionId: string,
   userId: string,
@@ -200,6 +208,11 @@ export async function submitFantasyTeam(
       "Fantasy teams can only be built once the auction is completed"
     );
   }
+  if (isFantasyEditingLocked(auction.tournament)) {
+    throw new InvalidStateTransitionError(
+      "The tournament has started — fantasy team picks are locked and can no longer be changed"
+    );
+  }
 
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user?.loginId) throw new ValidationError("Your account has no login ID");
@@ -211,15 +224,6 @@ export async function submitFantasyTeam(
   );
   if (!selfAuctionPlayer) {
     throw new ValidationError("You weren't part of this auction's player pool");
-  }
-
-  const existing = await prisma.fantasyTeam.findUnique({
-    where: { auctionId_userId: { auctionId, userId } },
-  });
-  if (existing) {
-    throw new InvalidStateTransitionError(
-      "You've already submitted a fantasy team for this auction — it can't be changed"
-    );
   }
 
   // You're always on your own fantasy team, whether or not the client sent your
@@ -253,19 +257,29 @@ export async function submitFantasyTeam(
     );
   }
 
-  return prisma.fantasyTeam.create({
-    data: {
-      auctionId,
-      userId,
-      picks: {
-        create: players.map((ap) => ({
-          auctionPlayerId: ap.id,
-          price: fantasyPrice(ap),
-        })),
+  // Re-submittable: upsert the team row (keeping its id/createdAt stable
+  // across edits) and replace its picks wholesale, same delete-then-recreate
+  // pattern the manager pre-auction draft already uses for its own
+  // keep-editing-until-locked flow (see preAuctionDraft.service.ts's submitDraft).
+  return prisma.$transaction(async (tx) => {
+    const fantasyTeam = await tx.fantasyTeam.upsert({
+      where: { auctionId_userId: { auctionId, userId } },
+      create: { auctionId, userId },
+      update: {},
+    });
+    await tx.fantasyTeamPlayer.deleteMany({ where: { fantasyTeamId: fantasyTeam.id } });
+    await tx.fantasyTeamPlayer.createMany({
+      data: players.map((ap) => ({
+        fantasyTeamId: fantasyTeam.id,
+        auctionPlayerId: ap.id,
+        price: fantasyPrice(ap),
+      })),
+    });
+    return tx.fantasyTeam.findUniqueOrThrow({
+      where: { id: fantasyTeam.id },
+      include: {
+        picks: { include: { auctionPlayer: { include: { player: true, category: true } } } },
       },
-    },
-    include: {
-      picks: { include: { auctionPlayer: { include: { player: true, category: true } } } },
-    },
+    });
   });
 }

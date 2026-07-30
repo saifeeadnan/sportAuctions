@@ -4,7 +4,12 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { requireAdminOrLeagueAdmin } from "@/lib/auth/guards";
 import { loadScopedRoster, loadScopedTournament, loadScopedTeam } from "@/lib/auth/scope";
-import { createTournament, deleteTournament, deleteTeam } from "@/lib/services/tournament.service";
+import {
+  createTournament,
+  deleteTournament,
+  deleteTeam,
+  updateTournamentDates,
+} from "@/lib/services/tournament.service";
 
 export async function createTournamentAction(formData: FormData) {
   const { session, leagueId } = await requireAdminOrLeagueAdmin();
@@ -31,6 +36,21 @@ export async function deleteTournamentAction(tournamentId: string) {
   await deleteTournament(tournamentId);
   revalidatePath("/admin/tournaments");
   revalidatePath("/");
+}
+
+export async function updateTournamentDatesAction(
+  tournamentId: string,
+  startDate: string,
+  endDate: string
+) {
+  const { leagueId } = await requireAdminOrLeagueAdmin();
+  await loadScopedTournament(tournamentId, leagueId);
+  await updateTournamentDates(tournamentId, {
+    startDate: new Date(startDate),
+    endDate: new Date(endDate),
+  });
+  revalidatePath(`/admin/tournaments/${tournamentId}`);
+  revalidatePath("/admin/tournaments");
 }
 
 export async function deleteTeamAction(teamId: string) {

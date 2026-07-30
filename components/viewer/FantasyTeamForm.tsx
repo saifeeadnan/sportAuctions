@@ -26,15 +26,19 @@ export function FantasyTeamForm({
   budget,
   players,
   lockedPlayerId,
+  initialSelected,
 }: {
   auctionId: string;
   cap: number;
   budget: string;
   players: PlayerOption[];
   lockedPlayerId: string;
+  initialSelected?: string[];
 }) {
   const router = useRouter();
-  const [selected, setSelected] = useState<Set<string>>(new Set([lockedPlayerId]));
+  const [selected, setSelected] = useState<Set<string>>(
+    new Set([lockedPlayerId, ...(initialSelected ?? [])])
+  );
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -71,19 +75,13 @@ export function FantasyTeamForm({
   }
 
   async function handleSubmit() {
-    if (
-      !window.confirm(
-        "Submit your fantasy team? This is final and cannot be changed afterward."
-      )
-    )
-      return;
     setLoading(true);
     setError(null);
     try {
       await submitFantasyTeamAction(auctionId, Array.from(selected));
       router.refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to submit fantasy team");
+      setError(err instanceof Error ? err.message : "Failed to save fantasy team");
     } finally {
       setLoading(false);
     }
@@ -161,7 +159,7 @@ export function FantasyTeamForm({
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
       <button onClick={handleSubmit} disabled={loading} className={`${buttonPrimary} self-start`}>
-        {loading ? "Submitting…" : "Submit fantasy team"}
+        {loading ? "Saving…" : "Save fantasy team"}
       </button>
     </div>
   );
