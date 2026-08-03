@@ -40,7 +40,7 @@ export default async function FantasyTeamPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const session = await requireRole("VIEWER");
+  const session = await requireRole("VIEWER", "TEAM_MANAGER");
 
   const eligibility = await getFantasyEligibility(id, session.user.id, scopeLeagueId(session));
   if (!eligibility.eligible) {
@@ -85,7 +85,7 @@ export default async function FantasyTeamPage({
         <p className="text-sm text-black/60 dark:text-white/60">
           You can keep editing your fantasy team until the tournament starts on{" "}
           <span className="font-medium">{formatCalendarDate(auction.tournament.startDate)}</span> — after
-          that, whatever you've saved becomes final automatically.
+          that, whatever you&apos;ve saved becomes final automatically.
         </p>
       )}
 

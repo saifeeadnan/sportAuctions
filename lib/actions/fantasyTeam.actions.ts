@@ -6,7 +6,7 @@ import { loadScopedAuction } from "@/lib/auth/scope";
 import { submitFantasyTeam, deleteFantasyTeam } from "@/lib/services/fantasyTeam.service";
 
 export async function submitFantasyTeamAction(auctionId: string, auctionPlayerIds: string[]) {
-  const session = await requireRole("VIEWER");
+  const session = await requireRole("VIEWER", "TEAM_MANAGER");
   await submitFantasyTeam(auctionId, session.user.id, auctionPlayerIds, scopeLeagueId(session));
   revalidatePath(`/viewer/auctions/${auctionId}/fantasy`);
 }

@@ -4,7 +4,6 @@ import { auth } from "@/auth";
 import { LandingHero } from "@/components/LandingHero";
 
 const roleLinks: Record<string, { href: string; label: string }[]> = {
-  TEAM_MANAGER: [{ href: "/manager", label: "My teams" }],
   AUCTIONEER: [{ href: "/auctioneer", label: "Auctions to run" }],
   VIEWER: [{ href: "/viewer", label: "Watch an auction" }],
 };
@@ -18,6 +17,13 @@ export default async function Home() {
 
   if (session.user.role === "ADMIN" || session.user.role === "LEAGUE_ADMIN") {
     redirect("/admin/rosters");
+  }
+
+  // Straight to the tournaments tab (with its nav) rather than an
+  // intermediate "click here" landing card — same treatment ADMIN/LEAGUE_ADMIN
+  // already get above.
+  if (session.user.role === "TEAM_MANAGER") {
+    redirect("/manager");
   }
 
   const links = roleLinks[session.user.role] ?? [];

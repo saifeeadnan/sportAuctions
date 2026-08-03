@@ -18,8 +18,7 @@ export default async function ManagerHomePage() {
     where: { managerId: session!.user.id },
     include: {
       tournament: true,
-      sponsorImage: { select: { id: true } },
-      entries: { include: { auction: true } },
+      entries: { include: { auction: true }, orderBy: { auction: { createdAt: "desc" } } },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -28,95 +27,63 @@ export default async function ManagerHomePage() {
   // several) so the rules link shows up as soon as they're assigned a team —
   // no auction needs to exist yet.
   const uniqueTournamentIds = Array.from(new Set(teams.map((t) => t.tournamentId)));
-  const rulesByTournamentId = new Map<string, { fileName: string } | null>();
+  const rulesByTournamentId = new Map<string, boolean>();
   await Promise.all(
     uniqueTournamentIds.map(async (tournamentId) => {
       const doc = await getRulesDocumentIfViewable(tournamentId, session!.user);
-      rulesByTournamentId.set(tournamentId, doc);
+      rulesByTournamentId.set(tournamentId, !!doc);
     })
   );
 
   return (
     <div>
-      <h1 className="text-xl font-semibold mb-6">My teams</h1>
+      <h1 className="text-xl font-semibold mb-6">Tournaments</h1>
 
       {teams.length === 0 ? (
         <p className="text-black/60 dark:text-white/60">
           You haven&apos;t been assigned to a team yet.
         </p>
       ) : (
-        <ul className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {teams.map((team) => (
-            <li key={team.id} className={`${cardInteractive} flex flex-col items-center gap-2 p-4`}>
-              {team.sponsorImage ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={`/api/teams/${team.id}/sponsor-image`}
-                  alt={`${team.name} sponsor`}
-                  className="h-[200px] w-[200px] rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-2"
-                />
-              ) : (
-                <div className="h-[200px] w-[200px] rounded border border-dashed border-black/10 dark:border-white/10 flex items-center justify-center text-xs text-black/30 dark:text-white/30">
-                  No logo
-                </div>
-              )}
-              <p className="font-medium text-center">
-                {team.name} &middot;{" "}
-                <span className="text-black/60 dark:text-white/60">
-                  {team.tournament.name}
-                </span>
-              </p>
-              {rulesByTournamentId.get(team.tournamentId) && (
-                <a
-                  href={`/tournaments/${team.tournamentId}/rules`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm underline underline-offset-2"
+        <ul className="flex flex-col gap-2">
+          {teams.map((team) => {
+            // Most recently created auction this team has an entry for —
+            // the one worth badging on the tournaments list.
+            const latestEntry = team.entries[0];
+            return (
+              <li
+                key={team.id}
+                className={`${cardInteractive} flex items-center justify-between gap-4 px-4 py-3`}
+              >
+                <Link
+                  href={`/manager/team/${team.id}`}
+                  className="flex-1 flex items-center justify-between gap-3"
                 >
-                  View tournament rules
-                </a>
-              )}
-              {team.entries.length === 0 ? (
-                <p className="text-sm text-black/60 dark:text-white/60">No active draft yet.</p>
-              ) : (
-                <ul className="text-sm flex flex-col items-center gap-1.5">
-                  {team.entries.map((entry) => (
-                    <li key={entry.id} className="flex items-center gap-2">
-                      <span className="text-black/60 dark:text-white/60">{entry.auction.name}</span>
-                      <Badge variant={ENTRY_STATUS_VARIANT[entry.status] ?? "neutral"}>
-                        {entry.status}
+                  <span>
+                    {team.tournament.name}{" "}
+                    <span className="text-black/50 dark:text-white/50">&middot;</span>{" "}
+                    <span className="font-medium underline underline-offset-2">{team.name}</span>
+                  </span>
+                  {latestEntry && (
+                    <span className="mr-4">
+                      <Badge variant={ENTRY_STATUS_VARIANT[latestEntry.status] ?? "neutral"}>
+                        {latestEntry.status}
                       </Badge>
-                      {(entry.status === "PRE_AUCTION_DRAFTING" ||
-                        entry.status === "PRE_AUCTION_SUBMITTED") && (
-                        <Link
-                          href={`/manager/teams/${entry.id}/draft`}
-                          className="underline underline-offset-2"
-                        >
-                          Submit draft
-                        </Link>
-                      )}
-                      {entry.status === "ALLOCATED_PRE_AUCTION" && (
-                        <Link
-                          href={`/manager/teams/${entry.id}/draft`}
-                          className="underline underline-offset-2"
-                        >
-                          View team
-                        </Link>
-                      )}
-                      {(entry.status === "AUCTION_LIVE" || entry.status === "FINAL") && (
-                        <Link
-                          href={`/manager/teams/${entry.id}/live`}
-                          className="underline underline-offset-2"
-                        >
-                          View live
-                        </Link>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </li>
-          ))}
+                    </span>
+                  )}
+                </Link>
+                {rulesByTournamentId.get(team.tournamentId) && (
+                  <a
+                    href={`/tournaments/${team.tournamentId}/rules`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs underline underline-offset-2 text-black/60 dark:text-white/60"
+                  >
+                    Rules
+                  </a>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
     </div>
