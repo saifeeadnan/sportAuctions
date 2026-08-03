@@ -24,10 +24,19 @@ app.prepare().then(() => {
     socket.on("join", async (auctionId: string) => {
       if (typeof auctionId !== "string" || !auctionId) return;
 
+      // Which cookie name NextAuth used (__Secure-authjs.session-token vs
+      // plain) depends on whether the browser sees the site as HTTPS — true
+      // when this dev server is reached through the Cloudflare tunnel, even
+      // though NODE_ENV still says "development". Reading it off the actual
+      // cookie header (rather than guessing from NODE_ENV) works in every
+      // setup: plain localhost dev, tunneled dev, and a real prod deploy.
+      const rawCookies = (socket.request.headers as Record<string, string | undefined>).cookie ?? "";
+      const secureCookie = rawCookies.includes("__Secure-authjs.session-token=");
+
       const token = await getToken({
         req: socket.request as unknown as { headers: Record<string, string> },
         secret: process.env.NEXTAUTH_SECRET,
-        secureCookie: !dev,
+        secureCookie,
       }).catch(() => null);
       if (!token) return;
 
