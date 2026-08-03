@@ -10,7 +10,7 @@ import { TeamStrengthSummary } from "@/components/manager/TeamStrengthSummary";
 import { RosterRibbon } from "@/components/roster/RosterRibbon";
 import { BidControl } from "@/components/auction/BidControl";
 import { computeMaxBid } from "@/lib/auction/maxBid";
-import { computeBidGuidance, type InitialStrategy } from "@/lib/auction/guidance";
+import { computeBidGuidance, computeLiveCategoryAvgPrice, type InitialStrategy } from "@/lib/auction/guidance";
 import { openAnalyticsDashboardWindow } from "@/lib/auction/popupWindow";
 
 export type { InitialStrategy };
@@ -92,8 +92,13 @@ export function LiveAuctionView({
           isMustHave: initialStrategy?.mustHaveIds.includes(onClock.id) ?? false,
           isAvoid: initialStrategy?.avoidIds.includes(onClock.id) ?? false,
           categoryTargetAvgPrice: initialStrategy?.budgetTargetsByCategoryName[onClock.categoryName] ?? null,
+          liveCategoryAvgPrice: computeLiveCategoryAvgPrice(state.players, onClock.categoryName),
           legalMaxBid: myMaxBid,
           otherMustHavesRemainingInCategory,
+          // This view has no prediction data (that's only fetched inside the
+          // analytics popup, kept private and off this page) — the status
+          // dot below just falls back to a plain PASS for avoid picks here.
+          predictedRival: null,
         })
       : null;
 
@@ -222,7 +227,9 @@ export function LiveAuctionView({
                   ? "bg-emerald-400"
                   : guidance.signal === "PASS"
                     ? "bg-amber-400"
-                    : "bg-white/70"
+                    : guidance.signal === "SPOILER"
+                      ? "bg-red-400"
+                      : "bg-white/70"
               }`}
               aria-hidden
             />

@@ -1,16 +1,18 @@
 import { Badge } from "@/components/ui/Badge";
 import type { GuidanceSignal } from "@/lib/auction/guidance";
 
-const SIGNAL_VARIANT: Record<GuidanceSignal, "success" | "info" | "warning"> = {
+const SIGNAL_VARIANT: Record<GuidanceSignal, "success" | "info" | "warning" | "danger"> = {
   BID: "success",
   CONSIDER: "info",
   PASS: "warning",
+  SPOILER: "danger",
 };
 
 const SIGNAL_LABEL: Record<GuidanceSignal, string> = {
   BID: "Bid",
   CONSIDER: "Consider",
   PASS: "Pass",
+  SPOILER: "Spoiler bid",
 };
 
 export function BidGuidancePanel({
@@ -30,7 +32,15 @@ export function BidGuidancePanel({
           <span className="text-sm font-medium">Suggested max: {suggestedMaxBid}</span>
         )}
       </div>
-      <p className="text-xs text-black/60 dark:text-white/60">{reason}</p>
+      <p
+        className={`text-xs ${
+          signal === "SPOILER"
+            ? "text-red-600 dark:text-red-400"
+            : "text-black/60 dark:text-white/60"
+        }`}
+      >
+        {reason}
+      </p>
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useAuctionSocket } from "@/hooks/useAuctionSocket";
 import type { AuctionState } from "@/lib/services/auctionState.service";
 import { computeMaxBid } from "@/lib/auction/maxBid";
-import { computeBidGuidance, type InitialStrategy } from "@/lib/auction/guidance";
+import { computeBidGuidance, computeLiveCategoryAvgPrice, type InitialStrategy } from "@/lib/auction/guidance";
 import { computeProjectedStandings, type PlayerPrediction } from "@/lib/auction/projectedStandings";
 import { BidGuidancePanel } from "@/components/manager/BidGuidancePanel";
 import { TeamProjectionBoard } from "@/components/manager/TeamProjectionBoard";
@@ -81,14 +81,34 @@ export function AnalyticsDashboardPage({
       ).length
     : 0;
 
+  // Your own prediction for whoever's on the clock right now, if you made
+  // one — a rival team can only ever appear here via your own guess, never
+  // theirs, since predictions are private per team.
+  const onClockPrediction = onClock ? predictions[onClock.id] : undefined;
+  const onClockPredictionTeamName = onClockPrediction
+    ? state.teams.find((t) => t.id === onClockPrediction.teamId)?.teamName
+    : undefined;
+
+  // Actual average sold price for the on-clock player's category so far —
+  // a live, objective fallback wherever a target price is needed and the
+  // manager hasn't set one.
+  const liveCategoryAvgPrice = onClock
+    ? computeLiveCategoryAvgPrice(state.players, onClock.categoryName)
+    : null;
+
   const guidance = onClock
     ? computeBidGuidance({
         basePrice: Number(onClock.basePrice),
         isMustHave: initialStrategy.mustHaveIds.includes(onClock.id),
         isAvoid: initialStrategy.avoidIds.includes(onClock.id),
         categoryTargetAvgPrice: initialStrategy.budgetTargetsByCategoryName[onClock.categoryName] ?? null,
+        liveCategoryAvgPrice,
         legalMaxBid: myMaxBid,
         otherMustHavesRemainingInCategory,
+        predictedRival:
+          onClockPredictionTeamName != null
+            ? { teamName: onClockPredictionTeamName, amount: onClockPrediction?.amount ?? null }
+            : null,
       })
     : null;
 
@@ -104,14 +124,6 @@ export function AnalyticsDashboardPage({
   const myRank = projections.findIndex((p) => p.teamId === myTeamId) + 1;
   const myProjection = projections.find((p) => p.teamId === myTeamId);
   const predictionsCount = Object.keys(predictions).length;
-
-  // Your own prediction for whoever's on the clock right now, if you made
-  // one — a rival team can only ever appear here via your own guess, never
-  // theirs, since predictions are private per team.
-  const onClockPrediction = onClock ? predictions[onClock.id] : undefined;
-  const onClockPredictionTeamName = onClockPrediction
-    ? state.teams.find((t) => t.id === onClockPrediction.teamId)?.teamName
-    : undefined;
 
   return (
     // Fixed + inset-0 deliberately escapes app/manager/layout.tsx's
@@ -186,7 +198,7 @@ export function AnalyticsDashboardPage({
                       suggestedMaxBid={guidance.suggestedMaxBid}
                       reason={guidance.reason}
                     />
-                    {onClockPredictionTeamName && (
+                    {onClockPredictionTeamName && guidance.signal !== "SPOILER" && (
                       <p className="text-xs text-black/60 dark:text-white/60">
                         Your prediction:{" "}
                         <span className="font-medium text-black dark:text-white">
