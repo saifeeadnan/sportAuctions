@@ -157,9 +157,7 @@ export function StrategyForm({
                   key={p.id}
                   className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-colors"
                 >
-                  <span className="flex-1">
-                    {p.name} {p.position ? `(${p.position})` : ""}
-                  </span>
+                  <span className="flex-1">{p.name}</span>
                   <span className="text-black/60 dark:text-white/60 mr-2">base {p.basePrice}</span>
                   <button
                     type="button"
