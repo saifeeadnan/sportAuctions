@@ -302,7 +302,7 @@ export async function placeBid(
     );
   }
 
-  const cooldownUntil = new Date(Date.now() + 5_000);
+  const cooldownUntil = new Date(Date.now() + 2_000);
   const bid = await prisma.$transaction(async (tx) => {
     const updateResult = await tx.auctionPlayer.updateMany({
       where: { id: auctionPlayerId, status: "IN_BIDDING", currentBidAmount: currentBid },

@@ -210,7 +210,7 @@ rules, all server-enforced (never trusted from the client):
 2. Bidder's team must have a free squad slot.
 3. **A team cannot re-raise its own standing bid** — `entry.id === auctionPlayer
    .currentBidderEntryId` is rejected outright.
-4. **Cooldown**: if `bidCooldownUntil` (now + 5s from the last accepted bid) hasn't passed,
+4. **Cooldown**: if `bidCooldownUntil` (now + 2s from the last accepted bid) hasn't passed,
    the bid is rejected — paces the room and gives the next bidder a fair window.
 5. **Minimum amount**: base price if no standing bid; otherwise `currentBid +
    category.bidIncrement` if the category defines one, else simply "strictly greater than."
