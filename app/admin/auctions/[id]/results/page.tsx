@@ -40,9 +40,14 @@ export default async function AuctionResultsPage({
             {auction.tournament.name} &middot; status: {auction.status}
           </p>
         </div>
-        <a href={`/api/auctions/${auction.id}/export.csv`} className={buttonSecondary}>
-          Export CSV
-        </a>
+        <div className="flex gap-2">
+          <a href={`/api/auctions/${auction.id}/export.csv`} className={buttonSecondary}>
+            Export CSV
+          </a>
+          <a href={`/api/auctions/${auction.id}/bid-history/export.csv`} className={buttonSecondary}>
+            Export bid history
+          </a>
+        </div>
       </div>
 
       {auction.entries.map((entry) => {

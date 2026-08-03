@@ -240,6 +240,12 @@ export default async function AuctionDetailPage({
             Submitted drafts
           </Link>
         )}
+
+        {(auction.status === "BIDDING" || auction.status === "COMPLETED") && (
+          <a href={`/api/auctions/${auction.id}/bid-history/export.csv`} className={buttonSecondary}>
+            Export bid history
+          </a>
+        )}
       </section>
 
       <SponsorRibbon sponsors={sponsors} />
