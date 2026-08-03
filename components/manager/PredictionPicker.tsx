@@ -28,6 +28,11 @@ export function PredictionPicker({
   // Local draft text per player, so typing a digit doesn't have to round-trip
   // to the server before the input reflects it — committed onBlur.
   const [amountDrafts, setAmountDrafts] = useState<Record<string, string>>({});
+  // Per-player save errors — a failed save must never fail silently: the
+  // amount input keeps showing what was typed regardless of whether it
+  // actually persisted, so without this a rejected save (e.g. predicting
+  // your own team, or a stale entitlement check) looks identical to success.
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   const categories = Array.from(new Set(players.map((p) => p.categoryName)));
   // Falls back to the first still-present category if the one a manager had
@@ -38,6 +43,7 @@ export function PredictionPicker({
 
   async function handleTeamChange(auctionPlayerId: string, teamId: string) {
     setPending(auctionPlayerId);
+    setErrors((prev) => ({ ...prev, [auctionPlayerId]: "" }));
     try {
       if (teamId === "") {
         await removePredictionAction(entryId, auctionPlayerId);
@@ -47,9 +53,11 @@ export function PredictionPicker({
         await savePredictionAction(entryId, auctionPlayerId, teamId, existingAmount);
         onPredictionChange(auctionPlayerId, { teamId, amount: existingAmount });
       }
-    } catch {
-      // Best-effort — a failed save just leaves the dropdown showing its
-      // previous value rather than surfacing a disruptive error mid-auction.
+    } catch (err) {
+      setErrors((prev) => ({
+        ...prev,
+        [auctionPlayerId]: err instanceof Error ? err.message : "Failed to save prediction",
+      }));
     } finally {
       setPending(null);
     }
@@ -58,14 +66,21 @@ export function PredictionPicker({
   async function handleAmountBlur(auctionPlayerId: string, teamId: string, rawValue: string) {
     const trimmed = rawValue.trim();
     const amount = trimmed === "" ? null : Number(trimmed);
-    if (amount != null && (Number.isNaN(amount) || amount <= 0)) return;
+    if (amount != null && (Number.isNaN(amount) || amount <= 0)) {
+      setErrors((prev) => ({ ...prev, [auctionPlayerId]: "Amount must be a number greater than 0" }));
+      return;
+    }
 
     setPending(auctionPlayerId);
+    setErrors((prev) => ({ ...prev, [auctionPlayerId]: "" }));
     try {
       await savePredictionAction(entryId, auctionPlayerId, teamId, amount);
       onPredictionChange(auctionPlayerId, { teamId, amount });
-    } catch {
-      // Best-effort, same as the team select above.
+    } catch (err) {
+      setErrors((prev) => ({
+        ...prev,
+        [auctionPlayerId]: err instanceof Error ? err.message : "Failed to save prediction",
+      }));
     } finally {
       setPending(null);
     }
@@ -101,40 +116,44 @@ export function PredictionPicker({
           {visiblePlayers.map((p) => {
             const prediction = predictions[p.id];
             const teamId = prediction?.teamId ?? "";
+            const error = errors[p.id];
             return (
               <li
                 key={p.id}
-                className="flex items-center gap-2 text-sm px-3 py-2 rounded-lg hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-colors"
+                className="flex flex-col gap-1 px-3 py-2 rounded-lg hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-colors"
               >
-                <span className="flex-1">{p.name}</span>
-                <select
-                  value={teamId}
-                  onChange={(e) => handleTeamChange(p.id, e.target.value)}
-                  disabled={pending === p.id}
-                  className={`${selectClass} text-xs py-1`}
-                >
-                  <option value="">No prediction</option>
-                  {otherTeams.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.teamName}
-                    </option>
-                  ))}
-                </select>
-                {teamId && (
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    placeholder="Predicted bid"
-                    value={amountDrafts[p.id] ?? prediction?.amount ?? ""}
-                    onChange={(e) =>
-                      setAmountDrafts((prev) => ({ ...prev, [p.id]: e.target.value }))
-                    }
-                    onBlur={(e) => handleAmountBlur(p.id, teamId, e.target.value)}
+                <div className="flex items-center gap-2 text-sm">
+                  <span className="flex-1">{p.name}</span>
+                  <select
+                    value={teamId}
+                    onChange={(e) => handleTeamChange(p.id, e.target.value)}
                     disabled={pending === p.id}
-                    className={`${inputClass} w-24 text-xs py-1`}
-                  />
-                )}
+                    className={`${selectClass} text-xs py-1`}
+                  >
+                    <option value="">No prediction</option>
+                    {otherTeams.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.teamName}
+                      </option>
+                    ))}
+                  </select>
+                  {teamId && (
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="Predicted bid"
+                      value={amountDrafts[p.id] ?? prediction?.amount ?? ""}
+                      onChange={(e) =>
+                        setAmountDrafts((prev) => ({ ...prev, [p.id]: e.target.value }))
+                      }
+                      onBlur={(e) => handleAmountBlur(p.id, teamId, e.target.value)}
+                      disabled={pending === p.id}
+                      className={`${inputClass} w-24 text-xs py-1`}
+                    />
+                  )}
+                </div>
+                {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
               </li>
             );
           })}
