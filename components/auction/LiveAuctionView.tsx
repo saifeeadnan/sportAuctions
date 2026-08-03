@@ -10,6 +10,10 @@ import { TeamStrengthSummary } from "@/components/manager/TeamStrengthSummary";
 import { RosterRibbon } from "@/components/roster/RosterRibbon";
 import { BidControl } from "@/components/auction/BidControl";
 import { computeMaxBid } from "@/lib/auction/maxBid";
+import { computeBidGuidance, type InitialStrategy } from "@/lib/auction/guidance";
+import { openAnalyticsDashboardWindow } from "@/lib/auction/popupWindow";
+
+export type { InitialStrategy };
 
 function CurrentBidLine({ player }: { player: { currentBid: string | null; currentBidderTeamName: string | null; basePrice: string } }) {
   return (
@@ -30,6 +34,8 @@ export function LiveAuctionView({
   initialState,
   highlightTeamEntryId,
   canPlaceBids = false,
+  analyticsEnabled = false,
+  initialStrategy,
 }: {
   initialState: AuctionState;
   highlightTeamEntryId?: string;
@@ -37,6 +43,12 @@ export function LiveAuctionView({
    * `highlightTeamEntryId`'s team — a viewer's own-sold-player highlight
    * must only ever show the live bid, never get bidding controls. */
   canPlaceBids?: boolean;
+  /** Premium analytics dashboard, gated per-team-per-auction (§ TeamAuctionEntry.analyticsEnabled).
+   * The dashboard itself lives in a separate popup window (/analytics) —
+   * this component only needs enough to compute the trigger button's status
+   * dot, not the full strategy/prediction data set. */
+  analyticsEnabled?: boolean;
+  initialStrategy?: InitialStrategy;
 }) {
   const { state, connected, lastSale } = useAuctionSocket(initialState.id, initialState);
   const onClock = state.players.find((p) => p.status === "IN_BIDDING");
@@ -59,6 +71,30 @@ export function LiveAuctionView({
   const myMaxBid =
     myTeam && onClock
       ? computeMaxBid(remainingPoolBasePrices, Number(myTeam.budgetRemaining), myTeam.slotsTotal - myTeam.slotsFilled)
+      : null;
+
+  // Other must-have picks still in play in the same category — bidding hard
+  // on a non-priority player here could leave too little for those.
+  const otherMustHavesRemainingInCategory = onClock
+    ? state.players.filter(
+        (p) =>
+          p.id !== onClock.id &&
+          p.categoryName === onClock.categoryName &&
+          p.status !== "SOLD" &&
+          (initialStrategy?.mustHaveIds.includes(p.id) ?? false)
+      ).length
+    : 0;
+
+  const guidance =
+    analyticsEnabled && onClock
+      ? computeBidGuidance({
+          basePrice: Number(onClock.basePrice),
+          isMustHave: initialStrategy?.mustHaveIds.includes(onClock.id) ?? false,
+          isAvoid: initialStrategy?.avoidIds.includes(onClock.id) ?? false,
+          categoryTargetAvgPrice: initialStrategy?.budgetTargetsByCategoryName[onClock.categoryName] ?? null,
+          legalMaxBid: myMaxBid,
+          otherMustHavesRemainingInCategory,
+        })
       : null;
 
   return (
@@ -171,6 +207,28 @@ export function LiveAuctionView({
             <SoldTicker players={state.players} teams={state.teams} />
           </section>
         </>
+      )}
+
+      {analyticsEnabled && myTeam && (
+        <button
+          type="button"
+          onClick={() => openAnalyticsDashboardWindow(myTeam.id)}
+          className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-2 rounded-full bg-indigo-600 dark:bg-indigo-500 text-white pl-4 pr-5 py-2.5 text-sm font-medium shadow-lg hover:bg-indigo-500 dark:hover:bg-indigo-400 transition-colors"
+        >
+          {guidance && (
+            <span
+              className={`h-2 w-2 rounded-full ${
+                guidance.signal === "BID"
+                  ? "bg-emerald-400"
+                  : guidance.signal === "PASS"
+                    ? "bg-amber-400"
+                    : "bg-white/70"
+              }`}
+              aria-hidden
+            />
+          )}
+          Analytics ↗
+        </button>
       )}
     </div>
   );

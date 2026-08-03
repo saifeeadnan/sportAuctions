@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
 import { ConfirmedRosterTable } from "@/components/roster/ConfirmedRosterTable";
 import { DeleteDraftPickButton } from "@/components/admin/DeleteDraftPickButton";
+import { ToggleAnalyticsEnabledButton } from "@/components/admin/ToggleAnalyticsEnabledButton";
 import { card } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 
@@ -52,6 +53,23 @@ export default async function TeamRosterPage({
           {entry.slotsTotal}
         </p>
       </div>
+
+      <section className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-sm font-medium">Auction analytics dashboard</h2>
+          <p className="text-sm text-black/60 dark:text-white/60">
+            {entry.analyticsEnabled
+              ? "Enabled — this team's manager can set a bidding strategy and see live guidance."
+              : "Not enabled for this team."}
+          </p>
+        </div>
+        <ToggleAnalyticsEnabledButton
+          auctionId={id}
+          teamAuctionEntryId={entryId}
+          teamName={entry.team.name}
+          isEnabled={entry.analyticsEnabled}
+        />
+      </section>
 
       <section>
         <h2 className="text-lg font-medium mb-3">Confirmed roster ({confirmedPlayers.length})</h2>

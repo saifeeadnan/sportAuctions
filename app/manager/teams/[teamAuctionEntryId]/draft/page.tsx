@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
@@ -85,6 +86,16 @@ export default async function DraftPage({
           Status: {entry.status} &middot; pick up to {cap} player(s) &middot; budget available:{" "}
           {String(entry.budgetRemaining)}
         </p>
+        {entry.analyticsEnabled && (
+          <Link
+            href={`/manager/teams/${entry.id}/analytics`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm underline underline-offset-2"
+          >
+            Open the analytics dashboard &rarr;
+          </Link>
+        )}
       </div>
 
       {/* Shown up top, not at the bottom of the page, so sponsors are visible
