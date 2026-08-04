@@ -1,9 +1,15 @@
 import type { TeamProjection } from "@/lib/auction/projectedStandings";
+import { card } from "@/lib/ui";
 
-// computeTeamStrength's ceiling (avgSkill maxes at 10, balance at 1) — a fixed
-// reference so bar widths reflect distance from a hypothetical max-strength
-// team, not just whichever team happens to be highest right now.
-const STRENGTH_SCALE_MAX = 10;
+// Categories are already ordered highest base price first (see
+// computeProjectedStandings) — a medal on the top two calls out the
+// priciest, most contested categories at a glance.
+const CATEGORY_MEDALS = ["🥇", "🥈"];
+
+function formatCountCell(counts: { sold: number; predicted: number }): string {
+  if (counts.sold === 0 && counts.predicted === 0) return "—";
+  return counts.predicted > 0 ? `${counts.sold} (${counts.predicted})` : String(counts.sold);
+}
 
 export function TeamProjectionBoard({
   projections,
@@ -12,54 +18,55 @@ export function TeamProjectionBoard({
   projections: TeamProjection[];
   myTeamId?: string;
 }) {
+  if (projections.length === 0) {
+    return <p className="text-sm text-black/50 dark:text-white/50">No teams to compare yet.</p>;
+  }
+
+  const categories = Object.keys(projections[0].categoryCounts);
+
   return (
-    <div className="flex flex-col gap-3">
-      {projections.map((p, i) => {
-        const isMine = p.teamId === myTeamId;
-        const widthPct = Math.min(100, (p.projectedStrength.teamStrength / STRENGTH_SCALE_MAX) * 100);
-        return (
-          <div key={p.teamId} className="flex flex-col gap-1">
-            <div className="flex items-center gap-3">
-              <span className="w-4 shrink-0 text-xs text-black/40 dark:text-white/40 text-right tabular-nums">
-                {i + 1}
-              </span>
-              <span
-                className={`w-28 shrink-0 truncate text-sm ${isMine ? "font-semibold text-indigo-700 dark:text-indigo-300" : ""}`}
-              >
-                {p.teamName}
-                {isMine ? " (you)" : ""}
-              </span>
-              <div className="flex-1 h-2.5 rounded-full bg-black/[0.06] dark:bg-white/[0.08] overflow-hidden">
-                <div
-                  className={`h-full rounded-full ${isMine ? "bg-indigo-600 dark:bg-indigo-500" : "bg-black/25 dark:bg-white/30"}`}
-                  style={{ width: `${widthPct}%` }}
-                />
-              </div>
-              <span className="w-10 shrink-0 text-sm font-medium text-right tabular-nums">
-                {p.projectedStrength.teamStrength.toFixed(1)}
-              </span>
-              <span className="w-24 shrink-0 text-xs text-black/50 dark:text-white/50 text-right tabular-nums">
-                {p.actualStrength.teamStrength.toFixed(1)} so far
-              </span>
-            </div>
-            <p className="pl-7 text-xs text-black/50 dark:text-white/50 tabular-nums">
-              Budget remaining: {p.budgetRemaining}
-              {p.predictedReserve > 0 && (
-                <>
-                  {" "}
-                  &middot; Your predicted reserve:{" "}
-                  <span className="text-black/70 dark:text-white/70">
-                    {p.predictedReserve.toLocaleString()}
+    <div className={`${card} overflow-x-auto`}>
+      <table className="w-full text-sm border-collapse">
+        <thead>
+          <tr className="text-left border-b border-black/10 dark:border-white/10">
+            <th className="py-2 pl-4 pr-4">Team</th>
+            <th className="py-2 pr-4 whitespace-nowrap">Team size</th>
+            <th className="py-2 pr-4 whitespace-nowrap">Purse left</th>
+            <th className="py-2 pr-4 whitespace-nowrap">Predicted reserve</th>
+            {categories.map((c, i) => (
+              <th key={c} className="py-2 pr-4 whitespace-nowrap">
+                {CATEGORY_MEDALS[i] ? `${CATEGORY_MEDALS[i]} ` : ""}
+                {c}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {projections.map((p) => {
+            const isMine = p.teamId === myTeamId;
+            return (
+              <tr key={p.teamId} className="border-b border-black/5 dark:border-white/5 last:border-0">
+                <td className="py-2 pl-4 pr-4">
+                  <span className={isMine ? "font-semibold text-indigo-700 dark:text-indigo-300" : ""}>
+                    {p.teamName}
+                    {isMine ? " (you)" : ""}
                   </span>
-                </>
-              )}
-            </p>
-          </div>
-        );
-      })}
-      {projections.length === 0 && (
-        <p className="text-sm text-black/50 dark:text-white/50">No teams to compare yet.</p>
-      )}
+                </td>
+                <td className="py-2 pr-4 tabular-nums">{formatCountCell(p.rosterCount)}</td>
+                <td className="py-2 pr-4 tabular-nums">{p.budgetRemaining}</td>
+                <td className="py-2 pr-4 tabular-nums">
+                  {p.predictedReserve > 0 ? p.predictedReserve.toLocaleString() : "—"}
+                </td>
+                {categories.map((c) => (
+                  <td key={c} className="py-2 pr-4 tabular-nums">
+                    {formatCountCell(p.categoryCounts[c])}
+                  </td>
+                ))}
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

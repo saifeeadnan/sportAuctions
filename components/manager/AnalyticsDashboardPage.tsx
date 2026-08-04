@@ -5,9 +5,16 @@ import { useAuctionSocket } from "@/hooks/useAuctionSocket";
 import type { AuctionState } from "@/lib/services/auctionState.service";
 import { computeMaxBid } from "@/lib/auction/maxBid";
 import { computeBidGuidance, computeLiveCategoryAvgPrice, type InitialStrategy } from "@/lib/auction/guidance";
-import { computeProjectedStandings, type PlayerPrediction } from "@/lib/auction/projectedStandings";
+import {
+  computeProjectedStandings,
+  computeRivalAffordabilityWarnings,
+  computeCategorySpendOverview,
+  type PlayerPrediction,
+} from "@/lib/auction/projectedStandings";
 import { BidGuidancePanel } from "@/components/manager/BidGuidancePanel";
 import { TeamProjectionBoard } from "@/components/manager/TeamProjectionBoard";
+import { RivalAffordabilityPanel } from "@/components/manager/RivalAffordabilityPanel";
+import { CategorySpendTable } from "@/components/manager/CategorySpendTable";
 import { PredictionPicker } from "@/components/manager/PredictionPicker";
 import {
   StrategyForm,
@@ -15,6 +22,7 @@ import {
   type StrategyPlayerOption,
 } from "@/components/manager/StrategyForm";
 import { card, tabsTrack, tabItem } from "@/lib/ui";
+import { HelpTooltip } from "@/components/ui/HelpTooltip";
 
 const PREDICTABLE_STATUSES = new Set(["AVAILABLE", "IN_PRE_AUCTION_POOL", "IN_BIDDING", "UNSOLD"]);
 
@@ -124,6 +132,8 @@ export function AnalyticsDashboardPage({
   const myRank = projections.findIndex((p) => p.teamId === myTeamId) + 1;
   const myProjection = projections.find((p) => p.teamId === myTeamId);
   const predictionsCount = Object.keys(predictions).length;
+  const affordabilityWarnings = computeRivalAffordabilityWarnings(projections);
+  const categorySpend = computeCategorySpendOverview(state.players, predictions);
 
   return (
     // Fixed + inset-0 deliberately escapes app/manager/layout.tsx's
@@ -187,7 +197,26 @@ export function AnalyticsDashboardPage({
               </div>
 
               <section className="flex flex-col gap-2">
-                <h2 className="text-sm font-medium">Bidding guidance</h2>
+                <div className="flex items-center gap-1.5">
+                  <h2 className="text-sm font-medium">Bidding guidance</h2>
+                  <HelpTooltip title="Bidding guidance">
+                    <p>
+                      Four signals: <span className="font-medium">Bid</span> (go for it),{" "}
+                      <span className="font-medium">Consider</span> (in range, but not a
+                      priority), <span className="font-medium">Pass</span>, and{" "}
+                      <span className="font-medium">Spoiler bid</span> (bid up a player you
+                      predicted a rival wants, without intending to win it — risky, since you
+                      could end up winning it anyway). The suggested max is always capped at
+                      your legal max, so it never suggests a bid the platform would reject.
+                    </p>
+                    <p className="mt-2">
+                      <span className="font-medium">Example:</span> Kohli is on the clock, base
+                      300. You marked him must-have and your legal max is 900 → <b>Bid</b>,
+                      suggested max 900. A non-priority player in a category with a 400 budget
+                      target and the same 900 legal max → <b>Consider</b>, suggested max 400.
+                    </p>
+                  </HelpTooltip>
+                </div>
                 {onClock && guidance ? (
                   <div className="flex flex-col gap-1.5">
                     <p className="text-sm">
@@ -220,12 +249,82 @@ export function AnalyticsDashboardPage({
               </section>
 
               <section className="flex flex-col gap-2">
-                <h2 className="text-sm font-medium">Projected standings</h2>
+                <div className="flex items-center gap-1.5">
+                  <h2 className="text-sm font-medium">Projected standings</h2>
+                  <HelpTooltip title="Projected standings">
+                    <p>
+                      &quot;Purse left&quot; is real. &quot;Predicted reserve&quot; is what{" "}
+                      <span className="font-medium">your own predictions</span> say that team
+                      will still spend — not a fact about them. Each category cell reads{" "}
+                      <span className="font-medium">sold (predicted)</span>: players already won,
+                      plus players you predict they&apos;ll still win.
+                    </p>
+                    <p className="mt-2">
+                      <span className="font-medium">Example:</span> Titans FC shows Purse left
+                      2,400, Predicted reserve 1,100 — that 1,100 is your guess, not theirs. Their
+                      Icon column reading &quot;2 (1)&quot; means 2 already sold to them, plus 1
+                      more you predict they&apos;ll win.
+                    </p>
+                  </HelpTooltip>
+                </div>
                 <p className="text-xs text-black/50 dark:text-white/50">
-                  Bar shows projected team strength out of 10 — sold players plus your own
-                  predictions for who wins each remaining one. Your team is highlighted.
+                  Budget, reserve, and roster by category (highest base price first) — each cell is
+                  sold count, with predicted-but-not-yet-sold in parentheses. Your team is
+                  highlighted.
                 </p>
                 <TeamProjectionBoard projections={projections} myTeamId={myTeamId} />
+              </section>
+
+              <section className="flex flex-col gap-2">
+                <div className="flex items-center gap-1.5">
+                  <h2 className="text-sm font-medium">Category spend</h2>
+                  <HelpTooltip title="Category spend">
+                    <p>
+                      &quot;Avg spent&quot; is the real average sold price so far in that
+                      category. &quot;Avg predicted&quot; is the average of{" "}
+                      <span className="font-medium">your own</span> predicted amounts for
+                      players still available in it. Side by side, they&apos;re a sanity check on
+                      your budget targets — never another team&apos;s data.
+                    </p>
+                    <p className="mt-2">
+                      <span className="font-medium">Example:</span> Icon shows Avg spent 450 (6
+                      sold) and Avg predicted 380 (2 predicted) — the category is running hotter
+                      than your assumptions, so your remaining budget target for Icon may be too
+                      low.
+                    </p>
+                  </HelpTooltip>
+                </div>
+                <p className="text-xs text-black/50 dark:text-white/50">
+                  Real average price paid so far per category vs. the average your own predictions
+                  assume for what&apos;s still to come.
+                </p>
+                <CategorySpendTable rows={categorySpend} />
+              </section>
+
+              <section className="flex flex-col gap-2">
+                <div className="flex items-center gap-1.5">
+                  <h2 className="text-sm font-medium">Prediction sanity check</h2>
+                  <HelpTooltip title="Prediction sanity check">
+                    <p>
+                      Flags a team when the amounts <span className="font-medium">you</span>{" "}
+                      predicted for their still-available picks add up to more than their real
+                      remaining budget can cover. It&apos;s a check on your own predictions, not
+                      a comment on their strategy.
+                    </p>
+                    <p className="mt-2">
+                      <span className="font-medium">Example:</span> You predicted Titans FC will
+                      win 3 more players for a combined 2,800, but they only have 2,200 left —
+                      flagged as over by 600, meaning some of those predictions can&apos;t all be
+                      true at those prices.
+                    </p>
+                  </HelpTooltip>
+                </div>
+                <p className="text-xs text-black/50 dark:text-white/50">
+                  Flags any team where your own predicted-win amounts add up to more than their
+                  real remaining budget — a check on your predictions, not a comment on their
+                  strategy.
+                </p>
+                <RivalAffordabilityPanel warnings={affordabilityWarnings} />
               </section>
             </div>
           )}
