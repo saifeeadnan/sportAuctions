@@ -12,6 +12,7 @@ async function main() {
     where: { name: "Demo Tournament" },
     include: { teams: { orderBy: { name: "asc" } }, roster: { include: { players: { orderBy: { name: "asc" } } } } },
   });
+  if (!tournament.roster) throw new Error("Demo Tournament has no roster attached");
   const players = tournament.roster.players;
   console.log(`Tournament: ${tournament.name}, teams: ${tournament.teams.map((t) => t.name).join(", ")}, players: ${players.length}`);
 

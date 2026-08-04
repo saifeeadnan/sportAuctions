@@ -6,6 +6,7 @@ import { requireAdminOrLeagueAdmin } from "@/lib/auth/guards";
 import { loadScopedRoster, loadScopedTournament, loadScopedTeam } from "@/lib/auth/scope";
 import {
   createTournament,
+  attachRosterToTournament,
   deleteTournament,
   deleteTeam,
   updateTournamentDates,
@@ -15,11 +16,19 @@ export async function createTournamentAction(formData: FormData) {
   const { session, leagueId } = await requireAdminOrLeagueAdmin();
 
   const rosterId = String(formData.get("rosterId") ?? "");
-  await loadScopedRoster(rosterId, leagueId);
+  if (rosterId) {
+    await loadScopedRoster(rosterId, leagueId);
+  }
+  // The session's own scoped leagueId always wins when present (a League
+  // Admin can't be redirected to another league by a tampered form field);
+  // a submitted leagueId is only trusted for an unscoped site ADMIN, same
+  // idiom as app/api/rosters/upload/route.ts.
+  const submittedLeagueId = String(formData.get("leagueId") ?? "");
 
   const tournament = await createTournament({
     name: String(formData.get("name") ?? ""),
-    rosterId,
+    rosterId: rosterId || undefined,
+    leagueId: leagueId ?? submittedLeagueId,
     numTeams: Number(formData.get("numTeams")),
     squadSize: Number(formData.get("squadSize")),
     startDate: new Date(String(formData.get("startDate"))),
@@ -28,6 +37,17 @@ export async function createTournamentAction(formData: FormData) {
   });
 
   redirect(`/admin/tournaments/${tournament.id}`);
+}
+
+export async function attachRosterToTournamentAction(tournamentId: string, formData: FormData) {
+  const { leagueId } = await requireAdminOrLeagueAdmin();
+  await loadScopedTournament(tournamentId, leagueId);
+
+  const rosterId = String(formData.get("rosterId") ?? "");
+  await loadScopedRoster(rosterId, leagueId);
+
+  await attachRosterToTournament(tournamentId, rosterId);
+  revalidatePath(`/admin/tournaments/${tournamentId}`);
 }
 
 export async function deleteTournamentAction(tournamentId: string) {

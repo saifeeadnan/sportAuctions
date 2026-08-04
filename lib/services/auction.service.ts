@@ -59,6 +59,9 @@ export async function createAuction(input: CreateAuctionInput) {
 
   const tournament = await prisma.tournament.findUnique({ where: { id: input.tournamentId } });
   if (!tournament) throw new ValidationError("Tournament not found");
+  if (!tournament.rosterId) {
+    throw new ValidationError("Attach a player roster to this tournament before creating an auction");
+  }
 
   const rosterPlayerIds = new Set(
     (await prisma.player.findMany({

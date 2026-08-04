@@ -37,8 +37,10 @@ async function main() {
     where: { name: "Demo Tournament" },
     include: { roster: true },
   });
+  assert(demoTournament.rosterId !== null, "Demo Tournament has a roster attached");
+  const demoRosterId = demoTournament.rosterId as string;
   try {
-    await deleteRoster(demoTournament.rosterId);
+    await deleteRoster(demoRosterId);
     throw new Error("Expected deleteRoster to reject a roster in use by a tournament");
   } catch (e) {
     assert(
@@ -46,7 +48,7 @@ async function main() {
       `In-use roster deletion is blocked: ${e instanceof Error ? e.message : e}`
     );
   }
-  const stillExists = await prisma.playerRoster.findUnique({ where: { id: demoTournament.rosterId } });
+  const stillExists = await prisma.playerRoster.findUnique({ where: { id: demoRosterId } });
   assert(stillExists !== null, "In-use roster still exists after the blocked attempt");
 
   console.log("\nAll delete-roster assertions passed.");

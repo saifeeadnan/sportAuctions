@@ -66,7 +66,7 @@ export async function getRulesDocumentContent(tournamentId: string) {
 type ViewerUser = { id: string; role: string; leagueId: string | null };
 
 async function resolveCanView(
-  tournament: { id: string; rosterId: string; leagueId: string },
+  tournament: { id: string; rosterId: string | null; leagueId: string },
   user: ViewerUser
 ): Promise<boolean> {
   if (user.role === "ADMIN") return true;
@@ -82,6 +82,9 @@ async function resolveCanView(
     });
     if (managedTeam) return true;
   }
+
+  // No roster attached yet means no players to match against.
+  if (!tournament.rosterId) return false;
 
   const account = await prisma.user.findUnique({ where: { id: user.id } });
   if (!account?.loginId) return false;

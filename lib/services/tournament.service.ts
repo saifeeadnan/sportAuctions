@@ -3,7 +3,12 @@ import { ValidationError } from "@/lib/errors";
 
 export type CreateTournamentInput = {
   name: string;
-  rosterId: string;
+  /** Optional — a tournament can be created before any roster exists and have
+   * one attached later via attachRosterToTournament. */
+  rosterId?: string;
+  /** Required only when rosterId is omitted, since leagueId is normally
+   * derived from the roster. */
+  leagueId?: string;
   numTeams: number;
   squadSize: number;
   startDate: Date;
@@ -19,23 +24,53 @@ export async function createTournament(input: CreateTournamentInput) {
     throw new ValidationError("End date cannot be before start date");
   }
 
-  const roster = await prisma.playerRoster.findUnique({ where: { id: input.rosterId } });
-  if (!roster) throw new ValidationError("Roster not found");
+  let leagueId: string;
+  if (input.rosterId) {
+    const roster = await prisma.playerRoster.findUnique({ where: { id: input.rosterId } });
+    if (!roster) throw new ValidationError("Roster not found");
+    // A tournament always inherits its league from its roster, so it can
+    // never disagree with the roster it's built on.
+    leagueId = roster.leagueId;
+  } else {
+    if (!input.leagueId) throw new ValidationError("Select a league or a roster");
+    const league = await prisma.league.findUnique({ where: { id: input.leagueId } });
+    if (!league) throw new ValidationError("League not found");
+    leagueId = league.id;
+  }
 
   return prisma.tournament.create({
     data: {
       name: input.name.trim(),
-      rosterId: input.rosterId,
+      // Spread rather than `rosterId: input.rosterId` — Prisma's create-input
+      // validation for an optional relation treats an explicit `undefined`
+      // value differently from the key being absent entirely, and rejects it.
+      ...(input.rosterId ? { rosterId: input.rosterId } : {}),
       numTeams: input.numTeams,
       squadSize: input.squadSize,
       startDate: input.startDate,
       endDate: input.endDate,
       createdById: input.createdById,
-      // A tournament always inherits its league from its roster, so it can
-      // never disagree with the roster it's built on.
-      leagueId: roster.leagueId,
+      leagueId,
     },
   });
+}
+
+/** Attaches a roster to a tournament that doesn't have one yet. Once set, a
+ * tournament's roster is locked — there's no swap/replace path, so callers
+ * never need to reason about what happens to auctions built on a prior
+ * roster. */
+export async function attachRosterToTournament(tournamentId: string, rosterId: string) {
+  const tournament = await prisma.tournament.findUnique({ where: { id: tournamentId } });
+  if (!tournament) throw new ValidationError("Tournament not found");
+  if (tournament.rosterId) throw new ValidationError("This tournament already has a roster attached");
+
+  const roster = await prisma.playerRoster.findUnique({ where: { id: rosterId } });
+  if (!roster) throw new ValidationError("Roster not found");
+  if (roster.leagueId !== tournament.leagueId) {
+    throw new ValidationError("Roster must belong to the same league as the tournament");
+  }
+
+  return prisma.tournament.update({ where: { id: tournamentId }, data: { rosterId } });
 }
 
 export type UpdateTournamentDatesInput = { startDate: Date; endDate: Date };

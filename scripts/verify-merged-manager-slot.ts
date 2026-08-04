@@ -16,6 +16,7 @@ async function main() {
     where: { name: "Demo Tournament" },
     include: { roster: { include: { players: true } }, teams: { include: { manager: true } } },
   });
+  if (!tournament.roster) throw new Error("Demo Tournament has no roster attached");
   const admin = await prisma.user.findFirstOrThrow({ where: { role: "ADMIN" } });
 
   // Team 1 / manager1 is self-matched to "Virat Kohli"; Team 2 / manager2 is NOT self-matched.

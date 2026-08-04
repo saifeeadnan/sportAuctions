@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
@@ -16,6 +17,21 @@ export default async function NewAuctionPage({
   });
   if (!tournament) notFound();
   assertInScope(leagueId, tournament.leagueId);
+
+  if (!tournament.roster) {
+    return (
+      <div>
+        <h1 className="text-xl font-semibold mb-1">New auction</h1>
+        <p className="text-sm text-black/60 dark:text-white/60">
+          {tournament.name} has no roster attached yet.{" "}
+          <Link href={`/admin/tournaments/${tournament.id}`} className="underline underline-offset-2">
+            Attach one from the tournament page
+          </Link>{" "}
+          before creating an auction.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div>

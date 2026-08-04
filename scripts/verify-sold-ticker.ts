@@ -27,6 +27,7 @@ async function main() {
     where: { name: "Demo Tournament" },
     include: { roster: { include: { players: true } } },
   });
+  if (!tournament.roster) throw new Error("Demo Tournament has no roster attached");
   const admin = await prisma.user.findFirstOrThrow({ where: { role: "ADMIN" } });
 
   await prisma.auction.deleteMany({ where: { tournamentId: tournament.id, name: "SoldTicker Verify Auction" } });

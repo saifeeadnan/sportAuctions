@@ -67,6 +67,11 @@ export async function getFantasyEligibility(auctionId: string, userId: string, l
 
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user?.loginId) return { eligible: false as const, reason: "Your account has no login ID" };
+  // An auction can only be created once its tournament has a roster
+  // attached (see auction.service.ts createAuction), so a COMPLETED
+  // auction's tournament always has one — this null check is just to
+  // satisfy the type, not a real runtime possibility.
+  if (!auction.tournament.rosterId) return { eligible: false as const, reason: "Auction not found" };
 
   const selfAuctionPlayer = await findSelfAuctionPlayer(
     auctionId,
@@ -216,6 +221,9 @@ export async function submitFantasyTeam(
 
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user?.loginId) throw new ValidationError("Your account has no login ID");
+  // Same invariant as getFantasyEligibility above — a COMPLETED auction's
+  // tournament always has a roster attached.
+  if (!auction.tournament.rosterId) throw new ValidationError("Auction not found");
 
   const selfAuctionPlayer = await findSelfAuctionPlayer(
     auctionId,

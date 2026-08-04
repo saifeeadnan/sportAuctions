@@ -148,8 +148,8 @@ model Player {
 model Tournament {
   id          String           @id @default(cuid())
   name        String
-  rosterId    String
-  roster      PlayerRoster     @relation(fields: [rosterId], references: [id])
+  rosterId    String?
+  roster      PlayerRoster?    @relation(fields: [rosterId], references: [id])
   numTeams    Int
   squadSize   Int
   startDate   DateTime

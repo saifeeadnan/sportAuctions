@@ -8,6 +8,7 @@ import { DeleteAuctionButton } from "@/components/admin/DeleteAuctionButton";
 import { UploadRulesDocumentForm } from "@/components/admin/UploadRulesDocumentForm";
 import { DeleteRulesDocumentButton } from "@/components/admin/DeleteRulesDocumentButton";
 import { AddTeamForm } from "@/components/admin/AddTeamForm";
+import { AttachRosterForm } from "@/components/admin/AttachRosterForm";
 import { DeleteTeamButton } from "@/components/admin/DeleteTeamButton";
 import { AddTournamentSponsorForm } from "@/components/admin/AddTournamentSponsorForm";
 import { DeleteTournamentSponsorButton } from "@/components/admin/DeleteTournamentSponsorButton";
@@ -51,7 +52,7 @@ export default async function TournamentDetailPage({
 
   // Filtered by the tournament's own league (not the caller's) — a site ADMIN
   // editing one specific tournament should only see that league's managers.
-  const [managers, auctions, rulesDocument, sponsors, knownSponsors] = await Promise.all([
+  const [managers, auctions, rulesDocument, sponsors, knownSponsors, leagueRosters] = await Promise.all([
     prisma.user.findMany({
       where: { role: "TEAM_MANAGER", leagueId: tournament.leagueId },
       orderBy: { name: "asc" },
@@ -60,6 +61,12 @@ export default async function TournamentDetailPage({
     getRulesDocumentMeta(id),
     listTournamentSponsors(id),
     listKnownSponsors(id, leagueId),
+    tournament.rosterId
+      ? Promise.resolve([])
+      : prisma.playerRoster.findMany({
+          where: { leagueId: tournament.leagueId },
+          orderBy: { name: "asc" },
+        }),
   ]);
 
   const canAddTeam = tournament.teams.length < tournament.numTeams;
@@ -69,7 +76,7 @@ export default async function TournamentDetailPage({
       <div>
         <h1 className="text-xl font-semibold mb-1">{tournament.name}</h1>
         <p className="text-sm text-black/60 dark:text-white/60">
-          Roster: {tournament.roster.name} &middot; {tournament.teams.length}/
+          Roster: {tournament.roster?.name ?? "Not attached yet"} &middot; {tournament.teams.length}/
           {tournament.numTeams} teams &middot; squad size {tournament.squadSize} &middot;{" "}
           {formatCalendarDate(tournament.startDate)} – {formatCalendarDate(tournament.endDate)}
         </p>
@@ -125,12 +132,27 @@ export default async function TournamentDetailPage({
             <AddTournamentSponsorForm tournamentId={tournament.id} knownSponsors={knownSponsors} />
           </details>
 
-          <Link
-            href={`/admin/tournaments/${tournament.id}/auctions/new`}
-            className={`${card} flex items-center px-4 py-3 text-sm font-medium hover:border-black/15 dark:hover:border-white/20 transition-colors`}
-          >
-            New auction
-          </Link>
+          {!tournament.rosterId && (
+            <details className={card}>
+              <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
+                Attach roster
+              </summary>
+              <AttachRosterForm tournamentId={tournament.id} rosters={leagueRosters} />
+            </details>
+          )}
+
+          {tournament.rosterId ? (
+            <Link
+              href={`/admin/tournaments/${tournament.id}/auctions/new`}
+              className={`${card} flex items-center px-4 py-3 text-sm font-medium hover:border-black/15 dark:hover:border-white/20 transition-colors`}
+            >
+              New auction
+            </Link>
+          ) : (
+            <div className={`${card} flex items-center px-4 py-3 text-sm text-black/60 dark:text-white/60`}>
+              Attach a roster before creating an auction.
+            </div>
+          )}
         </div>
       </section>
 
