@@ -130,6 +130,7 @@ export default async function FantasyTeamPage({
 
           <TeamStrengthSummary
             players={existingTeam.picks.map((p) => toRatedPlayer(p.auctionPlayer.player))}
+            squadSize={auction.tournament.squadSize}
           />
           <RosterRibbon
             grid

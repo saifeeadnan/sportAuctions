@@ -105,7 +105,7 @@ export function FantasyTeamForm({
           {formatAmount(budgetRemainingAfterSelection)}
         </span>
       </p>
-      <TeamStrengthSummary players={teamSoFar} />
+      <TeamStrengthSummary players={teamSoFar} squadSize={cap} />
 
       <div className={tabsTrack}>
         {categories.map((cat) => {

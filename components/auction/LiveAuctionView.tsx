@@ -128,7 +128,7 @@ export function LiveAuctionView({
                 Budget remaining: {myTeam.budgetRemaining} &middot; Slots: {myTeam.slotsFilled}/
                 {myTeam.slotsTotal}
               </p>
-              <TeamStrengthSummary players={myPlayers} />
+              <TeamStrengthSummary players={myPlayers} squadSize={myTeam.slotsTotal} />
             </section>
 
             <section>

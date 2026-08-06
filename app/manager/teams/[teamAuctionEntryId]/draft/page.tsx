@@ -109,6 +109,7 @@ export default async function DraftPage({
             <DraftForm
               entryId={entry.id}
               cap={cap}
+              squadSize={entry.slotsTotal}
               budgetRemaining={String(entry.budgetRemaining)}
               confirmedPlayers={confirmedPlayers.map((ap) => toRatedPlayer(ap.player))}
               players={availablePlayers.map((ap) => ({
@@ -127,7 +128,10 @@ export default async function DraftPage({
                 The pre-auction draft has been resolved — uniquely-picked players are confirmed to
                 your roster, and any contested picks moved to the live auction pool.
               </p>
-              <TeamStrengthSummary players={confirmedPlayers.map((ap) => toRatedPlayer(ap.player))} />
+              <TeamStrengthSummary
+                players={confirmedPlayers.map((ap) => toRatedPlayer(ap.player))}
+                squadSize={entry.slotsTotal}
+              />
             </div>
           ) : (
             <p className="text-black/60 dark:text-white/60">

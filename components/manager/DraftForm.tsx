@@ -21,6 +21,7 @@ function formatAmount(n: number) {
 export function DraftForm({
   entryId,
   cap,
+  squadSize,
   budgetRemaining,
   confirmedPlayers,
   players,
@@ -29,6 +30,9 @@ export function DraftForm({
 }: {
   entryId: string;
   cap: number;
+  /** Full target roster size — not the same as `cap`, which is only the
+   * slots still open for this draft round. */
+  squadSize: number;
   budgetRemaining: string;
   confirmedPlayers: RatedPlayer[];
   players: PlayerOption[];
@@ -120,7 +124,7 @@ export function DraftForm({
             {formatAmount(budgetRemainingAfterSelection)}
           </span>
         </p>
-        <TeamStrengthSummary players={teamSoFar} />
+        <TeamStrengthSummary players={teamSoFar} squadSize={squadSize} />
       </div>
 
       <div className={tabsTrack}>

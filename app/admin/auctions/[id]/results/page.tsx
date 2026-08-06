@@ -72,6 +72,7 @@ export default async function AuctionResultsPage({
                   fieldingRating:
                     ap.player.fieldingRating != null ? String(ap.player.fieldingRating) : null,
                 }))}
+                squadSize={auction.tournament.squadSize}
               />
             </div>
             {entry.playersWon.length === 0 ? (
