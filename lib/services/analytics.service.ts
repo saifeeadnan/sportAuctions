@@ -17,10 +17,27 @@ export async function createAnalyticsSession(userId: string) {
   return prisma.analyticsSession.create({ data: { userId } });
 }
 
+// Heartbeats ping every 45s (AnalyticsHeartbeat.tsx) while a tab is open and
+// visible — a gap larger than this means the tab was closed, backgrounded
+// past a missed ping, or the computer slept, so it shouldn't count as active
+// time even though the same session row keeps getting touched for as long as
+// the login's JWT stays valid (up to 30 days).
+const MAX_GAP_MS = 2 * 60_000;
+
 export async function touchSession(sessionId: string) {
-  await prisma.analyticsSession.updateMany({
+  const session = await prisma.analyticsSession.findUnique({
     where: { id: sessionId },
-    data: { lastSeenAt: new Date() },
+    select: { lastSeenAt: true },
+  });
+  if (!session) return;
+
+  const now = new Date();
+  const gapMs = now.getTime() - session.lastSeenAt.getTime();
+  const activeDelta = Math.min(Math.max(0, gapMs), MAX_GAP_MS);
+
+  await prisma.analyticsSession.update({
+    where: { id: sessionId },
+    data: { lastSeenAt: now, activeMs: { increment: activeDelta } },
   });
 }
 
@@ -85,8 +102,7 @@ export async function getTimeSpentSummary({
   const sessions = await prisma.analyticsSession.findMany({
     select: {
       userId: true,
-      startedAt: true,
-      lastSeenAt: true,
+      activeMs: true,
       user: { select: { name: true, loginId: true, role: true } },
     },
   });
@@ -96,7 +112,6 @@ export async function getTimeSpentSummary({
     { userId: string; name: string; loginId: string; role: string; totalMs: number; sessionCount: number }
   >();
   for (const s of sessions) {
-    const durationMs = s.lastSeenAt.getTime() - s.startedAt.getTime();
     const entry = byUser.get(s.userId) ?? {
       userId: s.userId,
       name: s.user.name,
@@ -105,7 +120,7 @@ export async function getTimeSpentSummary({
       totalMs: 0,
       sessionCount: 0,
     };
-    entry.totalMs += Math.max(0, durationMs);
+    entry.totalMs += s.activeMs;
     entry.sessionCount += 1;
     byUser.set(s.userId, entry);
   }

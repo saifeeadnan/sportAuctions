@@ -454,6 +454,12 @@ model AnalyticsSession {
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   startedAt  DateTime @default(now())
   lastSeenAt DateTime @default(now())
+  // Accumulated active time, built up incrementally by touchSession — each
+  // heartbeat adds the gap since the last one, capped so a multi-day gap
+  // between visits (same login, JWT session persists for weeks) doesn't
+  // count as time spent. Deliberately not derived from lastSeenAt -
+  // startedAt, which would span calendar time since login, not actual usage.
+  activeMs   Int      @default(0)
 
   @@index([userId])
   @@index([lastSeenAt])
