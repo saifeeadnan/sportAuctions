@@ -20,7 +20,7 @@ export function TeamBudgetBoard({
     <div className={`${card} overflow-x-auto`}>
       <table className="w-full text-sm border-collapse">
         <thead>
-          <tr className="text-left border-b border-black/10 dark:border-white/10">
+          <tr className="text-left border-b border-black/10 dark:border-white/10 sticky top-0 bg-white/95 dark:bg-black/70 backdrop-blur-sm">
             <th className="py-2 pl-4 pr-4">Team</th>
             <th className="py-2 pr-4">Budget remaining</th>
             <th className="py-2 pr-4">Slots</th>

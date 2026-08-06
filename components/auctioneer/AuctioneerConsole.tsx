@@ -19,7 +19,7 @@ import {
 } from "@/lib/actions/bidding.actions";
 import { resetAuctionAction } from "@/lib/actions/auction.actions";
 import { computeMaxBid } from "@/lib/auction/maxBid";
-import { card, cardInteractive, buttonPrimary, buttonSecondary, buttonDanger, inputClass, selectClass, tabsTrack, tabItem } from "@/lib/ui";
+import { card, buttonPrimary, buttonSecondary, buttonDanger, inputClass, selectClass, tabsTrack, tabItem } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 
 // "Abdulqadir Zumkhawala" -> "Abdulqadir Z." — keeps allocation columns compact.
@@ -268,35 +268,41 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
   const soldPlayers = state.players.filter((p) => p.status === "SOLD");
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-4">
       <SaleAnnouncement sale={lastSale} />
-      <div className="flex items-center gap-2 text-xs">
-        <Badge variant={connected ? "success" : "warning"}>{connected ? "Live" : "Connecting…"}</Badge>
-      </div>
 
-      <div className="grid grid-cols-3 gap-3">
-        <div className={`${card} px-4 py-3`}>
-          <p className="text-xs text-black/50 dark:text-white/50 mb-1">Sold</p>
-          <p className="text-2xl font-semibold">{soldCount}</p>
+      <div className={`${card} px-4 py-2.5 flex items-center justify-between gap-3 flex-wrap`}>
+        <div className="flex items-center gap-4 text-sm flex-wrap">
+          <Badge variant={connected ? "success" : "warning"}>{connected ? "Live" : "Connecting…"}</Badge>
+          <span>
+            Sold <span className="font-semibold">{soldCount}</span>
+          </span>
+          <span>
+            Remaining <span className="font-semibold">{queue.length}</span>
+          </span>
+          <span>
+            Teams with room{" "}
+            <span className="font-semibold">
+              {teamsWithRoom}/{state.teams.length}
+            </span>
+          </span>
         </div>
-        <div className={`${card} px-4 py-3`}>
-          <p className="text-xs text-black/50 dark:text-white/50 mb-1">Remaining</p>
-          <p className="text-2xl font-semibold">{queue.length}</p>
-        </div>
-        <div className={`${card} px-4 py-3`}>
-          <p className="text-xs text-black/50 dark:text-white/50 mb-1">Teams with room</p>
-          <p className="text-2xl font-semibold">
-            {teamsWithRoom}/{state.teams.length}
-          </p>
+        <div className="flex gap-2">
+          <button onClick={handleConclude} disabled={loading} className={`${buttonDanger} px-3 py-1.5 text-xs`}>
+            Conclude auction
+          </button>
+          <button onClick={handleReset} disabled={loading} className={`${buttonSecondary} px-3 py-1.5 text-xs`}>
+            Reset auction
+          </button>
         </div>
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <section className={`${card} p-4`}>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-medium">Remaining pool ({queue.length})</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <section className={`${card} p-3`}>
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-base font-medium">Remaining pool ({queue.length})</h2>
             <button
               type="button"
               onClick={handleRandomPick}
@@ -307,7 +313,7 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
             </button>
           </div>
 
-          <div className={`${tabsTrack} mb-3`}>
+          <div className={`${tabsTrack} mb-2`}>
             {categories.map((cat) => {
               const count = queue.filter((p) => p.categoryName === cat).length;
               return (
@@ -328,21 +334,21 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
               No remaining players in this category.
             </p>
           ) : (
-            <ul className="flex flex-col gap-1.5">
+            <ul className="flex flex-col max-h-[360px] overflow-y-auto">
               {visibleQueue.map((p) => (
                 <li
                   key={p.id}
-                  className={`${cardInteractive} flex items-center justify-between px-3 py-2 text-sm`}
+                  className="flex items-center justify-between gap-2 px-2 py-1 text-sm rounded-md hover:bg-black/[0.03] dark:hover:bg-white/[0.04] transition-colors border-b border-black/5 dark:border-white/5 last:border-0"
                 >
-                  <span className="flex items-center gap-2">
-                    {p.name}
+                  <span className="flex items-center gap-1.5 truncate">
+                    <span className="truncate">{p.name}</span>
                     {p.status === "IN_PRE_AUCTION_POOL" && <Badge variant="warning">Contested</Badge>}
                     {p.status === "UNSOLD" && <Badge variant="neutral">Re-offer</Badge>}
                   </span>
                   <button
                     onClick={() => handleSelect(p.id)}
                     disabled={!!onClock}
-                    className={`${buttonSecondary} px-2 py-1 text-xs`}
+                    className={`${buttonSecondary} px-2 py-0.5 text-xs shrink-0`}
                   >
                     Put on clock
                   </button>
@@ -352,10 +358,10 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
           )}
         </section>
 
-        <section className={`${card} p-4`}>
-          <h2 className="text-lg font-medium mb-3">On the clock</h2>
-          <div className="flex flex-col gap-3 items-center">
-            <OnClockCard player={onClock} photoWidth={200} photoHeight={300} />
+        <section className={`${card} p-3`}>
+          <h2 className="text-base font-medium mb-2">On the clock</h2>
+          <div className="flex flex-col gap-2 items-center">
+            <OnClockCard player={onClock} photoWidth={140} photoHeight={190} />
             {onClock && (
               <div className="flex flex-col gap-3 w-full max-w-sm">
                 <p className="text-sm text-center">
@@ -460,12 +466,14 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
       </div>
 
       <section>
-        <h2 className="text-lg font-medium mb-3">Teams</h2>
-        <TeamBudgetBoard teams={state.teams} maxBids={maxBids} showStatus={false} />
+        <h2 className="text-base font-medium mb-2">Teams</h2>
+        <div className="max-h-[220px] overflow-y-auto">
+          <TeamBudgetBoard teams={state.teams} maxBids={maxBids} showStatus={false} />
+        </div>
       </section>
 
       <details className={card}>
-        <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
+        <summary className="cursor-pointer select-none px-4 py-2.5 text-sm font-medium">
           Team allocations ({soldPlayers.length})
         </summary>
         <div className="px-4 pb-4">
@@ -529,15 +537,6 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
           )}
         </div>
       </details>
-
-      <div className="flex gap-3">
-        <button onClick={handleConclude} disabled={loading} className={buttonDanger}>
-          Conclude auction
-        </button>
-        <button onClick={handleReset} disabled={loading} className={buttonSecondary}>
-          Reset auction
-        </button>
-      </div>
     </div>
   );
 }
