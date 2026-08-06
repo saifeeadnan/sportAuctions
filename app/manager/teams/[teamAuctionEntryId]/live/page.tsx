@@ -55,8 +55,9 @@ export default async function ManagerLivePage({
 
   return (
     <div>
-      <h1 className="text-xl font-semibold mb-1">{state.name}</h1>
-      <p className="text-sm text-black/60 dark:text-white/60 mb-6">{state.tournamentName}</p>
+      <h1 className="text-lg font-semibold mb-3">
+        {state.name} <span className="text-black/50 dark:text-white/50 font-normal">&middot; {state.tournamentName}</span>
+      </h1>
       <LiveAuctionView
         initialState={state}
         highlightTeamEntryId={entry.id}

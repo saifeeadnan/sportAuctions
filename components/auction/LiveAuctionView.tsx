@@ -103,7 +103,7 @@ export function LiveAuctionView({
       : null;
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-4">
       <SaleAnnouncement sale={lastSale} />
       <p className="text-xs text-black/50 dark:text-white/50">
         {connected ? "Live" : "Connecting…"} &middot; auction status: {state.status}
@@ -111,15 +111,15 @@ export function LiveAuctionView({
 
       {myTeam ? (
         <>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <section className="rounded border border-black/20 dark:border-white/20 px-4 py-3 flex flex-col gap-2">
-              <div className="flex items-center gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+            <section className="rounded border border-black/20 dark:border-white/20 px-3 py-2.5 flex flex-col gap-1.5">
+              <div className="flex items-center gap-2.5">
                 {myTeam.hasSponsorImage && (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
                     src={`/api/teams/${myTeam.teamId}/sponsor-image`}
                     alt={`${myTeam.teamName} sponsor`}
-                    className="h-12 w-12 rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-1 shrink-0"
+                    className="h-10 w-10 rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-1 shrink-0"
                   />
                 )}
                 <p className="font-medium">{myTeam.teamName} (your team)</p>
@@ -132,45 +132,46 @@ export function LiveAuctionView({
             </section>
 
             <section>
-              <h2 className="text-lg font-medium mb-3">On the clock</h2>
-              <OnClockCard player={onClock} photoWidth={200} photoHeight={300} />
-              {onClock && (
-                <div className="flex flex-col gap-2 mt-3">
-                  <CurrentBidLine player={onClock} />
-                  {myMaxBid != null && (
-                    <p className="text-sm text-black/60 dark:text-white/60">
-                      Max possible bid:{" "}
-                      <span className="font-medium text-black dark:text-white">
-                        {myMaxBid < Number(onClock.basePrice) ? "Cannot bid" : myMaxBid}
-                      </span>
-                      *
-                    </p>
-                  )}
-                  {canPlaceBids && (
-                    <BidControl
-                      auctionId={state.id}
-                      player={onClock}
-                      teamEntryId={myTeam.id}
-                      slotsFilled={myTeam.slotsFilled}
-                      slotsTotal={myTeam.slotsTotal}
-                      maxBid={myMaxBid}
-                    />
-                  )}
-                  {myMaxBid != null && (
-                    <p className="text-xs text-black/50 dark:text-white/50">
-                      * Just an indicator based on the players currently available in the pool —
-                      it can change as the auction progresses.
-                    </p>
-                  )}
-                </div>
-              )}
+              <h2 className="text-base font-medium mb-2">On the clock</h2>
+              <div className="flex gap-3 items-start">
+                <OnClockCard player={onClock} photoWidth={110} photoHeight={150} />
+                {onClock && (
+                  <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+                    <CurrentBidLine player={onClock} />
+                    {myMaxBid != null && (
+                      <p className="text-sm text-black/60 dark:text-white/60">
+                        Max possible bid:{" "}
+                        <span className="font-medium text-black dark:text-white">
+                          {myMaxBid < Number(onClock.basePrice) ? "Cannot bid" : myMaxBid}
+                        </span>
+                        *
+                      </p>
+                    )}
+                    {canPlaceBids && (
+                      <BidControl
+                        auctionId={state.id}
+                        player={onClock}
+                        teamEntryId={myTeam.id}
+                        slotsFilled={myTeam.slotsFilled}
+                        slotsTotal={myTeam.slotsTotal}
+                        maxBid={myMaxBid}
+                      />
+                    )}
+                    {myMaxBid != null && (
+                      <p className="text-xs text-black/50 dark:text-white/50">
+                        * Just an indicator based on the players currently available in the pool —
+                        it can change as the auction progresses.
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
             </section>
           </div>
 
           <section>
-            <h2 className="text-lg font-medium mb-3">Your roster</h2>
+            <h2 className="text-base font-medium mb-2">Your roster</h2>
             <RosterRibbon
-              grid
               players={myPlayers
                 .filter((p) => p.status === "SOLD")
                 .map((p) => ({
