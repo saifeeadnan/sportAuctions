@@ -23,6 +23,7 @@ export async function listLeagues() {
     orderBy: { createdAt: "desc" },
     include: {
       _count: { select: { users: true, rosters: true, tournaments: true } },
+      logo: { select: { id: true } },
     },
   });
 }

@@ -2,7 +2,7 @@
 
 import { useSearchParams } from "next/navigation";
 
-type League = { id: string; name: string; type: string };
+type League = { id: string; name: string; type: string; logo?: { id: string } | null };
 
 export function ActiveLeagueBanner({ leagues }: { leagues: League[] }) {
   const searchParams = useSearchParams();
@@ -11,10 +11,15 @@ export function ActiveLeagueBanner({ leagues }: { leagues: League[] }) {
 
   return (
     <div className="mb-4 flex items-center gap-2 text-sm">
-      <span className="text-black/50 dark:text-white/50">Viewing:</span>
-      <span className="font-medium">
-        {league ? `${league.name} (${league.type})` : "All leagues"}
-      </span>
+      {league?.logo && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={`/api/leagues/${league.id}/logo`}
+          alt={`${league.name} logo`}
+          className="h-10 w-10 rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-1"
+        />
+      )}
+      <span className="font-medium">{league ? league.name : "All leagues"}</span>
     </div>
   );
 }

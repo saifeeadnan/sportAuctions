@@ -101,6 +101,7 @@ model League {
   users       User[]
   rosters     PlayerRoster[]
   tournaments Tournament[]
+  logo        LeagueLogo?
 
   @@map("leagues")
 }
@@ -210,6 +211,17 @@ model TeamSponsorImage {
   uploadedAt DateTime @default(now())
 
   @@map("team_sponsor_images")
+}
+
+model LeagueLogo {
+  id         String   @id @default(cuid())
+  leagueId   String   @unique
+  league     League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  mimeType   String
+  data       Bytes
+  uploadedAt DateTime @default(now())
+
+  @@map("league_logos")
 }
 
 model Team {
