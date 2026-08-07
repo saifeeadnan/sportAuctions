@@ -76,6 +76,7 @@ export default async function AdminAnalyticsPage({
                   <tr className="text-left border-b border-black/10 dark:border-white/10">
                     <th className="py-2 pl-4 pr-4">User</th>
                     <th className="py-2 pr-4">Role</th>
+                    <th className="py-2 pr-4">League</th>
                     <th className="py-2 pr-4">When</th>
                     <th className="py-2 pr-4">IP</th>
                   </tr>
@@ -88,6 +89,9 @@ export default async function AdminAnalyticsPage({
                       </td>
                       <td className="py-2 pr-4">
                         <Badge variant="info">{event.user.role}</Badge>
+                      </td>
+                      <td className="py-2 pr-4 text-black/60 dark:text-white/60">
+                        {event.user.league?.name ?? "—"}
                       </td>
                       <td className="py-2 pr-4 whitespace-nowrap">{formatEastern(event.loginAt)}</td>
                       <td className="py-2 pr-4 text-black/50 dark:text-white/50">{event.ipAddress ?? "—"}</td>
@@ -121,6 +125,7 @@ export default async function AdminAnalyticsPage({
                   <tr className="text-left border-b border-black/10 dark:border-white/10">
                     <th className="py-2 pl-4 pr-4">User</th>
                     <th className="py-2 pr-4">Role</th>
+                    <th className="py-2 pr-4">League</th>
                     <th className="py-2 pr-4">Sessions</th>
                     <th className="py-2 pr-4">Total time</th>
                   </tr>
@@ -134,6 +139,7 @@ export default async function AdminAnalyticsPage({
                       <td className="py-2 pr-4">
                         <Badge variant="info">{row.role}</Badge>
                       </td>
+                      <td className="py-2 pr-4 text-black/60 dark:text-white/60">{row.leagueName ?? "—"}</td>
                       <td className="py-2 pr-4">{row.sessionCount}</td>
                       <td className="py-2 pr-4">{formatDuration(row.totalMs)}</td>
                     </tr>

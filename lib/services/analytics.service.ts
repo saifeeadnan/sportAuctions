@@ -66,7 +66,7 @@ export async function getLoginSummary({
   loginAt: Date;
   ipAddress: string | null;
   userAgent: string | null;
-  user: { id: string; name: string; loginId: string; role: string };
+  user: { id: string; name: string; loginId: string; role: string; league: { name: string } | null };
 }>> {
   const [total, items] = await Promise.all([
     prisma.loginEvent.count(),
@@ -79,7 +79,9 @@ export async function getLoginSummary({
         loginAt: true,
         ipAddress: true,
         userAgent: true,
-        user: { select: { id: true, name: true, loginId: true, role: true } },
+        user: {
+          select: { id: true, name: true, loginId: true, role: true, league: { select: { name: true } } },
+        },
       },
     }),
   ]);
@@ -95,6 +97,7 @@ export async function getTimeSpentSummary({
     name: string;
     loginId: string;
     role: string;
+    leagueName: string | null;
     totalMs: number;
     sessionCount: number;
   }>
@@ -103,13 +106,21 @@ export async function getTimeSpentSummary({
     select: {
       userId: true,
       activeMs: true,
-      user: { select: { name: true, loginId: true, role: true } },
+      user: { select: { name: true, loginId: true, role: true, league: { select: { name: true } } } },
     },
   });
 
   const byUser = new Map<
     string,
-    { userId: string; name: string; loginId: string; role: string; totalMs: number; sessionCount: number }
+    {
+      userId: string;
+      name: string;
+      loginId: string;
+      role: string;
+      leagueName: string | null;
+      totalMs: number;
+      sessionCount: number;
+    }
   >();
   for (const s of sessions) {
     const entry = byUser.get(s.userId) ?? {
@@ -117,6 +128,7 @@ export async function getTimeSpentSummary({
       name: s.user.name,
       loginId: s.user.loginId,
       role: s.user.role,
+      leagueName: s.user.league?.name ?? null,
       totalMs: 0,
       sessionCount: 0,
     };

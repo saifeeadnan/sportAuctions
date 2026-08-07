@@ -1,8 +1,14 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { resetDb } from "../helpers/resetDb";
-import { createFixtureAdmin } from "../helpers/fixtures";
+import { createFixtureAdmin, createFixtureLeague, createFixtureManager } from "../helpers/fixtures";
 import { prisma } from "@/lib/prisma";
-import { createAnalyticsSession, touchSession } from "@/lib/services/analytics.service";
+import {
+  createAnalyticsSession,
+  touchSession,
+  recordLogin,
+  getLoginSummary,
+  getTimeSpentSummary,
+} from "@/lib/services/analytics.service";
 
 beforeEach(resetDb);
 
@@ -70,5 +76,42 @@ describe("touchSession activeMs accumulation", () => {
 
   it("silently no-ops for an unknown session id (best-effort analytics, never throws)", async () => {
     await expect(touchSession("does-not-exist")).resolves.toBeUndefined();
+  });
+});
+
+/**
+ * Coverage for surfacing each user's league in the analytics dashboard —
+ * both summaries join through User.league, and a league-less user (e.g. a
+ * site ADMIN, which has no leagueId) must show up with a null league rather
+ * than breaking the join.
+ */
+describe("league surfaced in analytics summaries", () => {
+  it("getLoginSummary includes the logging-in user's league name", async () => {
+    const league = await createFixtureLeague();
+    const manager = await createFixtureManager(league.id);
+    await recordLogin({ userId: manager.id });
+
+    const { items } = await getLoginSummary();
+    const event = items.find((e) => e.user.id === manager.id);
+    expect(event?.user.league?.name).toBe(league.name);
+  });
+
+  it("getLoginSummary reports a null league for a user with no league (e.g. a site admin)", async () => {
+    const admin = await createFixtureAdmin();
+    await recordLogin({ userId: admin.id });
+
+    const { items } = await getLoginSummary();
+    const event = items.find((e) => e.user.id === admin.id);
+    expect(event?.user.league).toBeNull();
+  });
+
+  it("getTimeSpentSummary includes the user's league name", async () => {
+    const league = await createFixtureLeague();
+    const manager = await createFixtureManager(league.id);
+    await createAnalyticsSession(manager.id);
+
+    const { items } = await getTimeSpentSummary();
+    const row = items.find((r) => r.userId === manager.id);
+    expect(row?.leagueName).toBe(league.name);
   });
 });
