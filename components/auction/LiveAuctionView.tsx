@@ -131,10 +131,10 @@ export function LiveAuctionView({
                   <img
                     src={`/api/teams/${myTeam.teamId}/sponsor-image`}
                     alt={`${myTeam.teamName} sponsor`}
-                    className="h-10 w-10 rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-1 shrink-0"
+                    className="h-14 w-14 rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-1 shrink-0"
                   />
                 )}
-                <p className="font-medium">{myTeam.teamName} (your team)</p>
+                <p className="font-medium">{myTeam.teamName}</p>
               </div>
               <p className="text-sm text-black/60 dark:text-white/60">
                 Budget remaining: {myTeam.budgetRemaining} &middot; Slots: {myTeam.slotsFilled}/
