@@ -16,7 +16,7 @@ import {
 } from "@/lib/services/bidding.service";
 
 export async function selectNextPlayerAction(auctionId: string, auctionPlayerId: string) {
-  const session = await requireRole("AUCTIONEER", "ADMIN");
+  const session = await requireRole("AUCTIONEER", "ADMIN", "LEAGUE_ADMIN");
   await loadScopedAuction(auctionId, scopeLeagueId(session));
   await selectNextPlayer(auctionId, auctionPlayerId);
   revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
@@ -28,21 +28,21 @@ export async function recordSaleAction(
   winningTeamAuctionEntryId: string,
   price: number
 ) {
-  const session = await requireRole("AUCTIONEER", "ADMIN");
+  const session = await requireRole("AUCTIONEER", "ADMIN", "LEAGUE_ADMIN");
   await loadScopedAuction(auctionId, scopeLeagueId(session));
   await recordSale(auctionId, auctionPlayerId, winningTeamAuctionEntryId, price);
   revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
 }
 
 export async function markUnsoldAction(auctionId: string, auctionPlayerId: string) {
-  const session = await requireRole("AUCTIONEER", "ADMIN");
+  const session = await requireRole("AUCTIONEER", "ADMIN", "LEAGUE_ADMIN");
   await loadScopedAuction(auctionId, scopeLeagueId(session));
   await markUnsold(auctionId, auctionPlayerId);
   revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
 }
 
 export async function concludeAuctionAction(auctionId: string) {
-  const session = await requireRole("AUCTIONEER", "ADMIN");
+  const session = await requireRole("AUCTIONEER", "ADMIN", "LEAGUE_ADMIN");
   await loadScopedAuction(auctionId, scopeLeagueId(session));
   await concludeAuction(auctionId);
   revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
@@ -50,7 +50,7 @@ export async function concludeAuctionAction(auctionId: string) {
 }
 
 export async function removePlayerFromTeamAction(auctionId: string, auctionPlayerId: string) {
-  const session = await requireRole("AUCTIONEER", "ADMIN");
+  const session = await requireRole("AUCTIONEER", "ADMIN", "LEAGUE_ADMIN");
   await loadScopedAuction(auctionId, scopeLeagueId(session));
   await removePlayerFromTeam(auctionId, auctionPlayerId);
   revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
@@ -90,7 +90,7 @@ export async function adminPlaceBidAction(
   teamAuctionEntryId: string,
   amount: number
 ) {
-  const session = await requireRole("AUCTIONEER", "ADMIN");
+  const session = await requireRole("AUCTIONEER", "ADMIN", "LEAGUE_ADMIN");
   await loadScopedAuction(auctionId, scopeLeagueId(session));
   await placeBid(auctionId, auctionPlayerId, teamAuctionEntryId, amount);
 }

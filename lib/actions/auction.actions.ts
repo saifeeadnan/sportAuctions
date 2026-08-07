@@ -44,7 +44,7 @@ export async function lockPreAuctionAction(auctionId: string, force: boolean) {
 }
 
 export async function startBiddingAction(auctionId: string) {
-  const session = await requireRole("ADMIN", "AUCTIONEER");
+  const session = await requireRole("ADMIN", "AUCTIONEER", "LEAGUE_ADMIN");
   await loadScopedAuction(auctionId, scopeLeagueId(session));
   await startBidding(auctionId);
   revalidatePath(`/admin/auctions/${auctionId}`);
@@ -52,7 +52,7 @@ export async function startBiddingAction(auctionId: string) {
 }
 
 export async function resetAuctionAction(auctionId: string) {
-  const session = await requireRole("ADMIN", "AUCTIONEER");
+  const session = await requireRole("ADMIN", "AUCTIONEER", "LEAGUE_ADMIN");
   await loadScopedAuction(auctionId, scopeLeagueId(session));
   await resetAuctionToPreBidding(auctionId);
   revalidatePath(`/admin/auctions/${auctionId}`);
