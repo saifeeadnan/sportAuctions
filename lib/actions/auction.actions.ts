@@ -15,6 +15,7 @@ import {
   deleteAuction,
   updateCategoryBidIncrement,
   addPlayerToAuction,
+  updateAuctionPlayerCategory,
   type CreateAuctionInput,
 } from "@/lib/services/auction.service";
 import { submitDraft, removeDraftPick } from "@/lib/services/preAuctionDraft.service";
@@ -67,6 +68,18 @@ export async function addPlayerToAuctionAction(
   const { leagueId } = await requireAdminOrLeagueAdmin();
   await loadScopedAuction(auctionId, leagueId);
   await addPlayerToAuction(auctionId, playerId, categoryId);
+  revalidatePath(`/admin/auctions/${auctionId}`);
+  revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
+}
+
+export async function updateAuctionPlayerCategoryAction(
+  auctionId: string,
+  auctionPlayerId: string,
+  categoryId: string
+) {
+  const { leagueId } = await requireAdminOrLeagueAdmin();
+  await loadScopedAuction(auctionId, leagueId);
+  await updateAuctionPlayerCategory(auctionId, auctionPlayerId, categoryId);
   revalidatePath(`/admin/auctions/${auctionId}`);
   revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
 }

@@ -6,6 +6,7 @@ import { openPreAuctionAction, startBiddingAction } from "@/lib/actions/auction.
 import { listTournamentSponsors } from "@/lib/services/tournamentSponsor.service";
 import { AssignPlayerForm } from "@/components/admin/AssignPlayerForm";
 import { AddPlayerToAuctionForm } from "@/components/admin/AddPlayerToAuctionForm";
+import { ChangePlayerCategoryForm } from "@/components/admin/ChangePlayerCategoryForm";
 import { EditCategoryBidIncrementForm } from "@/components/admin/EditCategoryBidIncrementForm";
 import { SponsorRibbon } from "@/components/tournament/SponsorRibbon";
 import { card, cardInteractive, buttonPrimary, buttonSecondary } from "@/lib/ui";
@@ -219,6 +220,36 @@ export default async function AuctionDetailPage({
             <AddPlayerToAuctionForm
               auctionId={auction.id}
               players={unassignedRosterPlayers.map((p) => ({ id: p.id, name: p.name }))}
+              categories={auction.categories.map((c) => ({
+                id: c.id,
+                name: c.name,
+                basePrice: String(c.basePrice),
+              }))}
+            />
+          </div>
+        </details>
+      )}
+
+      {auction.status !== "COMPLETED" && (
+        <details className={card}>
+          <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
+            Change player category
+          </summary>
+          <div className="px-4 pb-4">
+            <p className="text-sm text-black/60 dark:text-white/60 mb-3">
+              Moves a player to a different category of this auction — e.g. if the roster&apos;s
+              own category for them was corrected after this auction started. Only available
+              before a player is sold or on the clock.
+            </p>
+            <ChangePlayerCategoryForm
+              auctionId={auction.id}
+              players={auction.auctionPlayers
+                .filter((ap) => ap.status !== "SOLD" && ap.status !== "IN_BIDDING")
+                .map((ap) => ({
+                  id: ap.id,
+                  name: ap.player.name,
+                  categoryName: ap.category.name,
+                }))}
               categories={auction.categories.map((c) => ({
                 id: c.id,
                 name: c.name,

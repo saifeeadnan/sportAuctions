@@ -152,6 +152,42 @@ export async function addPlayerToAuction(auctionId: string, playerId: string, ca
   });
 }
 
+/**
+ * Moves an auction player to a different category of the same auction.
+ * AuctionPlayer.categoryId is a one-time snapshot taken when the player
+ * joins the pool (at createAuction or addPlayerToAuction) — Player.category
+ * (a roster-level field, only ever read as a pre-fill suggestion when
+ * building that snapshot) has no live link to it afterward, so editing the
+ * roster never changes it. Blocked once bidding or a sale has actually
+ * happened against the player, since the current bid/sale amount was
+ * validated against the old category's base price and increment.
+ */
+export async function updateAuctionPlayerCategory(
+  auctionId: string,
+  auctionPlayerId: string,
+  categoryId: string
+) {
+  const auctionPlayer = await prisma.auctionPlayer.findUnique({ where: { id: auctionPlayerId } });
+  if (!auctionPlayer || auctionPlayer.auctionId !== auctionId) {
+    throw new ValidationError("Player not found in this auction");
+  }
+  if (auctionPlayer.status === "SOLD" || auctionPlayer.status === "IN_BIDDING") {
+    throw new InvalidStateTransitionError(
+      `Cannot change category while player status is ${auctionPlayer.status}`
+    );
+  }
+
+  const category = await prisma.auctionCategory.findUnique({ where: { id: categoryId } });
+  if (!category || category.auctionId !== auctionId) {
+    throw new ValidationError("Category does not belong to this auction");
+  }
+
+  return prisma.auctionPlayer.update({
+    where: { id: auctionPlayerId },
+    data: { categoryId },
+  });
+}
+
 export async function updateCategoryBidIncrement(categoryId: string, bidIncrement: number | null) {
   if (bidIncrement != null && bidIncrement <= 0) {
     throw new ValidationError("Bid increment must be greater than 0");
