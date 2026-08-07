@@ -2,7 +2,10 @@ import { defineConfig } from "vitest/config";
 import tsconfigPaths from "vite-tsconfig-paths";
 
 export default defineConfig({
-  plugins: [tsconfigPaths()],
+  // tsconfig.json itself excludes test files (so the production build's type
+  // check doesn't need vitest's types) — point this at the sibling config
+  // that still includes them, or @/ imports inside tests stop resolving.
+  plugins: [tsconfigPaths({ projects: ["./tsconfig.vitest.json"] })],
   test: {
     environment: "node",
     include: ["lib/**/*.test.ts", "tests/integration/**/*.test.ts"],

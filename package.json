@@ -15,7 +15,8 @@
     "dev:tunnel": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-tunnel.ps1",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:db:setup": "tsx scripts/setup-test-db.ts"
+    "test:db:setup": "tsx scripts/setup-test-db.ts",
+    "test:typecheck": "tsc --noEmit -p tsconfig.vitest.json"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",
