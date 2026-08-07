@@ -39,6 +39,11 @@ export function OnClockCard({
       <p className="text-sm text-black/60 dark:text-white/60">
         {player.categoryName} &middot; base price {player.basePrice}
       </p>
+      <p className="text-sm text-black/60 dark:text-white/60">
+        {player.bidCount === 0
+          ? "No bids yet"
+          : `${player.bidCount} bid${player.bidCount === 1 ? "" : "s"} placed`}
+      </p>
       {player.previousTeam && (
         <p className="text-sm text-black/60 dark:text-white/60">
           Previous team: {player.previousTeam}

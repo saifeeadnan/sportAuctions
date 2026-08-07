@@ -18,6 +18,7 @@ export type AuctionStatePlayer = {
   currentBid: string | null;
   currentBidderEntryId: string | null;
   currentBidderTeamName: string | null;
+  bidCount: number;
   bidCooldownUntil: string | null;
   rating: string | null;
   battingRating: string | null;
@@ -56,6 +57,7 @@ export async function getAuctionState(auctionId: string): Promise<AuctionState |
           category: true,
           soldToEntry: { include: { team: true } },
           currentBidderEntry: { include: { team: true } },
+          _count: { select: { bids: true } },
         },
         orderBy: { player: { name: "asc" } },
       },
@@ -90,6 +92,7 @@ export async function getAuctionState(auctionId: string): Promise<AuctionState |
       currentBid: ap.currentBidAmount != null ? String(ap.currentBidAmount) : null,
       currentBidderEntryId: ap.currentBidderEntryId,
       currentBidderTeamName: ap.currentBidderEntry?.team.name ?? null,
+      bidCount: ap._count.bids,
       bidCooldownUntil: ap.bidCooldownUntil != null ? ap.bidCooldownUntil.toISOString() : null,
       rating: ap.player.rating != null ? String(ap.player.rating) : null,
       battingRating: ap.player.battingRating != null ? String(ap.player.battingRating) : null,

@@ -3,7 +3,7 @@ import { resetDb } from "../helpers/resetDb";
 import { createAuctionReadyFixture } from "../helpers/fixtures";
 import { prisma } from "@/lib/prisma";
 import { createAuction, openPreAuction, lockPreAuction, startBidding } from "@/lib/services/auction.service";
-import { selectNextPlayer, recordSale, markUnsold } from "@/lib/services/bidding.service";
+import { selectNextPlayer, recordSale, markUnsold, placeBid } from "@/lib/services/bidding.service";
 import { getAuctionState } from "@/lib/services/auctionState.service";
 
 beforeEach(resetDb);
@@ -97,6 +97,29 @@ describe("sold player ordering", () => {
 
     expect(team1Sold.map((p) => p.name)).toEqual(["Player C", "Player A"]);
     expect(team1Sold.every((p) => p.soldAt !== null)).toBe(true);
+  });
+});
+
+describe("bid count in auction state", () => {
+  it("reports zero bids for a player just put on the clock, then tracks each bid placed", async () => {
+    const { auction, teams } = await createLiveAuction(["Player A"], ["Team 1", "Team 2"]);
+    const [team1, team2] = await getEntries(auction.id, teams);
+    const target = await getAvailablePlayer(auction.id);
+
+    await selectNextPlayer(auction.id, target.id);
+    let state = await getAuctionState(auction.id);
+    expect(state!.players.find((p) => p.id === target.id)?.bidCount).toBe(0);
+
+    await placeBid(auction.id, target.id, team1.id, 200);
+    state = await getAuctionState(auction.id);
+    expect(state!.players.find((p) => p.id === target.id)?.bidCount).toBe(1);
+
+    // placeBid sets a 2s cooldown on the player after each bid.
+    await new Promise((r) => setTimeout(r, 2100));
+
+    await placeBid(auction.id, target.id, team2.id, 250);
+    state = await getAuctionState(auction.id);
+    expect(state!.players.find((p) => p.id === target.id)?.bidCount).toBe(2);
   });
 });
 
