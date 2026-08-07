@@ -113,6 +113,45 @@ export async function createAuction(input: CreateAuctionInput) {
   });
 }
 
+/**
+ * Adds a roster player into an already-created auction's pool — the only way
+ * a player joins an auction otherwise is the fixed set chosen at
+ * createAuction time, so a player added to the roster afterward (or left out
+ * by mistake) would never appear no matter how many times the live pages are
+ * refreshed. Always joins as AVAILABLE, same as every player createAuction
+ * itself creates.
+ */
+export async function addPlayerToAuction(auctionId: string, playerId: string, categoryId: string) {
+  const auction = await prisma.auction.findUnique({
+    where: { id: auctionId },
+    include: { tournament: true },
+  });
+  if (!auction) throw new ValidationError("Auction not found");
+  if (auction.status === "COMPLETED") {
+    throw new InvalidStateTransitionError("Cannot add a player to a completed auction");
+  }
+
+  const category = await prisma.auctionCategory.findUnique({ where: { id: categoryId } });
+  if (!category || category.auctionId !== auctionId) {
+    throw new ValidationError("Category does not belong to this auction");
+  }
+
+  const player = await prisma.player.findUnique({ where: { id: playerId } });
+  if (!player) throw new ValidationError("Player not found");
+  if (player.rosterId !== auction.tournament.rosterId) {
+    throw new ValidationError("Player does not belong to this tournament's roster");
+  }
+
+  const existing = await prisma.auctionPlayer.findUnique({
+    where: { auctionId_playerId: { auctionId, playerId } },
+  });
+  if (existing) throw new ValidationError("This player is already in the auction's pool");
+
+  return prisma.auctionPlayer.create({
+    data: { auctionId, playerId, categoryId },
+  });
+}
+
 export async function updateCategoryBidIncrement(categoryId: string, bidIncrement: number | null) {
   if (bidIncrement != null && bidIncrement <= 0) {
     throw new ValidationError("Bid increment must be greater than 0");

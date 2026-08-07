@@ -14,6 +14,7 @@ import {
   resetAuctionToPreBidding,
   deleteAuction,
   updateCategoryBidIncrement,
+  addPlayerToAuction,
   type CreateAuctionInput,
 } from "@/lib/services/auction.service";
 import { submitDraft, removeDraftPick } from "@/lib/services/preAuctionDraft.service";
@@ -54,6 +55,18 @@ export async function resetAuctionAction(auctionId: string) {
   const session = await requireRole("ADMIN", "AUCTIONEER");
   await loadScopedAuction(auctionId, scopeLeagueId(session));
   await resetAuctionToPreBidding(auctionId);
+  revalidatePath(`/admin/auctions/${auctionId}`);
+  revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
+}
+
+export async function addPlayerToAuctionAction(
+  auctionId: string,
+  playerId: string,
+  categoryId: string
+) {
+  const { leagueId } = await requireAdminOrLeagueAdmin();
+  await loadScopedAuction(auctionId, leagueId);
+  await addPlayerToAuction(auctionId, playerId, categoryId);
   revalidatePath(`/admin/auctions/${auctionId}`);
   revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
 }

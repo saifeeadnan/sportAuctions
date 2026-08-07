@@ -5,6 +5,7 @@ import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
 import { openPreAuctionAction, startBiddingAction } from "@/lib/actions/auction.actions";
 import { listTournamentSponsors } from "@/lib/services/tournamentSponsor.service";
 import { AssignPlayerForm } from "@/components/admin/AssignPlayerForm";
+import { AddPlayerToAuctionForm } from "@/components/admin/AddPlayerToAuctionForm";
 import { EditCategoryBidIncrementForm } from "@/components/admin/EditCategoryBidIncrementForm";
 import { SponsorRibbon } from "@/components/tournament/SponsorRibbon";
 import { card, cardInteractive, buttonPrimary, buttonSecondary } from "@/lib/ui";
@@ -38,6 +39,18 @@ export default async function AuctionDetailPage({
   assertInScope(leagueId, auction.tournament.leagueId);
 
   const sponsors = await listTournamentSponsors(auction.tournamentId);
+
+  // Roster players not yet represented as an AuctionPlayer row — e.g. added
+  // to the roster after this auction was created, so createAuction's
+  // one-time playerAssignments snapshot never picked them up.
+  const rosterPlayers = auction.tournament.rosterId
+    ? await prisma.player.findMany({
+        where: { rosterId: auction.tournament.rosterId },
+        orderBy: { name: "asc" },
+      })
+    : [];
+  const playerIdsInAuction = new Set(auction.auctionPlayers.map((ap) => ap.playerId));
+  const unassignedRosterPlayers = rosterPlayers.filter((p) => !playerIdsInAuction.has(p.id));
 
   const statusCounts = auction.auctionPlayers.reduce<Record<string, number>>((acc, ap) => {
     acc[ap.status] = (acc[ap.status] ?? 0) + 1;
@@ -187,6 +200,29 @@ export default async function AuctionDetailPage({
                 budgetRemaining: String(entry.budgetRemaining),
                 slotsFilled: entry.slotsFilled,
                 slotsTotal: entry.slotsTotal,
+              }))}
+            />
+          </div>
+        </details>
+      )}
+
+      {auction.status !== "COMPLETED" && (
+        <details className={card}>
+          <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
+            Add player from roster ({unassignedRosterPlayers.length} not yet in this auction)
+          </summary>
+          <div className="px-4 pb-4">
+            <p className="text-sm text-black/60 dark:text-white/60 mb-3">
+              For a player added to the roster (or missed) after this auction was created —
+              joins the pool as Available, same as every player chosen when the auction started.
+            </p>
+            <AddPlayerToAuctionForm
+              auctionId={auction.id}
+              players={unassignedRosterPlayers.map((p) => ({ id: p.id, name: p.name }))}
+              categories={auction.categories.map((c) => ({
+                id: c.id,
+                name: c.name,
+                basePrice: String(c.basePrice),
               }))}
             />
           </div>
