@@ -4,10 +4,22 @@ import { useSearchParams } from "next/navigation";
 
 type League = { id: string; name: string; type: string; logo?: { id: string } | null };
 
-export function ActiveLeagueBanner({ leagues }: { leagues: League[] }) {
+export function ActiveLeagueBanner({
+  leagues,
+  fixedLeague,
+}: {
+  /** Site-ADMIN case: resolve which league is active from the sidebar's
+   * `?league=` selection. Omit when passing `fixedLeague` instead. */
+  leagues?: League[];
+  /** LEAGUE_ADMIN case: their own league is fixed for the whole session, not
+   * a URL selection, so it's passed straight through with no search-param
+   * lookup at all. */
+  fixedLeague?: League | null;
+}) {
   const searchParams = useSearchParams();
   const selectedLeagueId = searchParams.get("league");
-  const league = selectedLeagueId ? leagues.find((l) => l.id === selectedLeagueId) : null;
+  const league =
+    fixedLeague ?? (leagues && selectedLeagueId ? leagues.find((l) => l.id === selectedLeagueId) : null);
 
   return (
     <div className="mb-4 flex items-center gap-2 text-sm">
