@@ -4,7 +4,7 @@ import { useState } from "react";
 import { placeBidAction } from "@/lib/actions/bidding.actions";
 import type { AuctionStatePlayer } from "@/lib/services/auctionState.service";
 import { useBidTiming } from "@/hooks/useBidTiming";
-import { inputClass, buttonPrimary } from "@/lib/ui";
+import { buttonPrimary } from "@/lib/ui";
 
 function formatAmount(n: number) {
   return Number.isInteger(n) ? String(n) : n.toFixed(2);
@@ -28,22 +28,19 @@ export function BidControl({
    * server be the only thing that catches it. */
   maxBid?: number | null;
 }) {
-  const [amount, setAmount] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { currentBid, basePrice, increment, cooldownMs, onCooldown, minNext } = useBidTiming(player);
+  const { increment, cooldownMs, onCooldown, minNext } = useBidTiming(player);
   const isLeading = player.currentBidderEntryId === teamEntryId;
   const noRoom = slotsFilled >= slotsTotal;
   const quickBidExceedsMax = maxBid != null && minNext > maxBid;
-  const typedAmountExceedsMax = maxBid != null && amount !== "" && Number(amount) > maxBid;
 
   async function submit(value: number) {
     setLoading(true);
     setError(null);
     try {
       await placeBidAction(auctionId, player.id, teamEntryId, value);
-      setAmount("");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to place bid");
     } finally {
@@ -61,44 +58,29 @@ export function BidControl({
   if (noRoom) {
     return <p className="text-sm text-black/50 dark:text-white/50">Your squad is full.</p>;
   }
+  if (increment == null) {
+    return (
+      <p className="text-sm text-black/50 dark:text-white/50">
+        Ask the auctioneer to set a bid increment for this category before bidding.
+      </p>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-2">
-      {increment != null ? (
-        <button
-          type="button"
-          disabled={loading || onCooldown || quickBidExceedsMax}
-          onClick={() => submit(minNext)}
-          className={`${buttonPrimary} self-start`}
-        >
-          {onCooldown
-            ? `Wait ${Math.ceil(cooldownMs / 1000)}s…`
-            : loading
-              ? "Bidding…"
-              : `Bid ${formatAmount(minNext)}`}
-        </button>
-      ) : (
-        <div className="flex items-center gap-2">
-          <input
-            type="number"
-            min={currentBid ?? basePrice}
-            step="0.01"
-            placeholder={`Min ${formatAmount(minNext)}`}
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            className={`${inputClass} w-32`}
-          />
-          <button
-            type="button"
-            disabled={loading || onCooldown || !amount || typedAmountExceedsMax}
-            onClick={() => submit(Number(amount))}
-            className={buttonPrimary}
-          >
-            {onCooldown ? `Wait ${Math.ceil(cooldownMs / 1000)}s…` : loading ? "Bidding…" : "Place bid"}
-          </button>
-        </div>
-      )}
-      {(quickBidExceedsMax || typedAmountExceedsMax) && (
+      <button
+        type="button"
+        disabled={loading || onCooldown || quickBidExceedsMax}
+        onClick={() => submit(minNext)}
+        className={`${buttonPrimary} self-start`}
+      >
+        {onCooldown
+          ? `Wait ${Math.ceil(cooldownMs / 1000)}s…`
+          : loading
+            ? "Bidding…"
+            : `Bid ${formatAmount(minNext)}`}
+      </button>
+      {quickBidExceedsMax && (
         <p className="text-xs text-amber-600 dark:text-amber-400">
           That would exceed your max possible bid.
         </p>
