@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import type { AuctionState } from "@/lib/services/auctionState.service";
 import { useAuctionSocket } from "@/hooks/useAuctionSocket";
 import { TeamBudgetBoard } from "@/components/auction/TeamBudgetBoard";
@@ -50,6 +51,7 @@ export function LiveAuctionView({
   analyticsEnabled?: boolean;
   initialStrategy?: InitialStrategy;
 }) {
+  const router = useRouter();
   const { state, connected, lastSale } = useAuctionSocket(initialState.id, initialState);
   const onClock = state.players.find((p) => p.status === "IN_BIDDING");
   const myTeam = highlightTeamEntryId
@@ -105,8 +107,18 @@ export function LiveAuctionView({
   return (
     <div className="flex flex-col gap-4">
       <SaleAnnouncement sale={lastSale} />
-      <p className="text-xs text-black/50 dark:text-white/50">
-        {connected ? "Live" : "Connecting…"} &middot; auction status: {state.status}
+      <p className="text-xs text-black/50 dark:text-white/50 flex items-center gap-2">
+        <span>
+          {connected ? "Live" : "Connecting…"} &middot; auction status: {state.status}
+        </span>
+        <button
+          type="button"
+          onClick={() => router.refresh()}
+          title="Pull in any roster edits (name, photo, rating…) made since this page loaded"
+          className="underline underline-offset-2 hover:text-black dark:hover:text-white transition-colors"
+        >
+          Refresh
+        </button>
       </p>
 
       {myTeam ? (

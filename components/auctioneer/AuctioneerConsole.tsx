@@ -288,6 +288,14 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
           </span>
         </div>
         <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => router.refresh()}
+            title="Pull in any roster edits (name, photo, rating…) made since this page loaded"
+            className={`${buttonSecondary} px-3 py-1.5 text-xs`}
+          >
+            Refresh
+          </button>
           <button onClick={handleConclude} disabled={loading} className={`${buttonDanger} px-3 py-1.5 text-xs`}>
             Conclude auction
           </button>

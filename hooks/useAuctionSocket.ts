@@ -17,6 +17,17 @@ export function useAuctionSocket(auctionId: string, initialState: AuctionState) 
   const [lastSale, setLastSale] = useState<SaleAnnouncement | null>(null);
   const socketRef = useRef<Socket | null>(null);
 
+  // useState's initializer only runs on mount — without this, a fresh
+  // server refetch (e.g. router.refresh() after editing a player's roster
+  // details elsewhere) would never reach this already-mounted component,
+  // since the socket below only ever patches specific bid/sale fields, never
+  // player bio data. Only fires when the parent actually passes a new
+  // initialState object (a real refetch), not on every socket-driven
+  // re-render, since those never touch this prop.
+  useEffect(() => {
+    setState(initialState);
+  }, [initialState]);
+
   useEffect(() => {
     const socket = io({ path: "/socket.io" });
     socketRef.current = socket;
