@@ -44,11 +44,11 @@ export function UploadTeamSponsorImageForm({ teamId }: { teamId: string }) {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3 max-w-xl">
       <label className="flex flex-col gap-1 text-sm">
-        Sponsor picture (JPG only)
+        Sponsor picture (JPG or PNG)
         <input
           required
           type="file"
-          accept="image/jpeg"
+          accept="image/jpeg,image/png"
           onChange={(e) => setFile(e.target.files?.[0] ?? null)}
           className={`text-sm ${inputClass}`}
         />

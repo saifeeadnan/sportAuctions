@@ -65,8 +65,8 @@ export function AddTeamForm({
         </select>
       </label>
       <label className="flex flex-col gap-1 text-sm">
-        Sponsor picture (JPG, optional)
-        <input name="sponsorImage" type="file" accept="image/jpeg" className={`text-sm ${inputClass}`} />
+        Sponsor picture (JPG or PNG, optional)
+        <input name="sponsorImage" type="file" accept="image/jpeg,image/png" className={`text-sm ${inputClass}`} />
       </label>
       <input type="hidden" name="managerOccupiesSlot" value="off" />
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
