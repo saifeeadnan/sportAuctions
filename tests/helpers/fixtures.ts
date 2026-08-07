@@ -1,0 +1,127 @@
+import bcrypt from "bcryptjs";
+import { prisma } from "@/lib/prisma";
+
+let counter = 0;
+/** A short, collision-free suffix per fixture object within a single test
+ * run — tests never share fixtures, so uniqueness (not readability) is all
+ * that matters here. */
+function unique(prefix: string): string {
+  counter += 1;
+  return `${prefix}-${Date.now()}-${counter}`;
+}
+
+export async function createFixtureLeague() {
+  return prisma.league.create({ data: { name: unique("League"), type: "Cricket" } });
+}
+
+export async function createFixtureAdmin() {
+  return prisma.user.create({
+    data: {
+      loginId: unique("admin"),
+      passwordHash: await bcrypt.hash("password123", 4),
+      name: "Test Admin",
+      role: "ADMIN",
+    },
+  });
+}
+
+/** managerBasePrice defaults to 50 — the exact fee amount the ported
+ * verify-*.ts scenarios were originally written against. */
+export async function createFixtureManager(leagueId: string, managerBasePrice = 50) {
+  return prisma.user.create({
+    data: {
+      loginId: unique("manager"),
+      passwordHash: await bcrypt.hash("password123", 4),
+      name: unique("Manager"),
+      role: "TEAM_MANAGER",
+      leagueId,
+      managerBasePrice,
+    },
+  });
+}
+
+export async function createFixtureRoster(
+  leagueId: string,
+  createdById: string,
+  playerNames: string[]
+) {
+  const roster = await prisma.playerRoster.create({
+    data: { name: unique("Roster"), leagueId, createdById },
+  });
+  await prisma.player.createMany({
+    data: playerNames.map((name) => ({ rosterId: roster.id, name })),
+  });
+  const players = await prisma.player.findMany({
+    where: { rosterId: roster.id },
+    orderBy: { name: "asc" },
+  });
+  return { roster, players };
+}
+
+export async function createFixtureTournament(input: {
+  leagueId: string;
+  rosterId: string;
+  createdById: string;
+  numTeams: number;
+  squadSize: number;
+}) {
+  return prisma.tournament.create({
+    data: {
+      name: unique("Tournament"),
+      leagueId: input.leagueId,
+      rosterId: input.rosterId,
+      createdById: input.createdById,
+      numTeams: input.numTeams,
+      squadSize: input.squadSize,
+      startDate: new Date(),
+      endDate: new Date(Date.now() + 24 * 60 * 60 * 1000),
+    },
+  });
+}
+
+export async function createFixtureTeam(
+  tournamentId: string,
+  name: string,
+  managerId?: string | null
+) {
+  return prisma.team.create({
+    data: { tournamentId, name, managerId: managerId ?? null, managerOccupiesSlot: true },
+  });
+}
+
+/** Builds a full ready-to-auction baseline: one league, one admin, one
+ * roster with `playerNames.length` players, one tournament sized for
+ * `teamNames.length` teams, and those teams — each with its own fresh
+ * manager (managerBasePrice 50) unless `teamNames[i]`'s manager is
+ * overridden via `managerLoginIdByTeam`, which self-matches a manager's
+ * loginId to one of the roster's players (the "merged manager slot" case). */
+export async function createAuctionReadyFixture(input: {
+  playerNames: string[];
+  teamNames: string[];
+  squadSize: number;
+  selfMatch?: { teamName: string; playerName: string }[];
+}) {
+  const league = await createFixtureLeague();
+  const admin = await createFixtureAdmin();
+  const { roster, players } = await createFixtureRoster(league.id, admin.id, input.playerNames);
+  const tournament = await createFixtureTournament({
+    leagueId: league.id,
+    rosterId: roster.id,
+    createdById: admin.id,
+    numTeams: input.teamNames.length,
+    squadSize: input.squadSize,
+  });
+
+  const teams = [];
+  for (const teamName of input.teamNames) {
+    const manager = await createFixtureManager(league.id);
+    const selfMatch = input.selfMatch?.find((m) => m.teamName === teamName);
+    if (selfMatch) {
+      const player = players.find((p) => p.name === selfMatch.playerName);
+      await prisma.player.update({ where: { id: player!.id }, data: { loginId: manager.loginId } });
+    }
+    teams.push(await createFixtureTeam(tournament.id, teamName, manager.id));
+  }
+
+  return { league, admin, roster, players, tournament, teams };
+}
