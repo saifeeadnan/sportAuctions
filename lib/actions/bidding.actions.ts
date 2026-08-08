@@ -26,11 +26,12 @@ export async function recordSaleAction(
   auctionId: string,
   auctionPlayerId: string,
   winningTeamAuctionEntryId: string,
-  price: number
+  price: number,
+  force?: boolean
 ) {
   const session = await requireRole("AUCTIONEER", "ADMIN", "LEAGUE_ADMIN");
   await loadScopedAuction(auctionId, scopeLeagueId(session));
-  await recordSale(auctionId, auctionPlayerId, winningTeamAuctionEntryId, price);
+  await recordSale(auctionId, auctionPlayerId, winningTeamAuctionEntryId, price, { force });
   revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
 }
 

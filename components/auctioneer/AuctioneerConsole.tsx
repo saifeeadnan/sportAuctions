@@ -128,19 +128,48 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
     handleSelect(pick.id);
   }
 
-  async function handleRecordSale() {
-    if (!onClock || !selectedTeamId || !price) return;
+  // Below-base-price and budget-reserve rejections are ones an auctioneer
+  // might knowingly want to accept anyway (e.g. selling cheap to finish a
+  // squad, or accepting the team will end up smaller than planned) — on
+  // either, offer to retry the exact same sale with the server-side check
+  // skipped rather than just failing outright. Any other rejection (squad
+  // already full, price beyond the team's total remaining budget) is a hard
+  // stop with no override.
+  function overridableMessage(err: unknown): string | null {
+    if (!(err instanceof Error)) return null;
+    return /at least the base price|must keep at least/.test(err.message) ? err.message : null;
+  }
+
+  async function attemptSale(auctionPlayerId: string, teamId: string, priceValue: number) {
     setLoading(true);
     setError(null);
     try {
-      await recordSaleAction(state.id, onClock.id, selectedTeamId, Number(price));
+      await recordSaleAction(state.id, auctionPlayerId, teamId, priceValue);
+    } catch (err) {
+      const message = overridableMessage(err);
+      if (!message || !window.confirm(`${message}\n\nRecord this sale anyway?`)) {
+        setError(err instanceof Error ? err.message : "Failed to record sale");
+        setLoading(false);
+        return false;
+      }
+      try {
+        await recordSaleAction(state.id, auctionPlayerId, teamId, priceValue, true);
+      } catch (err2) {
+        setError(err2 instanceof Error ? err2.message : "Failed to record sale");
+        setLoading(false);
+        return false;
+      }
+    }
+    setLoading(false);
+    return true;
+  }
+
+  async function handleRecordSale() {
+    if (!onClock || !selectedTeamId || !price) return;
+    if (await attemptSale(onClock.id, selectedTeamId, Number(price))) {
       setSelectedTeamId("");
       setPrice("");
       router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to record sale");
-    } finally {
-      setLoading(false);
     }
   }
 
@@ -164,15 +193,8 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
   // than going through the manual price/team form fields at all.
   async function handleRecordSaleToLeader() {
     if (!onClock || !onClock.currentBid || !onClock.currentBidderEntryId) return;
-    setLoading(true);
-    setError(null);
-    try {
-      await recordSaleAction(state.id, onClock.id, onClock.currentBidderEntryId, Number(onClock.currentBid));
+    if (await attemptSale(onClock.id, onClock.currentBidderEntryId, Number(onClock.currentBid))) {
       router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to record sale");
-    } finally {
-      setLoading(false);
     }
   }
 

@@ -100,6 +100,70 @@ describe("sold player ordering", () => {
   });
 });
 
+describe("recordSale force override", () => {
+  it("allows an admin to force a sale below the category base price", async () => {
+    const { auction, teams } = await createLiveAuction(["Player A"], ["Team 1"]);
+    const [team1] = await getEntries(auction.id, teams);
+    const target = await getAvailablePlayer(auction.id);
+
+    await selectNextPlayer(auction.id, target.id);
+    await expect(recordSale(auction.id, target.id, team1.id, 100)).rejects.toThrow(/base price/);
+
+    const result = await recordSale(auction.id, target.id, team1.id, 100, { force: true });
+    expect(result.player.status).toBe("SOLD");
+    expect(String(result.player.soldPrice)).toBe("100");
+  });
+
+  it("allows an admin to force a sale that would leave the team unable to fill its remaining slots", async () => {
+    const { auction, teams } = await createLiveAuction(["Player A"], ["Team 1"]);
+    const [team1] = await getEntries(auction.id, teams);
+    const target = await getAvailablePlayer(auction.id);
+
+    // Fresh team: 1 slot already occupied by the manager's own fee, budget
+    // 2000 - 50 manager fee = 1950. Selling at 1500 would leave only 450,
+    // short of the 600 (3 remaining slots x 200 reserve unit) required.
+    await selectNextPlayer(auction.id, target.id);
+    await expect(recordSale(auction.id, target.id, team1.id, 1500)).rejects.toThrow(/must keep at least/);
+
+    const result = await recordSale(auction.id, target.id, team1.id, 1500, { force: true });
+    expect(result.player.status).toBe("SOLD");
+    expect(String(result.entry.budgetRemaining)).toBe("450");
+  });
+
+  it("still refuses a price beyond the team's total remaining budget, even forced", async () => {
+    const { auction, teams } = await createLiveAuction(["Player A"], ["Team 1"]);
+    const [team1] = await getEntries(auction.id, teams);
+    const target = await getAvailablePlayer(auction.id);
+
+    await selectNextPlayer(auction.id, target.id);
+    await expect(
+      recordSale(auction.id, target.id, team1.id, 2500, { force: true })
+    ).rejects.toThrow(/does not have enough budget remaining/);
+  });
+
+  it("still refuses a sale to a team whose squad is already full, even forced", async () => {
+    const { auction, teams } = await createLiveAuction(
+      ["Player 1", "Player 2", "Player 3", "Player 4", "Player 5"],
+      ["Team 1"]
+    );
+    const [team1] = await getEntries(auction.id, teams);
+
+    // The manager's own fee already occupies 1 of the team's 5 slots, so 4
+    // sales at base price fill the remaining slots exactly.
+    for (let i = 0; i < 4; i++) {
+      const p = await getAvailablePlayer(auction.id);
+      await selectNextPlayer(auction.id, p.id);
+      await recordSale(auction.id, p.id, team1.id, 200);
+    }
+
+    const last = await getAvailablePlayer(auction.id);
+    await selectNextPlayer(auction.id, last.id);
+    await expect(
+      recordSale(auction.id, last.id, team1.id, 200, { force: true })
+    ).rejects.toThrow(/already filled its squad/);
+  });
+});
+
 describe("bid count in auction state", () => {
   it("reports zero bids for a player just put on the clock, then tracks each bid placed", async () => {
     const { auction, teams } = await createLiveAuction(["Player A"], ["Team 1", "Team 2"]);

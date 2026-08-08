@@ -67,7 +67,14 @@ async function allocatePlayerToTeam(
   auctionPlayerId: string,
   teamAuctionEntryId: string,
   price: number,
-  soldVia: $Enums.SoldVia
+  soldVia: $Enums.SoldVia,
+  options: {
+    /** Admin override for a live sale: skips the below-base-price and
+     * budget-reserve-for-remaining-slots checks (the two a human might
+     * knowingly accept), but never the squad-cap or literal
+     * insufficient-funds checks below — those would corrupt the data. */
+    force?: boolean;
+  } = {}
 ) {
   if (price <= 0) throw new ValidationError("Price must be greater than 0");
 
@@ -94,7 +101,7 @@ async function allocatePlayerToTeam(
   }
 
   const priceDecimal = new Prisma.Decimal(price);
-  if (priceDecimal.lessThan(auctionPlayer.category.basePrice)) {
+  if (!options.force && priceDecimal.lessThan(auctionPlayer.category.basePrice)) {
     throw new ValidationError(
       `Price must be at least the base price (${String(auctionPlayer.category.basePrice)}) for category "${auctionPlayer.category.name}"`
     );
@@ -109,7 +116,7 @@ async function allocatePlayerToTeam(
   const reserveUnit = computeReserveUnit(categories);
   const budgetAfterPick = new Prisma.Decimal(entry.budgetRemaining).minus(priceDecimal);
   const requiredReserve = reserveUnit.times(remainingSlotsAfterPick);
-  if (budgetAfterPick.lessThan(requiredReserve)) {
+  if (!options.force && budgetAfterPick.lessThan(requiredReserve)) {
     throw new InsufficientBudgetError(
       `Team "${entry.team.name}" must keep at least ${requiredReserve.toString()} in budget to fill its remaining ${remainingSlotsAfterPick} slot(s)`
     );
@@ -164,7 +171,8 @@ export async function recordSale(
   auctionId: string,
   auctionPlayerId: string,
   winningTeamAuctionEntryId: string,
-  price: number
+  price: number,
+  options: { force?: boolean } = {}
 ) {
   const auctionPlayer = await prisma.auctionPlayer.findUnique({ where: { id: auctionPlayerId } });
   if (!auctionPlayer || auctionPlayer.auctionId !== auctionId) {
@@ -181,7 +189,7 @@ export async function recordSale(
     );
   }
 
-  return allocatePlayerToTeam(auctionId, auctionPlayerId, winningTeamAuctionEntryId, price, "LIVE_BID");
+  return allocatePlayerToTeam(auctionId, auctionPlayerId, winningTeamAuctionEntryId, price, "LIVE_BID", options);
 }
 
 /**
