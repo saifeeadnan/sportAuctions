@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
 import { updatePlayerAction } from "@/lib/actions/roster.actions";
+import { ActionResultForm } from "@/components/ui/ActionResultForm";
 import { PlayerFormFields } from "@/components/roster/PlayerFormFields";
 import { card, buttonPrimary, buttonSecondary } from "@/lib/ui";
 
@@ -26,7 +27,7 @@ export default async function EditPlayerPage({
       <h1 className="text-xl font-semibold mb-6">Edit player</h1>
 
       <div className="flex gap-8 items-start">
-        <form
+        <ActionResultForm
           action={updatePlayerAction.bind(null, id, playerId)}
           className="flex flex-col gap-3 flex-1 max-w-xl"
         >
@@ -53,7 +54,7 @@ export default async function EditPlayerPage({
               Cancel
             </Link>
           </div>
-        </form>
+        </ActionResultForm>
 
         <div
           className={`${card} shrink-0 flex items-center justify-center overflow-hidden`}

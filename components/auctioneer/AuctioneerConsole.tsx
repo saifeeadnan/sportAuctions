@@ -71,12 +71,12 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
 
   async function handleSelect(playerId: string) {
     setError(null);
-    try {
-      await selectNextPlayerAction(state.id, playerId);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to select player");
+    const result = await selectNextPlayerAction(state.id, playerId);
+    if (result.error) {
+      setError(result.error);
+      return;
     }
+    router.refresh();
   }
 
   function pickFromHighestCategory(pool: typeof queue): { id: string; categoryName: string } | null {
@@ -135,27 +135,23 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
   // skipped rather than just failing outright. Any other rejection (squad
   // already full, price beyond the team's total remaining budget) is a hard
   // stop with no override.
-  function overridableMessage(err: unknown): string | null {
-    if (!(err instanceof Error)) return null;
-    return /at least the base price|must keep at least/.test(err.message) ? err.message : null;
+  function isOverridable(message: string): boolean {
+    return /at least the base price|must keep at least/.test(message);
   }
 
   async function attemptSale(auctionPlayerId: string, teamId: string, priceValue: number) {
     setLoading(true);
     setError(null);
-    try {
-      await recordSaleAction(state.id, auctionPlayerId, teamId, priceValue);
-    } catch (err) {
-      const message = overridableMessage(err);
-      if (!message || !window.confirm(`${message}\n\nRecord this sale anyway?`)) {
-        setError(err instanceof Error ? err.message : "Failed to record sale");
+    const result = await recordSaleAction(state.id, auctionPlayerId, teamId, priceValue);
+    if (result.error) {
+      if (!isOverridable(result.error) || !window.confirm(`${result.error}\n\nRecord this sale anyway?`)) {
+        setError(result.error);
         setLoading(false);
         return false;
       }
-      try {
-        await recordSaleAction(state.id, auctionPlayerId, teamId, priceValue, true);
-      } catch (err2) {
-        setError(err2 instanceof Error ? err2.message : "Failed to record sale");
+      const forcedResult = await recordSaleAction(state.id, auctionPlayerId, teamId, priceValue, true);
+      if (forcedResult.error) {
+        setError(forcedResult.error);
         setLoading(false);
         return false;
       }
@@ -179,14 +175,13 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
     if (!onClock || !selectedTeamId || !price) return;
     setLoading(true);
     setError(null);
-    try {
-      await adminPlaceBidAction(state.id, onClock.id, selectedTeamId, Number(price));
+    const result = await adminPlaceBidAction(state.id, onClock.id, selectedTeamId, Number(price));
+    if (result.error) {
+      setError(result.error);
+    } else {
       setPrice("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to place bid");
-    } finally {
-      setLoading(false);
     }
+    setLoading(false);
   }
 
   // One click, no re-typing — reads the live leading bid directly rather
@@ -202,14 +197,13 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
     if (!onClock) return;
     setLoading(true);
     setError(null);
-    try {
-      await markUnsoldAction(state.id, onClock.id);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to mark unsold");
-    } finally {
-      setLoading(false);
+    const result = await markUnsoldAction(state.id, onClock.id);
+    setLoading(false);
+    if (result.error) {
+      setError(result.error);
+      return;
     }
+    router.refresh();
   }
 
   async function handleRemove(auctionPlayerId: string, playerName: string, teamName: string | null) {
@@ -221,28 +215,26 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
       return;
     setLoading(true);
     setError(null);
-    try {
-      await removePlayerFromTeamAction(state.id, auctionPlayerId);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to remove player");
-    } finally {
-      setLoading(false);
+    const result = await removePlayerFromTeamAction(state.id, auctionPlayerId);
+    setLoading(false);
+    if (result.error) {
+      setError(result.error);
+      return;
     }
+    router.refresh();
   }
 
   async function handleConclude() {
     if (!window.confirm("Conclude this auction? Remaining players will be marked unsold.")) return;
     setLoading(true);
     setError(null);
-    try {
-      await concludeAuctionAction(state.id);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to conclude auction");
-    } finally {
-      setLoading(false);
+    const result = await concludeAuctionAction(state.id);
+    setLoading(false);
+    if (result.error) {
+      setError(result.error);
+      return;
     }
+    router.refresh();
   }
 
   async function handleReset() {
@@ -254,14 +246,13 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
       return;
     setLoading(true);
     setError(null);
-    try {
-      await resetAuctionAction(state.id);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to reset auction");
-    } finally {
-      setLoading(false);
+    const result = await resetAuctionAction(state.id);
+    setLoading(false);
+    if (result.error) {
+      setError(result.error);
+      return;
     }
+    router.refresh();
   }
 
   if (state.status === "COMPLETED") {

@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
 import { openPreAuctionAction, startBiddingAction } from "@/lib/actions/auction.actions";
+import { ActionResultForm } from "@/components/ui/ActionResultForm";
 import { listTournamentSponsors } from "@/lib/services/tournamentSponsor.service";
 import { AssignPlayerForm } from "@/components/admin/AssignPlayerForm";
 import { AddPlayerToAuctionForm } from "@/components/admin/AddPlayerToAuctionForm";
@@ -262,11 +263,11 @@ export default async function AuctionDetailPage({
 
       <section className="flex gap-3">
         {auction.status === "CREATED" && (
-          <form action={openPreAuctionAction.bind(null, auction.id)}>
+          <ActionResultForm action={openPreAuctionAction.bind(null, auction.id)}>
             <button type="submit" className={buttonPrimary}>
               Open pre-auction
             </button>
-          </form>
+          </ActionResultForm>
         )}
 
         {auction.status === "PRE_AUCTION_OPEN" && (
@@ -276,11 +277,11 @@ export default async function AuctionDetailPage({
         )}
 
         {auction.status === "PRE_AUCTION_LOCKED" && (
-          <form action={startBiddingAction.bind(null, auction.id)}>
+          <ActionResultForm action={startBiddingAction.bind(null, auction.id)}>
             <button type="submit" className={buttonPrimary}>
               Start bidding
             </button>
-          </form>
+          </ActionResultForm>
         )}
 
         {auction.status === "BIDDING" && (

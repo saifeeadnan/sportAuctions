@@ -28,15 +28,14 @@ export function ChangePlayerCategoryForm({
     if (!auctionPlayerId || !categoryId) return;
     setLoading(true);
     setError(null);
-    try {
-      await updateAuctionPlayerCategoryAction(auctionId, auctionPlayerId, categoryId);
-      setAuctionPlayerId("");
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to change category");
-    } finally {
-      setLoading(false);
+    const result = await updateAuctionPlayerCategoryAction(auctionId, auctionPlayerId, categoryId);
+    setLoading(false);
+    if (result.error) {
+      setError(result.error);
+      return;
     }
+    setAuctionPlayerId("");
+    router.refresh();
   }
 
   if (players.length === 0) {

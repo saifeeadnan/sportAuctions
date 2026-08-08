@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAdminOrLeagueAdmin } from "@/lib/auth/guards";
 import { listLeagues } from "@/lib/services/league.service";
 import { registerUserAction } from "@/lib/actions/auth.actions";
+import { ActionResultForm } from "@/components/ui/ActionResultForm";
 import { DeleteUserButton } from "@/components/admin/DeleteUserButton";
 import { ResetPasswordButton } from "@/components/admin/ResetPasswordButton";
 import { ToggleUserActiveButton } from "@/components/admin/ToggleUserActiveButton";
@@ -69,7 +70,7 @@ export async function UsersPanel({
         <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
           Create user
         </summary>
-        <form action={registerUserAction} className="flex flex-col gap-3 max-w-xl px-4 pb-4">
+        <ActionResultForm action={registerUserAction} className="flex flex-col gap-3 max-w-xl px-4 pb-4">
           <NameLoginIdFields />
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label className="flex flex-col gap-1 text-sm">
@@ -119,7 +120,7 @@ export async function UsersPanel({
           <button type="submit" className={`${buttonPrimary} mt-2 self-start`}>
             Create user
           </button>
-        </form>
+        </ActionResultForm>
       </details>
 
       <div className={`${tabsTrack} mb-4`}>

@@ -39,13 +39,11 @@ export function BidControl({
   async function submit(value: number) {
     setLoading(true);
     setError(null);
-    try {
-      await placeBidAction(auctionId, player.id, teamEntryId, value);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to place bid");
-    } finally {
-      setLoading(false);
+    const result = await placeBidAction(auctionId, player.id, teamEntryId, value);
+    if (result.error) {
+      setError(result.error);
     }
+    setLoading(false);
   }
 
   if (isLeading) {

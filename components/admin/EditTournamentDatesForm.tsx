@@ -40,15 +40,14 @@ export function EditTournamentDatesForm({
   async function handleSave() {
     setLoading(true);
     setError(null);
-    try {
-      await updateTournamentDatesAction(tournamentId, start, end);
-      setOpen(false);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update dates");
-    } finally {
-      setLoading(false);
+    const result = await updateTournamentDatesAction(tournamentId, start, end);
+    setLoading(false);
+    if (result.error) {
+      setError(result.error);
+      return;
     }
+    setOpen(false);
+    router.refresh();
   }
 
   return (

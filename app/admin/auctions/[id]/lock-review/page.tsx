@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
 import { lockPreAuctionAction } from "@/lib/actions/auction.actions";
+import { ActionResultForm } from "@/components/ui/ActionResultForm";
 import { card, buttonPrimary, buttonSecondary } from "@/lib/ui";
 
 export default async function LockReviewPage({
@@ -162,16 +163,16 @@ export default async function LockReviewPage({
           </p>
 
           <div className="flex gap-3">
-            <form action={lockPreAuctionAction.bind(null, auction.id, false)}>
+            <ActionResultForm action={lockPreAuctionAction.bind(null, auction.id, false)}>
               <button type="submit" className={buttonPrimary}>
                 Confirm &amp; lock pre-auction
               </button>
-            </form>
-            <form action={lockPreAuctionAction.bind(null, auction.id, true)}>
+            </ActionResultForm>
+            <ActionResultForm action={lockPreAuctionAction.bind(null, auction.id, true)}>
               <button type="submit" className={buttonSecondary}>
                 Force lock (skip missing submissions)
               </button>
-            </form>
+            </ActionResultForm>
             <Link
               href={`/admin/auctions/${auction.id}`}
               className="text-sm underline underline-offset-2 self-center"

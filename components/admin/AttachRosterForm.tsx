@@ -1,4 +1,5 @@
 import { attachRosterToTournamentAction } from "@/lib/actions/tournament.actions";
+import { ActionResultForm } from "@/components/ui/ActionResultForm";
 import { selectClass, buttonPrimary } from "@/lib/ui";
 
 export function AttachRosterForm({
@@ -18,7 +19,7 @@ export function AttachRosterForm({
   }
 
   return (
-    <form
+    <ActionResultForm
       action={attachRosterToTournamentAction.bind(null, tournamentId)}
       className="flex flex-col gap-3 max-w-sm px-4 pb-4"
     >
@@ -35,6 +36,6 @@ export function AttachRosterForm({
       <button type="submit" className={`${buttonPrimary} mt-2 self-start`}>
         Attach roster
       </button>
-    </form>
+    </ActionResultForm>
   );
 }

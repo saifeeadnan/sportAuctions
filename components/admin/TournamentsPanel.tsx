@@ -4,6 +4,7 @@ import { resolveAdminScope } from "@/lib/auth/scope";
 import { listLeagues } from "@/lib/services/league.service";
 import { DeleteTournamentButton } from "@/components/admin/DeleteTournamentButton";
 import { createTournamentAction } from "@/lib/actions/tournament.actions";
+import { ActionResultForm } from "@/components/ui/ActionResultForm";
 import { card, cardInteractive, buttonPrimary, inputClass, selectClass } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 
@@ -42,7 +43,7 @@ export async function TournamentsPanel({ selectedLeagueId }: { selectedLeagueId?
         <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
           New tournament
         </summary>
-        <form action={createTournamentAction} className="flex flex-col gap-3 max-w-xl px-4 pb-4">
+        <ActionResultForm action={createTournamentAction} className="flex flex-col gap-3 max-w-xl px-4 pb-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label className="flex flex-col gap-1 text-sm">
               Tournament name
@@ -112,7 +113,7 @@ export async function TournamentsPanel({ selectedLeagueId }: { selectedLeagueId?
           <button type="submit" className={`${buttonPrimary} mt-2 self-start`}>
             Create tournament
           </button>
-        </form>
+        </ActionResultForm>
       </details>
 
       {tournaments.length === 0 ? (

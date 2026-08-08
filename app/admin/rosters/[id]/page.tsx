@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
 import { createPlayerAction } from "@/lib/actions/roster.actions";
+import { ActionResultForm } from "@/components/ui/ActionResultForm";
 import { PlayerFormFields } from "@/components/roster/PlayerFormFields";
 import { DeletePlayerButton } from "@/components/admin/DeletePlayerButton";
 import { RenameRosterForm } from "@/components/admin/RenameRosterForm";
@@ -93,7 +94,7 @@ export default async function RosterDetailPage({
         <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
           Add player
         </summary>
-        <form
+        <ActionResultForm
           action={createPlayerAction.bind(null, roster.id)}
           className="flex flex-col gap-3 max-w-xl px-4 pb-4"
         >
@@ -101,7 +102,7 @@ export default async function RosterDetailPage({
           <button type="submit" className={`${buttonPrimary} mt-2 self-start`}>
             Add player
           </button>
-        </form>
+        </ActionResultForm>
       </details>
 
       <div className={`${card} overflow-x-auto`}>

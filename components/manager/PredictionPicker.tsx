@@ -44,23 +44,23 @@ export function PredictionPicker({
   async function handleTeamChange(auctionPlayerId: string, teamId: string) {
     setPending(auctionPlayerId);
     setErrors((prev) => ({ ...prev, [auctionPlayerId]: "" }));
-    try {
-      if (teamId === "") {
-        await removePredictionAction(entryId, auctionPlayerId);
-        onPredictionChange(auctionPlayerId, null);
+    if (teamId === "") {
+      const result = await removePredictionAction(entryId, auctionPlayerId);
+      if (result.error) {
+        setErrors((prev) => ({ ...prev, [auctionPlayerId]: result.error }));
       } else {
-        const existingAmount = predictions[auctionPlayerId]?.amount ?? null;
-        await savePredictionAction(entryId, auctionPlayerId, teamId, existingAmount);
+        onPredictionChange(auctionPlayerId, null);
+      }
+    } else {
+      const existingAmount = predictions[auctionPlayerId]?.amount ?? null;
+      const result = await savePredictionAction(entryId, auctionPlayerId, teamId, existingAmount);
+      if (result.error) {
+        setErrors((prev) => ({ ...prev, [auctionPlayerId]: result.error }));
+      } else {
         onPredictionChange(auctionPlayerId, { teamId, amount: existingAmount });
       }
-    } catch (err) {
-      setErrors((prev) => ({
-        ...prev,
-        [auctionPlayerId]: err instanceof Error ? err.message : "Failed to save prediction",
-      }));
-    } finally {
-      setPending(null);
     }
+    setPending(null);
   }
 
   async function handleAmountBlur(auctionPlayerId: string, teamId: string, rawValue: string) {
@@ -73,17 +73,13 @@ export function PredictionPicker({
 
     setPending(auctionPlayerId);
     setErrors((prev) => ({ ...prev, [auctionPlayerId]: "" }));
-    try {
-      await savePredictionAction(entryId, auctionPlayerId, teamId, amount);
+    const result = await savePredictionAction(entryId, auctionPlayerId, teamId, amount);
+    if (result.error) {
+      setErrors((prev) => ({ ...prev, [auctionPlayerId]: result.error }));
+    } else {
       onPredictionChange(auctionPlayerId, { teamId, amount });
-    } catch (err) {
-      setErrors((prev) => ({
-        ...prev,
-        [auctionPlayerId]: err instanceof Error ? err.message : "Failed to save prediction",
-      }));
-    } finally {
-      setPending(null);
     }
+    setPending(null);
   }
 
   const visiblePlayers = players.filter((p) => p.categoryName === effectiveCategory);

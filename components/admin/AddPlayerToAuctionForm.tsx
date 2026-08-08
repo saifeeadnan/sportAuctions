@@ -28,15 +28,14 @@ export function AddPlayerToAuctionForm({
     if (!playerId || !categoryId) return;
     setLoading(true);
     setError(null);
-    try {
-      await addPlayerToAuctionAction(auctionId, playerId, categoryId);
-      setPlayerId("");
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to add player");
-    } finally {
-      setLoading(false);
+    const result = await addPlayerToAuctionAction(auctionId, playerId, categoryId);
+    setLoading(false);
+    if (result.error) {
+      setError(result.error);
+      return;
     }
+    setPlayerId("");
+    router.refresh();
   }
 
   if (players.length === 0) {

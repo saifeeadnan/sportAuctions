@@ -136,28 +136,30 @@ export function NewAuctionForm({
     }
 
     setLoading(true);
-    try {
-      const result = await createAuctionAction({
-        tournamentId,
-        name,
-        teamBudget: Number(teamBudget),
-        auctionType,
-        categories: categories
-          .filter((c) => c.name.trim())
-          .map((c) => ({
-            name: c.name.trim(),
-            basePrice: Number(c.basePrice),
-            preAuctionEligible: c.preAuctionEligible,
-            bidIncrement: c.bidIncrement.trim() ? Number(c.bidIncrement) : undefined,
-          })),
-        playerAssignments,
-      });
-      router.push(`/admin/auctions/${result.auctionId}`);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create auction");
-    } finally {
-      setLoading(false);
+    const result = await createAuctionAction({
+      tournamentId,
+      name,
+      teamBudget: Number(teamBudget),
+      auctionType,
+      categories: categories
+        .filter((c) => c.name.trim())
+        .map((c) => ({
+          name: c.name.trim(),
+          basePrice: Number(c.basePrice),
+          preAuctionEligible: c.preAuctionEligible,
+          bidIncrement: c.bidIncrement.trim() ? Number(c.bidIncrement) : undefined,
+        })),
+      playerAssignments,
+    });
+    setLoading(false);
+    if (result.error) {
+      setError(result.error);
+      return;
     }
+    // TS can't statically rule out an empty-string `error` on the other
+    // branch from a plain truthiness check, so `.data` reads as possibly
+    // undefined here even though the check above guarantees it.
+    router.push(`/admin/auctions/${result.data!.auctionId}`);
   }
 
   return (

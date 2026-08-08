@@ -83,15 +83,14 @@ export function DraftForm({
   async function handleSubmit() {
     setLoading(true);
     setError(null);
-    try {
-      await submitDraftAction(entryId, Array.from(selected));
-      setSaved(true);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to submit draft");
-    } finally {
-      setLoading(false);
+    const result = await submitDraftAction(entryId, Array.from(selected));
+    setLoading(false);
+    if (result.error) {
+      setError(result.error);
+      return;
     }
+    setSaved(true);
+    router.refresh();
   }
 
   const totalBasePrice = players

@@ -27,17 +27,16 @@ export function ResetPasswordButton({ userId }: { userId: string }) {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    try {
-      const formData = new FormData();
-      formData.set("newPassword", newPassword);
-      await resetUserPasswordAction(userId, formData);
-      setSuccess(true);
-      setNewPassword("");
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to reset password");
-    } finally {
-      setLoading(false);
+    const formData = new FormData();
+    formData.set("newPassword", newPassword);
+    const result = await resetUserPasswordAction(userId, formData);
+    setLoading(false);
+    if (result.error) {
+      setError(result.error);
+      return;
     }
+    setSuccess(true);
+    setNewPassword("");
   }
 
   return (

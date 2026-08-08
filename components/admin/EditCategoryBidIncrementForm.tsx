@@ -35,19 +35,18 @@ export function EditCategoryBidIncrementForm({
   async function handleSave() {
     setLoading(true);
     setError(null);
-    try {
-      await updateCategoryBidIncrementAction(
-        auctionId,
-        categoryId,
-        value.trim() ? Number(value) : null
-      );
-      setOpen(false);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update bid increment");
-    } finally {
-      setLoading(false);
+    const result = await updateCategoryBidIncrementAction(
+      auctionId,
+      categoryId,
+      value.trim() ? Number(value) : null
+    );
+    setLoading(false);
+    if (result.error) {
+      setError(result.error);
+      return;
     }
+    setOpen(false);
+    router.refresh();
   }
 
   return (

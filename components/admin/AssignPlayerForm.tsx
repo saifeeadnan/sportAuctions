@@ -43,17 +43,16 @@ export function AssignPlayerForm({
     if (!playerId || !teamEntryId || !price) return;
     setLoading(true);
     setError(null);
-    try {
-      await adminAssignPlayerAction(auctionId, playerId, teamEntryId, Number(price));
-      setPlayerId("");
-      setTeamEntryId("");
-      setPrice("");
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to assign player");
-    } finally {
-      setLoading(false);
+    const result = await adminAssignPlayerAction(auctionId, playerId, teamEntryId, Number(price));
+    setLoading(false);
+    if (result.error) {
+      setError(result.error);
+      return;
     }
+    setPlayerId("");
+    setTeamEntryId("");
+    setPrice("");
+    router.refresh();
   }
 
   if (players.length === 0) {

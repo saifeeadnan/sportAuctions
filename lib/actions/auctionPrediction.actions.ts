@@ -3,6 +3,7 @@
 import { requireRole } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { ValidationError } from "@/lib/errors";
+import { toActionResult, type ActionResult } from "@/lib/actions/result";
 import { savePrediction, removePrediction } from "@/lib/services/auctionPrediction.service";
 
 async function requireOwnedAnalyticsEntry(teamAuctionEntryId: string) {
@@ -29,12 +30,19 @@ export async function savePredictionAction(
   auctionPlayerId: string,
   predictedWinnerEntryId: string,
   predictedAmount: number | null
-) {
-  await requireOwnedAnalyticsEntry(teamAuctionEntryId);
-  await savePrediction(teamAuctionEntryId, auctionPlayerId, predictedWinnerEntryId, predictedAmount);
+): Promise<ActionResult> {
+  return toActionResult(async () => {
+    await requireOwnedAnalyticsEntry(teamAuctionEntryId);
+    await savePrediction(teamAuctionEntryId, auctionPlayerId, predictedWinnerEntryId, predictedAmount);
+  });
 }
 
-export async function removePredictionAction(teamAuctionEntryId: string, auctionPlayerId: string) {
-  await requireOwnedAnalyticsEntry(teamAuctionEntryId);
-  await removePrediction(teamAuctionEntryId, auctionPlayerId);
+export async function removePredictionAction(
+  teamAuctionEntryId: string,
+  auctionPlayerId: string
+): Promise<ActionResult> {
+  return toActionResult(async () => {
+    await requireOwnedAnalyticsEntry(teamAuctionEntryId);
+    await removePrediction(teamAuctionEntryId, auctionPlayerId);
+  });
 }

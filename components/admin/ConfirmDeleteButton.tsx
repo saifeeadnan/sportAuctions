@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import type { ActionResult } from "@/lib/actions/result";
 
 export function ConfirmDeleteButton({
   confirmMessage,
@@ -12,7 +13,11 @@ export function ConfirmDeleteButton({
   className,
 }: {
   confirmMessage: string;
-  action: () => Promise<void>;
+  // Server Actions now return { error } (Next.js redacts a thrown error's
+  // message in production); a few buttons still call a fetch()-based Route
+  // Handler and throw on failure (unaffected by that redaction, since it's
+  // a plain HTTP response, not an RSC boundary) — support both.
+  action: () => Promise<ActionResult | void>;
   disabledReason?: string;
   label?: string;
   loadingLabel?: string;
@@ -38,12 +43,18 @@ export function ConfirmDeleteButton({
     setLoading(true);
     setError(null);
     try {
-      await action();
-      router.refresh();
+      const result = await action();
+      if (result?.error) {
+        setError(result.error);
+        setLoading(false);
+        return;
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete");
       setLoading(false);
+      return;
     }
+    router.refresh();
   }
 
   return (

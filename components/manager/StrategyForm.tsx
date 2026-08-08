@@ -77,25 +77,24 @@ export function StrategyForm({
   async function handleSubmit() {
     setLoading(true);
     setError(null);
-    try {
-      const mustHaveIds = Array.from(preferences.entries())
-        .filter(([, v]) => v === "MUST_HAVE")
-        .map(([id]) => id);
-      const avoidIds = Array.from(preferences.entries())
-        .filter(([, v]) => v === "AVOID")
-        .map(([id]) => id);
-      const targets = Array.from(budgetTargets.entries())
-        .filter(([, value]) => Number(value) > 0)
-        .map(([categoryId, value]) => ({ categoryId, targetAvgPrice: Number(value) }));
+    const mustHaveIds = Array.from(preferences.entries())
+      .filter(([, v]) => v === "MUST_HAVE")
+      .map(([id]) => id);
+    const avoidIds = Array.from(preferences.entries())
+      .filter(([, v]) => v === "AVOID")
+      .map(([id]) => id);
+    const targets = Array.from(budgetTargets.entries())
+      .filter(([, value]) => Number(value) > 0)
+      .map(([categoryId, value]) => ({ categoryId, targetAvgPrice: Number(value) }));
 
-      await saveStrategyAction(entryId, mustHaveIds, avoidIds, targets);
-      setSaved(true);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save strategy");
-    } finally {
-      setLoading(false);
+    const result = await saveStrategyAction(entryId, mustHaveIds, avoidIds, targets);
+    setLoading(false);
+    if (result.error) {
+      setError(result.error);
+      return;
     }
+    setSaved(true);
+    router.refresh();
   }
 
   const visiblePlayers = players.filter((p) => p.categoryId === activeCategory);

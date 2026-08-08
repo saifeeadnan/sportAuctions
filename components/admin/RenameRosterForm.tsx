@@ -27,15 +27,14 @@ export function RenameRosterForm({ rosterId, name }: { rosterId: string; name: s
   async function handleSave() {
     setLoading(true);
     setError(null);
-    try {
-      await renameRosterAction(rosterId, value);
-      setOpen(false);
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to rename roster");
-    } finally {
-      setLoading(false);
+    const result = await renameRosterAction(rosterId, value);
+    setLoading(false);
+    if (result.error) {
+      setError(result.error);
+      return;
     }
+    setOpen(false);
+    router.refresh();
   }
 
   return (

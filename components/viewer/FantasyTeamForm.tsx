@@ -77,14 +77,13 @@ export function FantasyTeamForm({
   async function handleSubmit() {
     setLoading(true);
     setError(null);
-    try {
-      await submitFantasyTeamAction(auctionId, Array.from(selected));
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to save fantasy team");
-    } finally {
-      setLoading(false);
+    const result = await submitFantasyTeamAction(auctionId, Array.from(selected));
+    setLoading(false);
+    if (result.error) {
+      setError(result.error);
+      return;
     }
+    router.refresh();
   }
 
   const totalPrice = players

@@ -1,5 +1,6 @@
 import { listLeagues } from "@/lib/services/league.service";
 import { createLeagueAction } from "@/lib/actions/league.actions";
+import { ActionResultForm } from "@/components/ui/ActionResultForm";
 import { DeleteLeagueButton } from "@/components/admin/DeleteLeagueButton";
 import { CopyInviteLinkButton } from "@/components/admin/CopyInviteLinkButton";
 import { UploadLeagueLogoForm } from "@/components/admin/UploadLeagueLogoForm";
@@ -17,7 +18,7 @@ export async function LeaguesPanel() {
         <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
           New league
         </summary>
-        <form action={createLeagueAction} className="flex flex-col gap-3 max-w-xl px-4 pb-4">
+        <ActionResultForm action={createLeagueAction} className="flex flex-col gap-3 max-w-xl px-4 pb-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label className="flex flex-col gap-1 text-sm">
               League name
@@ -35,7 +36,7 @@ export async function LeaguesPanel() {
           <button type="submit" className={`${buttonPrimary} mt-2 self-start`}>
             Create league
           </button>
-        </form>
+        </ActionResultForm>
       </details>
 
       {leagues.length === 0 ? (
