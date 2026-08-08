@@ -124,7 +124,7 @@ Start-Process -FilePath "npm.cmd" -ArgumentList "run", "dev" -WorkingDirectory $
 
 Write-Host "Waiting for dev server to become ready..."
 $ready = $false
-for ($i = 0; $i -lt 30; $i++) {
+for ($i = 0; $i -lt 60; $i++) {
   Start-Sleep -Seconds 1
   $log = ""
   if (Test-Path $devLog) { $log += (Get-Content $devLog -Raw) }
@@ -138,6 +138,19 @@ for ($i = 0; $i -lt 30; $i++) {
 if (-not $ready) {
   throw ("Dev server did not report ready in time. Check " + $devLog + " and " + $devErrLog)
 }
+
+# Next's dev server compiles each route on-demand, on its first hit. Without
+# this, that first hit is whatever the browser does first against a brand
+# new tunnel URL — usually the login page's CSRF fetch + credentials POST —
+# and that compile can be slow enough that the login attempt loses the race
+# and appears to just fail, requiring a second, now-warm attempt. Warming
+# both routes here (via localhost, not the tunnel — compilation is
+# server-side and doesn't care which hostname reached it) means the first
+# real visit never pays that cost.
+Write-Host "Warming up login routes..."
+$localBase = "http://localhost:" + $Port
+try { Invoke-WebRequest -Uri ($localBase + "/login") -Method Get -TimeoutSec 15 -UseBasicParsing | Out-Null } catch {}
+try { Invoke-WebRequest -Uri ($localBase + "/api/auth/csrf") -Method Get -TimeoutSec 15 -UseBasicParsing | Out-Null } catch {}
 
 Write-Host ""
 Write-Host ("Local:  http://localhost:" + $Port)
