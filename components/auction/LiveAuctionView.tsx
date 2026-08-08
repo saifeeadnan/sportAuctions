@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { AuctionState } from "@/lib/services/auctionState.service";
 import { useAuctionSocket } from "@/hooks/useAuctionSocket";
@@ -13,6 +14,8 @@ import { BidControl } from "@/components/auction/BidControl";
 import { computeMaxBid } from "@/lib/auction/maxBid";
 import { computeBidGuidance, computeLiveCategoryAvgPrice, type InitialStrategy } from "@/lib/auction/guidance";
 import { openAnalyticsDashboardWindow } from "@/lib/auction/popupWindow";
+import { card, tabsTrack, tabItem } from "@/lib/ui";
+import { Badge } from "@/components/ui/Badge";
 
 export type { InitialStrategy };
 
@@ -67,6 +70,24 @@ export function LiveAuctionView({
   const queue = state.players.filter(
     (p) => p.status === "AVAILABLE" || p.status === "IN_PRE_AUCTION_POOL" || p.status === "UNSOLD"
   );
+
+  // Read-only mirror of the auctioneer console's "Remaining pool" — same
+  // category tabs and ordering, minus the "Put on clock" action.
+  const categoryBasePrices = new Map<string, number>();
+  for (const p of queue) {
+    if (!categoryBasePrices.has(p.categoryName)) {
+      categoryBasePrices.set(p.categoryName, Number(p.basePrice));
+    }
+  }
+  const poolCategories = Array.from(categoryBasePrices.keys()).sort(
+    (a, b) => (categoryBasePrices.get(b) ?? 0) - (categoryBasePrices.get(a) ?? 0)
+  );
+  const [activePoolCategory, setActivePoolCategory] = useState<string>("");
+  const effectivePoolCategory =
+    activePoolCategory && poolCategories.includes(activePoolCategory)
+      ? activePoolCategory
+      : (poolCategories[0] ?? "");
+  const visiblePool = queue.filter((p) => p.categoryName === effectivePoolCategory);
   const remainingPoolBasePrices = onClock
     ? queue.filter((p) => p.id !== onClock.id).map((p) => Number(p.basePrice))
     : [];
@@ -108,9 +129,8 @@ export function LiveAuctionView({
     <div className="flex flex-col gap-4">
       <SaleAnnouncement sale={lastSale} />
       <p className="text-xs text-black/50 dark:text-white/50 flex items-center gap-2">
-        <span>
-          {connected ? "Live" : "Connecting…"} &middot; auction status: {state.status}
-        </span>
+        <Badge variant={connected ? "success" : "warning"}>{connected ? "Live" : "Connecting…"}</Badge>
+        <span>auction status: {state.status}</span>
         <button
           type="button"
           onClick={() => router.refresh()}
@@ -123,27 +143,74 @@ export function LiveAuctionView({
 
       {myTeam ? (
         <>
+          <div className={`${card} px-4 py-2.5 flex flex-col gap-2`}>
+            <div className="flex items-center gap-2.5 flex-wrap">
+              {myTeam.hasSponsorImage && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={`/api/teams/${myTeam.teamId}/sponsor-image`}
+                  alt={`${myTeam.teamName} sponsor`}
+                  className="h-10 w-10 rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-1 shrink-0"
+                />
+              )}
+              <p className="font-medium">{myTeam.teamName}</p>
+              <span className="text-sm text-black/60 dark:text-white/60">
+                Budget remaining <span className="font-semibold text-black dark:text-white">{myTeam.budgetRemaining}</span>
+              </span>
+              <span className="text-sm text-black/60 dark:text-white/60">
+                Slots{" "}
+                <span className="font-semibold text-black dark:text-white">
+                  {myTeam.slotsFilled}/{myTeam.slotsTotal}
+                </span>
+              </span>
+            </div>
+            <TeamStrengthSummary players={myPlayers} squadSize={myTeam.slotsTotal} />
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-            <section className="rounded border border-black/20 dark:border-white/20 px-3 py-2.5 flex flex-col gap-1.5">
-              <div className="flex items-center gap-2.5">
-                {myTeam.hasSponsorImage && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={`/api/teams/${myTeam.teamId}/sponsor-image`}
-                    alt={`${myTeam.teamName} sponsor`}
-                    className="h-14 w-14 rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-1 shrink-0"
-                  />
-                )}
-                <p className="font-medium">{myTeam.teamName}</p>
-              </div>
-              <p className="text-sm text-black/60 dark:text-white/60">
-                Budget remaining: {myTeam.budgetRemaining} &middot; Slots: {myTeam.slotsFilled}/
-                {myTeam.slotsTotal}
-              </p>
-              <TeamStrengthSummary players={myPlayers} squadSize={myTeam.slotsTotal} />
+            <section className={`${card} p-3`}>
+              <h2 className="text-base font-medium mb-2">Remaining pool ({queue.length})</h2>
+              {poolCategories.length > 0 && (
+                <div className={`${tabsTrack} mb-2`}>
+                  {poolCategories.map((cat) => {
+                    const count = queue.filter((p) => p.categoryName === cat).length;
+                    return (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => setActivePoolCategory(cat)}
+                        className={tabItem(effectivePoolCategory === cat)}
+                      >
+                        {cat} ({count})
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              {visiblePool.length === 0 ? (
+                <p className="text-sm text-black/60 dark:text-white/60">
+                  No remaining players in this category.
+                </p>
+              ) : (
+                <ul className="flex flex-col max-h-[360px] overflow-y-auto">
+                  {visiblePool.map((p) => (
+                    <li
+                      key={p.id}
+                      className="flex items-center justify-between gap-2 px-2 py-1 text-sm border-b border-black/5 dark:border-white/5 last:border-0"
+                    >
+                      <span className="flex items-center gap-1.5 truncate">
+                        <span className="truncate">{p.name}</span>
+                        {p.status === "IN_PRE_AUCTION_POOL" && <Badge variant="warning">Contested</Badge>}
+                        {p.status === "UNSOLD" && <Badge variant="neutral">Re-offer</Badge>}
+                      </span>
+                      <span className="text-black/50 dark:text-white/50 shrink-0">{p.basePrice}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </section>
 
-            <section>
+            <section className={`${card} p-3`}>
               <h2 className="text-base font-medium mb-2">On the clock</h2>
               <div className="flex gap-3 items-start">
                 <OnClockCard player={onClock} photoWidth={110} photoHeight={150} />
