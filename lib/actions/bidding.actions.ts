@@ -25,6 +25,7 @@ export async function selectNextPlayerAction(
     await loadScopedAuction(auctionId, scopeLeagueId(session));
     await selectNextPlayer(auctionId, auctionPlayerId);
     revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
+    revalidatePath(`/admin/auctions/${auctionId}`);
   });
 }
 
@@ -40,6 +41,7 @@ export async function recordSaleAction(
     await loadScopedAuction(auctionId, scopeLeagueId(session));
     await recordSale(auctionId, auctionPlayerId, winningTeamAuctionEntryId, price, { force });
     revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
+    revalidatePath(`/admin/auctions/${auctionId}`);
   });
 }
 
@@ -49,6 +51,7 @@ export async function markUnsoldAction(auctionId: string, auctionPlayerId: strin
     await loadScopedAuction(auctionId, scopeLeagueId(session));
     await markUnsold(auctionId, auctionPlayerId);
     revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
+    revalidatePath(`/admin/auctions/${auctionId}`);
   });
 }
 

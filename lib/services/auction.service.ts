@@ -204,12 +204,16 @@ export async function updateCategoryBidIncrement(categoryId: string, bidIncremen
   });
   if (!category) throw new ValidationError("Category not found");
 
-  // Only blocked mid-live-bidding — changing a category's increment before or
-  // between bidding rounds (or after the auction has completed) is safe since
-  // it's a soft UI convenience, not something bids were validated against.
-  if (category.auction.status === "BIDDING") {
+  // Only blocked while a player is actually on the clock — a bid increment
+  // is read fresh at the moment each bid is placed, not baked into any
+  // stored balance, so it's safe to change between players even while the
+  // auction's own status stays "BIDDING" for the whole live session.
+  const playerOnClock = await prisma.auctionPlayer.findFirst({
+    where: { auctionId: category.auctionId, status: "IN_BIDDING" },
+  });
+  if (playerOnClock) {
     throw new InvalidStateTransitionError(
-      "Cannot change a bid increment while the auction is live — pause or finish bidding first"
+      "Cannot change a bid increment while a player is on the clock — wait until the current sale is resolved"
     );
   }
 

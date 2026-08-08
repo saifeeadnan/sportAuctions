@@ -2,7 +2,13 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { resetDb } from "../helpers/resetDb";
 import { createAuctionReadyFixture } from "../helpers/fixtures";
 import { prisma } from "@/lib/prisma";
-import { createAuction, openPreAuction, lockPreAuction, startBidding } from "@/lib/services/auction.service";
+import {
+  createAuction,
+  openPreAuction,
+  lockPreAuction,
+  startBidding,
+  updateCategoryBidIncrement,
+} from "@/lib/services/auction.service";
 import { selectNextPlayer, recordSale, markUnsold, placeBid } from "@/lib/services/bidding.service";
 import { getAuctionState } from "@/lib/services/auctionState.service";
 
@@ -184,6 +190,37 @@ describe("bid count in auction state", () => {
     await placeBid(auction.id, target.id, team2.id, 250);
     state = await getAuctionState(auction.id);
     expect(state!.players.find((p) => p.id === target.id)?.bidCount).toBe(2);
+  });
+});
+
+describe("updateCategoryBidIncrement — locked only while a player is on the clock", () => {
+  it("allows editing during live bidding when no player is currently on the clock", async () => {
+    const { auction } = await createLiveAuction(["Player A"], ["Team 1"]);
+    const category = await prisma.auctionCategory.findFirstOrThrow({ where: { auctionId: auction.id } });
+
+    const updated = await updateCategoryBidIncrement(category.id, 25);
+    expect(String(updated.bidIncrement)).toBe("25");
+  });
+
+  it("rejects editing while a player is on the clock", async () => {
+    const { auction } = await createLiveAuction(["Player A"], ["Team 1"]);
+    const category = await prisma.auctionCategory.findFirstOrThrow({ where: { auctionId: auction.id } });
+    const target = await getAvailablePlayer(auction.id);
+    await selectNextPlayer(auction.id, target.id);
+
+    await expect(updateCategoryBidIncrement(category.id, 25)).rejects.toThrow(/on the clock/);
+  });
+
+  it("allows editing again once the on-clock player is sold", async () => {
+    const { auction, teams } = await createLiveAuction(["Player A"], ["Team 1"]);
+    const [team1] = await getEntries(auction.id, teams);
+    const category = await prisma.auctionCategory.findFirstOrThrow({ where: { auctionId: auction.id } });
+    const target = await getAvailablePlayer(auction.id);
+    await selectNextPlayer(auction.id, target.id);
+    await recordSale(auction.id, target.id, team1.id, 200);
+
+    const updated = await updateCategoryBidIncrement(category.id, 25);
+    expect(String(updated.bidIncrement)).toBe("25");
   });
 });
 

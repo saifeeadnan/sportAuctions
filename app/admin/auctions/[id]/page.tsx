@@ -9,7 +9,8 @@ import { AssignPlayerForm } from "@/components/admin/AssignPlayerForm";
 import { AddPlayerToAuctionForm } from "@/components/admin/AddPlayerToAuctionForm";
 import { ChangePlayerCategoryForm } from "@/components/admin/ChangePlayerCategoryForm";
 import { EditCategoryBidIncrementForm } from "@/components/admin/EditCategoryBidIncrementForm";
-import { EditAuctionTeamSettingsForm } from "@/components/admin/EditAuctionTeamSettingsForm";
+import { EditAuctionBudgetForm } from "@/components/admin/EditAuctionBudgetForm";
+import { EditAuctionSquadSizeForm } from "@/components/admin/EditAuctionSquadSizeForm";
 import { SponsorRibbon } from "@/components/tournament/SponsorRibbon";
 import { card, cardInteractive, buttonPrimary, buttonSecondary } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
@@ -68,6 +69,11 @@ export default async function AuctionDetailPage({
     {}
   );
 
+  // Bid increments are only locked while someone is actually on the
+  // clock — not for the whole "BIDDING" auction status, which spans the
+  // entire live session including every gap between players.
+  const playerOnClock = auction.auctionPlayers.some((ap) => ap.status === "IN_BIDDING");
+
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 flex flex-col gap-8">
       <div>
@@ -76,13 +82,6 @@ export default async function AuctionDetailPage({
           {auction.tournament.name} &middot; {AUCTION_TYPE_LABELS[auction.auctionType]} &middot;
           status: {auction.status} &middot; team budget: {String(auction.teamBudget)}
         </p>
-        {auction.entries.length > 0 && auction.status !== "COMPLETED" && (
-          <EditAuctionTeamSettingsForm
-            auctionId={auction.id}
-            teamBudget={String(auction.teamBudget)}
-            squadSize={auction.entries[0].slotsTotal}
-          />
-        )}
         <p className="text-sm text-black/60 dark:text-white/60">
           Player pool ({auction.auctionPlayers.length}):{" "}
           {Object.entries(statusCounts)
@@ -118,19 +117,7 @@ export default async function AuctionDetailPage({
                     </Badge>
                   </td>
                   <td className="py-2 pr-4">
-                    {auction.status === "BIDDING" ? (
-                      c.bidIncrement != null ? (
-                        `+${String(c.bidIncrement)}`
-                      ) : (
-                        "—"
-                      )
-                    ) : (
-                      <EditCategoryBidIncrementForm
-                        auctionId={auction.id}
-                        categoryId={c.id}
-                        bidIncrement={c.bidIncrement != null ? String(c.bidIncrement) : null}
-                      />
-                    )}
+                    {c.bidIncrement != null ? `+${String(c.bidIncrement)}` : "—"}
                   </td>
                 </tr>
               ))}
@@ -184,89 +171,156 @@ export default async function AuctionDetailPage({
         )}
       </section>
 
-      {auction.entries.length > 0 && auction.status !== "COMPLETED" && (
-        <details className={card}>
-          <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
-            Assign player directly
-          </summary>
-          <div className="px-4 pb-4">
-            <p className="text-sm text-black/60 dark:text-white/60 mb-3">
-              Assigns a player straight to a team as sold, bypassing the pre-auction draft and
-              live auction entirely.
-            </p>
-            <AssignPlayerForm
-              auctionId={auction.id}
-              players={auction.auctionPlayers
-                .filter((ap) => ap.status === "AVAILABLE")
-                .map((ap) => ({
-                  id: ap.id,
-                  name: ap.player.name,
-                  categoryName: ap.category.name,
-                  basePrice: String(ap.category.basePrice),
-                }))}
-              teams={auction.entries.map((entry) => ({
-                id: entry.id,
-                teamName: entry.team.name,
-                budgetRemaining: String(entry.budgetRemaining),
-                slotsFilled: entry.slotsFilled,
-                slotsTotal: entry.slotsTotal,
-              }))}
-            />
-          </div>
-        </details>
-      )}
-
       {auction.status !== "COMPLETED" && (
-        <details className={card}>
-          <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
-            Add player from roster ({unassignedRosterPlayers.length} not yet in this auction)
-          </summary>
-          <div className="px-4 pb-4">
-            <p className="text-sm text-black/60 dark:text-white/60 mb-3">
-              For a player added to the roster (or missed) after this auction was created —
-              joins the pool as Available, same as every player chosen when the auction started.
-            </p>
-            <AddPlayerToAuctionForm
-              auctionId={auction.id}
-              players={unassignedRosterPlayers.map((p) => ({ id: p.id, name: p.name }))}
-              categories={auction.categories.map((c) => ({
-                id: c.id,
-                name: c.name,
-                basePrice: String(c.basePrice),
-              }))}
-            />
-          </div>
-        </details>
-      )}
+        <section>
+          <h2 className="text-lg font-medium mb-3">Settings</h2>
+          <div className={`${card} divide-y divide-black/5 dark:divide-white/5`}>
+            {auction.entries.length > 0 && (
+              <details>
+                <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
+                  Edit team budget
+                </summary>
+                <div className="px-4 pb-4">
+                  <p className="text-sm text-black/60 dark:text-white/60 mb-3">
+                    Shifts every team&apos;s remaining budget by the same amount immediately,
+                    even mid-bidding — money already spent is preserved. Rejected entirely if it
+                    would put any team into deficit.
+                  </p>
+                  <EditAuctionBudgetForm auctionId={auction.id} teamBudget={String(auction.teamBudget)} />
+                </div>
+              </details>
+            )}
 
-      {auction.status !== "COMPLETED" && (
-        <details className={card}>
-          <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
-            Change player category
-          </summary>
-          <div className="px-4 pb-4">
-            <p className="text-sm text-black/60 dark:text-white/60 mb-3">
-              Moves a player to a different category of this auction — e.g. if the roster&apos;s
-              own category for them was corrected after this auction started. Only available
-              before a player is sold or on the clock.
-            </p>
-            <ChangePlayerCategoryForm
-              auctionId={auction.id}
-              players={auction.auctionPlayers
-                .filter((ap) => ap.status !== "SOLD" && ap.status !== "IN_BIDDING")
-                .map((ap) => ({
-                  id: ap.id,
-                  name: ap.player.name,
-                  categoryName: ap.category.name,
-                }))}
-              categories={auction.categories.map((c) => ({
-                id: c.id,
-                name: c.name,
-                basePrice: String(c.basePrice),
-              }))}
-            />
+            {auction.entries.length > 0 && (
+              <details>
+                <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
+                  Edit squad size
+                </summary>
+                <div className="px-4 pb-4">
+                  <p className="text-sm text-black/60 dark:text-white/60 mb-3">
+                    Sets every team&apos;s slot cap to this exact number immediately, even
+                    mid-bidding. Rejected entirely if any team already has more players than
+                    this.
+                  </p>
+                  <EditAuctionSquadSizeForm auctionId={auction.id} squadSize={auction.entries[0].slotsTotal} />
+                </div>
+              </details>
+            )}
+
+            {auction.entries.length > 0 && (
+              <details>
+                <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
+                  Assign player directly
+                </summary>
+                <div className="px-4 pb-4">
+                  <p className="text-sm text-black/60 dark:text-white/60 mb-3">
+                    Assigns a player straight to a team as sold, bypassing the pre-auction draft
+                    and live auction entirely.
+                  </p>
+                  <AssignPlayerForm
+                    auctionId={auction.id}
+                    players={auction.auctionPlayers
+                      .filter((ap) => ap.status === "AVAILABLE")
+                      .map((ap) => ({
+                        id: ap.id,
+                        name: ap.player.name,
+                        categoryName: ap.category.name,
+                        basePrice: String(ap.category.basePrice),
+                      }))}
+                    teams={auction.entries.map((entry) => ({
+                      id: entry.id,
+                      teamName: entry.team.name,
+                      budgetRemaining: String(entry.budgetRemaining),
+                      slotsFilled: entry.slotsFilled,
+                      slotsTotal: entry.slotsTotal,
+                    }))}
+                  />
+                </div>
+              </details>
+            )}
+
+            <details>
+              <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
+                Add player from roster ({unassignedRosterPlayers.length} not yet in this auction)
+              </summary>
+              <div className="px-4 pb-4">
+                <p className="text-sm text-black/60 dark:text-white/60 mb-3">
+                  For a player added to the roster (or missed) after this auction was created —
+                  joins the pool as Available, same as every player chosen when the auction
+                  started.
+                </p>
+                <AddPlayerToAuctionForm
+                  auctionId={auction.id}
+                  players={unassignedRosterPlayers.map((p) => ({ id: p.id, name: p.name }))}
+                  categories={auction.categories.map((c) => ({
+                    id: c.id,
+                    name: c.name,
+                    basePrice: String(c.basePrice),
+                  }))}
+                />
+              </div>
+            </details>
+
+            <details>
+              <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
+                Change player category
+              </summary>
+              <div className="px-4 pb-4">
+                <p className="text-sm text-black/60 dark:text-white/60 mb-3">
+                  Moves a player to a different category of this auction — e.g. if the
+                  roster&apos;s own category for them was corrected after this auction started.
+                  Only available before a player is sold or on the clock.
+                </p>
+                <ChangePlayerCategoryForm
+                  auctionId={auction.id}
+                  players={auction.auctionPlayers
+                    .filter((ap) => ap.status !== "SOLD" && ap.status !== "IN_BIDDING")
+                    .map((ap) => ({
+                      id: ap.id,
+                      name: ap.player.name,
+                      categoryName: ap.category.name,
+                    }))}
+                  categories={auction.categories.map((c) => ({
+                    id: c.id,
+                    name: c.name,
+                    basePrice: String(c.basePrice),
+                  }))}
+                />
+              </div>
+            </details>
+
+            <details>
+              <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
+                Bid increments
+              </summary>
+              <div className="px-4 pb-4">
+                <p className="text-sm text-black/60 dark:text-white/60 mb-3">
+                  How much each new bid must beat the current one by, per category. Locked only
+                  while a player is on the clock — editable any other time, including between
+                  players during live bidding.
+                </p>
+                <ul className="flex flex-col gap-2">
+                  {auction.categories.map((c) => (
+                    <li key={c.id} className="flex items-center justify-between gap-3 text-sm">
+                      <span>{c.name}</span>
+                      {playerOnClock ? (
+                        <span className="text-black/60 dark:text-white/60">
+                          {c.bidIncrement != null ? `+${String(c.bidIncrement)}` : "—"}
+                        </span>
+                      ) : (
+                        <EditCategoryBidIncrementForm
+                          auctionId={auction.id}
+                          categoryId={c.id}
+                          bidIncrement={c.bidIncrement != null ? String(c.bidIncrement) : null}
+                        />
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </details>
           </div>
-        </details>
+        </section>
       )}
 
       <section className="flex gap-3">
