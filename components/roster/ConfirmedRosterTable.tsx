@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import { formatSoldVia } from "@/lib/format";
 import { card } from "@/lib/ui";
 
@@ -10,24 +13,82 @@ export type ConfirmedRosterPlayer = {
   soldVia: string | null;
 };
 
-export function ConfirmedRosterTable({ players }: { players: ConfirmedRosterPlayer[] }) {
+type SortField = "playerName" | "categoryName" | "soldPrice" | "soldVia";
+type SortDir = "asc" | "desc";
+
+const COLUMNS: { field: SortField; label: string }[] = [
+  { field: "playerName", label: "Player" },
+  { field: "categoryName", label: "Category" },
+  { field: "soldPrice", label: "Price" },
+  { field: "soldVia", label: "Via" },
+];
+
+function compareValues(a: ConfirmedRosterPlayer, b: ConfirmedRosterPlayer, field: SortField): number {
+  if (field === "soldPrice") {
+    const av = a.soldPrice != null ? Number(a.soldPrice) : -Infinity;
+    const bv = b.soldPrice != null ? Number(b.soldPrice) : -Infinity;
+    return av - bv;
+  }
+  const av = (a[field] ?? "").toLowerCase();
+  const bv = (b[field] ?? "").toLowerCase();
+  return av.localeCompare(bv);
+}
+
+export function ConfirmedRosterTable({
+  players,
+  photoSize = 34,
+}: {
+  players: ConfirmedRosterPlayer[];
+  /** Player photo diameter in px — 34 (default) is 20% larger than the
+   * original 28px (h-7/w-7) this table used before. */
+  photoSize?: number;
+}) {
+  const [sortField, setSortField] = useState<SortField>("playerName");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+
   if (players.length === 0) {
     return <p className="text-sm text-black/60 dark:text-white/60">No players confirmed yet.</p>;
   }
+
+  function handleSort(field: SortField) {
+    if (field === sortField) {
+      setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortField(field);
+      setSortDir("asc");
+    }
+  }
+
+  const sorted = [...players].sort((a, b) => {
+    const cmp = compareValues(a, b, sortField);
+    return sortDir === "asc" ? cmp : -cmp;
+  });
 
   return (
     <div className={`${card} overflow-x-auto`}>
       <table className="w-full text-sm border-collapse">
         <thead>
           <tr className="text-left border-b border-black/10 dark:border-white/10">
-            <th className="py-2 pl-4 pr-4">Player</th>
-            <th className="py-2 pr-4">Category</th>
-            <th className="py-2 pr-4">Price</th>
-            <th className="py-2 pr-4">Via</th>
+            {COLUMNS.map((col, i) => (
+              <th key={col.field} className={i === 0 ? "py-2 pl-4 pr-4" : "py-2 pr-4"}>
+                <button
+                  type="button"
+                  onClick={() => handleSort(col.field)}
+                  className="inline-flex items-center gap-1 hover:underline"
+                >
+                  {col.label}
+                  {sortField === col.field && (
+                    <span className="text-black/50 dark:text-white/50">
+                      {sortDir === "asc" ? "▲" : "▼"}
+                    </span>
+                  )}
+                </button>
+              </th>
+            ))}
           </tr>
         </thead>
         <tbody>
-          {players.map((p) => (
+          {sorted.map((p) => (
             <tr key={p.id} className="border-b border-black/5 dark:border-white/5 last:border-0">
               <td className="py-2 pl-4 pr-4">
                 <div className="flex items-center gap-2">
@@ -36,10 +97,14 @@ export function ConfirmedRosterTable({ players }: { players: ConfirmedRosterPlay
                     <img
                       src={p.photoUrl}
                       alt={p.playerName}
-                      className="h-7 w-7 rounded-full object-cover shrink-0"
+                      className="rounded-full object-cover shrink-0"
+                      style={{ height: photoSize, width: photoSize }}
                     />
                   ) : (
-                    <span className="h-7 w-7 rounded-full bg-black/5 dark:bg-white/10 shrink-0" />
+                    <span
+                      className="rounded-full bg-black/5 dark:bg-white/10 shrink-0"
+                      style={{ height: photoSize, width: photoSize }}
+                    />
                   )}
                   {p.playerName}
                 </div>

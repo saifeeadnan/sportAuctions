@@ -51,7 +51,8 @@ export default async function ManagerTeamDetailPage({
             <img
               src={`/api/teams/${team.id}/sponsor-image`}
               alt={`${team.name} sponsor`}
-              className="h-10 w-10 rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-1 shrink-0"
+              // 20% larger than the standard h-10/w-10 (40px) used elsewhere.
+              className="h-12 w-12 rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-1 shrink-0"
             />
           )}
           <h1 className="text-xl font-semibold">{team.name}</h1>
