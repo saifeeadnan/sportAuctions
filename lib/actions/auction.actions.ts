@@ -17,6 +17,7 @@ import {
   updateCategoryBidIncrement,
   addPlayerToAuction,
   updateAuctionPlayerCategory,
+  updateAuctionTeamSettings,
   type CreateAuctionInput,
 } from "@/lib/services/auction.service";
 import { submitDraft, removeDraftPick } from "@/lib/services/preAuctionDraft.service";
@@ -130,6 +131,19 @@ export async function updateCategoryBidIncrementAction(
     await loadScopedAuction(auctionId, leagueId);
     await updateCategoryBidIncrement(categoryId, bidIncrement);
     revalidatePath(`/admin/auctions/${auctionId}`);
+  });
+}
+
+export async function updateAuctionTeamSettingsAction(
+  auctionId: string,
+  input: { newTeamBudget?: number; newSquadSize?: number }
+): Promise<ActionResult> {
+  return toActionResult(async () => {
+    const { leagueId } = await requireAdminOrLeagueAdmin();
+    await loadScopedAuction(auctionId, leagueId);
+    await updateAuctionTeamSettings(auctionId, input);
+    revalidatePath(`/admin/auctions/${auctionId}`);
+    revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
   });
 }
 

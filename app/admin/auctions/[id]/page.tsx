@@ -9,6 +9,7 @@ import { AssignPlayerForm } from "@/components/admin/AssignPlayerForm";
 import { AddPlayerToAuctionForm } from "@/components/admin/AddPlayerToAuctionForm";
 import { ChangePlayerCategoryForm } from "@/components/admin/ChangePlayerCategoryForm";
 import { EditCategoryBidIncrementForm } from "@/components/admin/EditCategoryBidIncrementForm";
+import { EditAuctionTeamSettingsForm } from "@/components/admin/EditAuctionTeamSettingsForm";
 import { SponsorRibbon } from "@/components/tournament/SponsorRibbon";
 import { card, cardInteractive, buttonPrimary, buttonSecondary } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
@@ -75,6 +76,13 @@ export default async function AuctionDetailPage({
           {auction.tournament.name} &middot; {AUCTION_TYPE_LABELS[auction.auctionType]} &middot;
           status: {auction.status} &middot; team budget: {String(auction.teamBudget)}
         </p>
+        {auction.entries.length > 0 && auction.status !== "COMPLETED" && (
+          <EditAuctionTeamSettingsForm
+            auctionId={auction.id}
+            teamBudget={String(auction.teamBudget)}
+            squadSize={auction.entries[0].slotsTotal}
+          />
+        )}
         <p className="text-sm text-black/60 dark:text-white/60">
           Player pool ({auction.auctionPlayers.length}):{" "}
           {Object.entries(statusCounts)

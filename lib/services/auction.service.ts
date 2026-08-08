@@ -1,6 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/app/generated/prisma/client";
-import { ValidationError, InsufficientBudgetError, InvalidStateTransitionError } from "@/lib/errors";
+import {
+  ValidationError,
+  InsufficientBudgetError,
+  InvalidStateTransitionError,
+  SquadCapExceededError,
+} from "@/lib/errors";
 import { computeManagerSlotPrice } from "@/lib/services/budget.service";
 import { resolveOverlaps } from "@/lib/services/overlapResolution.service";
 import { findManagerSelfAuctionPlayerId } from "@/lib/services/preAuctionDraft.service";
@@ -428,6 +433,117 @@ export async function resetAuctionToPreBidding(auctionId: string) {
   const freshState = await getAuctionState(auctionId);
   if (freshState) {
     emitAuctionEvent(auctionId, "auction:reset", freshState);
+  }
+}
+
+/**
+ * Lets an admin adjust team budget and/or squad size for an auction already
+ * underway. Auction.teamBudget and Tournament.squadSize are write-once
+ * template values only ever read at openPreAuction time — the numbers that
+ * actually govern bidding are each TeamAuctionEntry's own budgetRemaining/
+ * slotsTotal, so this reaches into every entry directly rather than editing
+ * the (otherwise inert) parent records. A budget change shifts every team's
+ * remaining budget by the same delta (preserving what's already spent); a
+ * squad-size change sets every team's slot cap to the same new number
+ * (there's no per-team spend history to preserve for a slot count). Squad
+ * size here is scoped to this auction only — Tournament.squadSize is never
+ * touched, matching how updateAuctionPlayerCategory overrides a category
+ * per-auction without writing back to the Player template.
+ */
+export async function updateAuctionTeamSettings(
+  auctionId: string,
+  input: { newTeamBudget?: number; newSquadSize?: number }
+) {
+  if (input.newTeamBudget == null && input.newSquadSize == null) {
+    throw new ValidationError("Provide a new team budget and/or a new squad size");
+  }
+  if (input.newTeamBudget != null && input.newTeamBudget <= 0) {
+    throw new ValidationError("Team budget must be greater than 0");
+  }
+  if (
+    input.newSquadSize != null &&
+    (!Number.isInteger(input.newSquadSize) || input.newSquadSize <= 0)
+  ) {
+    throw new ValidationError("Squad size must be a whole number greater than 0");
+  }
+
+  const auction = await prisma.auction.findUnique({
+    where: { id: auctionId },
+    include: { entries: { include: { team: true } } },
+  });
+  if (!auction) throw new ValidationError("Auction not found");
+  if (auction.status === "CREATED") {
+    throw new InvalidStateTransitionError("Open pre-auction before editing team budget or squad size");
+  }
+  if (auction.status === "COMPLETED") {
+    throw new InvalidStateTransitionError(
+      "Cannot edit team budget or squad size once the auction has concluded"
+    );
+  }
+
+  const budgetDelta =
+    input.newTeamBudget != null
+      ? new Prisma.Decimal(input.newTeamBudget).minus(auction.teamBudget)
+      : null;
+
+  const budgetViolations: string[] = [];
+  const squadViolations: string[] = [];
+  const plan = auction.entries.map((entry) => {
+    const newBudgetRemaining =
+      budgetDelta != null
+        ? new Prisma.Decimal(entry.budgetRemaining).plus(budgetDelta)
+        : new Prisma.Decimal(entry.budgetRemaining);
+    const newSlotsTotal = input.newSquadSize ?? entry.slotsTotal;
+
+    if (newBudgetRemaining.lessThan(0)) {
+      budgetViolations.push(`"${entry.team.name}" would go ${newBudgetRemaining.toString()} into deficit`);
+    }
+    if (newSlotsTotal < entry.slotsFilled) {
+      squadViolations.push(`"${entry.team.name}" already has ${entry.slotsFilled} filled slot(s)`);
+    }
+    return {
+      entryId: entry.id,
+      teamName: entry.team.name,
+      newBudgetRemaining,
+      newSlotsTotal,
+      slotsFilled: entry.slotsFilled,
+    };
+  });
+
+  if (budgetViolations.length > 0 || squadViolations.length > 0) {
+    const messages = [
+      budgetViolations.length > 0 ? `Insufficient budget: ${budgetViolations.join("; ")}` : null,
+      squadViolations.length > 0 ? `Squad cap too low: ${squadViolations.join("; ")}` : null,
+    ].filter((m): m is string => m != null);
+    if (budgetViolations.length > 0 && squadViolations.length === 0) {
+      throw new InsufficientBudgetError(messages.join(" "));
+    }
+    if (squadViolations.length > 0 && budgetViolations.length === 0) {
+      throw new SquadCapExceededError(messages.join(" "));
+    }
+    throw new ValidationError(messages.join(" "));
+  }
+
+  await prisma.$transaction(async (tx) => {
+    for (const p of plan) {
+      await tx.teamAuctionEntry.update({
+        where: { id: p.entryId },
+        data: { budgetRemaining: p.newBudgetRemaining, slotsTotal: p.newSlotsTotal },
+      });
+    }
+    if (input.newTeamBudget != null) {
+      await tx.auction.update({ where: { id: auctionId }, data: { teamBudget: input.newTeamBudget } });
+    }
+  });
+
+  for (const p of plan) {
+    emitAuctionEvent(auctionId, "team:budget-updated", {
+      teamAuctionEntryId: p.entryId,
+      teamName: p.teamName,
+      budgetRemaining: p.newBudgetRemaining.toString(),
+      slotsFilled: p.slotsFilled,
+      slotsTotal: p.newSlotsTotal,
+    });
   }
 }
 
