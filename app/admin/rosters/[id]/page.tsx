@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
+import { isLeagueReadOnly } from "@/lib/services/league.service";
 import { createPlayerAction } from "@/lib/actions/roster.actions";
 import { ActionResultForm } from "@/components/ui/ActionResultForm";
 import { PlayerFormFields } from "@/components/roster/PlayerFormFields";
@@ -61,6 +62,12 @@ export default async function RosterDetailPage({
   if (!roster) notFound();
   assertInScope(leagueId, roster.leagueId);
 
+  const rosterLeague = await prisma.league.findUniqueOrThrow({
+    where: { id: roster.leagueId },
+    select: { endDate: true },
+  });
+  const readOnly = isLeagueReadOnly(rosterLeague);
+
   const columns: { field: SortField; label: string }[] = [
     { field: "name", label: "Name" },
     { field: "position", label: "Position" },
@@ -90,20 +97,26 @@ export default async function RosterDetailPage({
         </a>
       </div>
 
-      <details className={`${card} mb-6`}>
-        <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
-          Add player
-        </summary>
-        <ActionResultForm
-          action={createPlayerAction.bind(null, roster.id)}
-          className="flex flex-col gap-3 max-w-xl px-4 pb-4"
-        >
-          <PlayerFormFields />
-          <button type="submit" className={`${buttonPrimary} mt-2 self-start`}>
+      {readOnly ? (
+        <div className={`${card} mb-6 px-4 py-3 text-sm text-black/60 dark:text-white/60`}>
+          Add player — this league is read-only.
+        </div>
+      ) : (
+        <details className={`${card} mb-6`}>
+          <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
             Add player
-          </button>
-        </ActionResultForm>
-      </details>
+          </summary>
+          <ActionResultForm
+            action={createPlayerAction.bind(null, roster.id)}
+            className="flex flex-col gap-3 max-w-xl px-4 pb-4"
+          >
+            <PlayerFormFields />
+            <button type="submit" className={`${buttonPrimary} mt-2 self-start`}>
+              Add player
+            </button>
+          </ActionResultForm>
+        </details>
+      )}
 
       <div className={`${card} overflow-x-auto`}>
         <table className="w-full text-sm border-collapse">

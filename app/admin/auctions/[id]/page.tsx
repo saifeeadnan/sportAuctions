@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
+import { isLeagueReadOnly } from "@/lib/services/league.service";
 import { openPreAuctionAction, startBiddingAction } from "@/lib/actions/auction.actions";
 import { ActionResultForm } from "@/components/ui/ActionResultForm";
 import { listTournamentSponsors } from "@/lib/services/tournamentSponsor.service";
@@ -42,7 +43,14 @@ export default async function AuctionDetailPage({
   if (!auction) notFound();
   assertInScope(leagueId, auction.tournament.leagueId);
 
-  const sponsors = await listTournamentSponsors(auction.tournamentId);
+  const [sponsors, league] = await Promise.all([
+    listTournamentSponsors(auction.tournamentId),
+    prisma.league.findUniqueOrThrow({
+      where: { id: auction.tournament.leagueId },
+      select: { endDate: true },
+    }),
+  ]);
+  const readOnly = isLeagueReadOnly(league);
 
   // Roster players not yet represented as an AuctionPlayer row — e.g. added
   // to the roster after this auction was created, so createAuction's
@@ -171,7 +179,16 @@ export default async function AuctionDetailPage({
         )}
       </section>
 
-      {auction.status !== "COMPLETED" && (
+      {auction.status !== "COMPLETED" && readOnly && (
+        <section>
+          <h2 className="text-lg font-medium mb-3">Settings</h2>
+          <div className={`${card} px-4 py-3 text-sm text-black/40 dark:text-white/40`}>
+            This league is read-only — auction settings can no longer be changed.
+          </div>
+        </section>
+      )}
+
+      {auction.status !== "COMPLETED" && !readOnly && (
         <section>
           <h2 className="text-lg font-medium mb-3">Settings</h2>
           <div className={`${card} divide-y divide-black/5 dark:divide-white/5`}>

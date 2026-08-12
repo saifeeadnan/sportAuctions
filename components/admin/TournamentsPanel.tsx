@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { resolveAdminScope } from "@/lib/auth/scope";
-import { listLeagues } from "@/lib/services/league.service";
+import { listLeagues, isLeagueReadOnly } from "@/lib/services/league.service";
 import { DeleteTournamentButton } from "@/components/admin/DeleteTournamentButton";
 import { createTournamentAction } from "@/lib/actions/tournament.actions";
 import { ActionResultForm } from "@/components/ui/ActionResultForm";
@@ -17,7 +17,7 @@ export async function TournamentsPanel({ selectedLeagueId }: { selectedLeagueId?
   // unrestricted and needs an explicit leagueId whenever no roster is picked.
   const isSiteAdmin = session.user.role === "ADMIN";
 
-  const [tournaments, rosters, leagues] = await Promise.all([
+  const [tournaments, rosters, leagues, myLeague] = await Promise.all([
     prisma.tournament.findMany({
       where: leagueId ? { leagueId } : {},
       orderBy: { createdAt: "desc" },
@@ -33,12 +33,26 @@ export async function TournamentsPanel({ selectedLeagueId }: { selectedLeagueId?
       orderBy: { name: "asc" },
     }),
     isSiteAdmin ? listLeagues() : Promise.resolve(null),
+    !isSiteAdmin && leagueId
+      ? prisma.league.findUnique({ where: { id: leagueId }, select: { endDate: true } })
+      : Promise.resolve(null),
   ]);
+
+  // A League Admin has no league picker (always their own fixed league), so
+  // if it's read-only the whole "create" form is blocked outright. A site
+  // ADMIN instead sees read-only leagues marked (not removed) in the picker
+  // below, since they might still want to pick a different, active league.
+  const myLeagueReadOnly = myLeague != null && isLeagueReadOnly(myLeague);
 
   return (
     <div>
       <h2 className="text-lg font-medium mb-4">Tournaments</h2>
 
+      {myLeagueReadOnly ? (
+        <div className={`${card} mb-6 px-4 py-3 text-sm text-black/60 dark:text-white/60`}>
+          New tournament — this league is read-only.
+        </div>
+      ) : (
       <details className={`${card} mb-6`}>
         <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
           New tournament
@@ -83,8 +97,9 @@ export async function TournamentsPanel({ selectedLeagueId }: { selectedLeagueId?
               <select name="leagueId" defaultValue={leagueId ?? ""} className={selectClass}>
                 <option value="">— Select a league —</option>
                 {leagues.map((l) => (
-                  <option key={l.id} value={l.id}>
+                  <option key={l.id} value={l.id} disabled={isLeagueReadOnly(l)}>
                     {l.name}
+                    {isLeagueReadOnly(l) ? " (read-only)" : ""}
                   </option>
                 ))}
               </select>
@@ -115,6 +130,7 @@ export async function TournamentsPanel({ selectedLeagueId }: { selectedLeagueId?
           </button>
         </ActionResultForm>
       </details>
+      )}
 
       {tournaments.length === 0 ? (
         <p className="text-black/60 dark:text-white/60">No tournaments yet.</p>

@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@/app/generated/prisma/client";
 
 let counter = 0;
 /** A short, collision-free suffix per fixture object within a single test
@@ -10,8 +11,12 @@ function unique(prefix: string): string {
   return `${prefix}-${Date.now()}-${counter}`;
 }
 
-export async function createFixtureLeague() {
-  return prisma.league.create({ data: { name: unique("League"), type: "Cricket" } });
+export async function createFixtureLeague(
+  overrides: Partial<Prisma.LeagueCreateInput> = {}
+) {
+  return prisma.league.create({
+    data: { name: unique("League"), type: "Cricket", ...overrides },
+  });
 }
 
 export async function createFixtureAdmin() {

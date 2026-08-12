@@ -25,7 +25,7 @@ export function UploadRosterForm({
 }: {
   /** Non-null only for a site ADMIN (unrestricted) — shows a league picker.
    * A League Admin's roster is always scoped to their own league server-side. */
-  leagues?: { id: string; name: string }[] | null;
+  leagues?: { id: string; name: string; readOnly: boolean }[] | null;
 }) {
   const router = useRouter();
   const [rosterName, setRosterName] = useState("");
@@ -105,8 +105,9 @@ export function UploadRosterForm({
             >
               {leagues.length === 0 && <option value="">— No leagues yet —</option>}
               {leagues.map((l) => (
-                <option key={l.id} value={l.id}>
+                <option key={l.id} value={l.id} disabled={l.readOnly}>
                   {l.name}
+                  {l.readOnly ? " (read-only)" : ""}
                 </option>
               ))}
             </select>

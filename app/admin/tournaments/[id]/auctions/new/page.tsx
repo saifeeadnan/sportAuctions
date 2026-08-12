@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
+import { isLeagueReadOnly } from "@/lib/services/league.service";
 import { NewAuctionForm } from "@/components/admin/NewAuctionForm";
 
 export default async function NewAuctionPage({
@@ -17,6 +18,21 @@ export default async function NewAuctionPage({
   });
   if (!tournament) notFound();
   assertInScope(leagueId, tournament.leagueId);
+
+  const league = await prisma.league.findUniqueOrThrow({
+    where: { id: tournament.leagueId },
+    select: { endDate: true },
+  });
+  if (isLeagueReadOnly(league)) {
+    return (
+      <div>
+        <h1 className="text-xl font-semibold mb-1">New auction</h1>
+        <p className="text-sm text-black/60 dark:text-white/60">
+          This league is read-only — no new auctions can be created.
+        </p>
+      </div>
+    );
+  }
 
   if (!tournament.roster) {
     return (

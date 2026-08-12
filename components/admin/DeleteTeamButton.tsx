@@ -7,11 +7,13 @@ export function DeleteTeamButton({
   teamId,
   teamName,
   entryCount,
+  readOnly = false,
   compact = false,
 }: {
   teamId: string;
   teamName: string;
   entryCount: number;
+  readOnly?: boolean;
   compact?: boolean;
 }) {
   return (
@@ -19,7 +21,11 @@ export function DeleteTeamButton({
       confirmMessage={`Delete team "${teamName}"? This cannot be undone.`}
       action={() => deleteTeamAction(teamId)}
       disabledReason={
-        entryCount > 0 ? `Used in ${entryCount} auction(s) — remove those first` : undefined
+        entryCount > 0
+          ? `Used in ${entryCount} auction(s) — remove those first`
+          : readOnly
+            ? "This league is read-only"
+            : undefined
       }
       label={compact ? "×" : "Delete"}
       loadingLabel={compact ? "…" : "Deleting…"}

@@ -1,6 +1,7 @@
 import Papa from "papaparse";
 import { prisma } from "@/lib/prisma";
 import { ValidationError } from "@/lib/errors";
+import { assertLeagueNotReadOnly } from "@/lib/services/league.service";
 import type { Player } from "@/app/generated/prisma/client";
 
 export type ParsedPlayerRow = {
@@ -143,6 +144,10 @@ export async function createRosterFromUpload(
     throw new ValidationError("No valid player rows to import");
   }
 
+  const league = await prisma.league.findUnique({ where: { id: leagueId } });
+  if (!league) throw new ValidationError("League not found");
+  assertLeagueNotReadOnly(league);
+
   return prisma.$transaction(async (tx) => {
     const roster = await tx.playerRoster.create({
       data: { name: name.trim(), createdById, leagueId },
@@ -187,10 +192,14 @@ export async function createPlayer(rosterId: string, input: PlayerInput) {
   if (!input.name.trim()) {
     throw new ValidationError("Player name is required");
   }
-  const roster = await prisma.playerRoster.findUnique({ where: { id: rosterId } });
+  const roster = await prisma.playerRoster.findUnique({
+    where: { id: rosterId },
+    include: { league: true },
+  });
   if (!roster) {
     throw new ValidationError("Roster not found");
   }
+  assertLeagueNotReadOnly(roster.league);
 
   return prisma.player.create({
     data: { ...input, rosterId, name: input.name.trim() },

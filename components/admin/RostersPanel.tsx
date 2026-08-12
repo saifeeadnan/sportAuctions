@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { resolveAdminScope } from "@/lib/auth/scope";
-import { listLeagues } from "@/lib/services/league.service";
+import { listLeagues, isLeagueReadOnly } from "@/lib/services/league.service";
 import { DeleteRosterButton } from "@/components/admin/DeleteRosterButton";
 import { UploadRosterForm } from "@/components/roster/UploadRosterForm";
 import { card, cardInteractive } from "@/lib/ui";
@@ -9,25 +9,38 @@ import { card, cardInteractive } from "@/lib/ui";
 export async function RostersPanel({ selectedLeagueId }: { selectedLeagueId?: string }) {
   const { leagueId } = await resolveAdminScope(selectedLeagueId);
 
-  const [rosters, leagues] = await Promise.all([
+  const [rosters, leagues, myLeague] = await Promise.all([
     prisma.playerRoster.findMany({
       where: leagueId ? { leagueId } : {},
       orderBy: { createdAt: "desc" },
       include: { _count: { select: { players: true, tournaments: true } } },
     }),
     leagueId ? Promise.resolve(null) : listLeagues(),
+    leagueId ? prisma.league.findUnique({ where: { id: leagueId }, select: { endDate: true } }) : Promise.resolve(null),
   ]);
+
+  // A League Admin has no league picker (always their own fixed league), so
+  // if it's read-only the whole "upload" section is blocked outright.
+  const myLeagueReadOnly = myLeague != null && isLeagueReadOnly(myLeague);
 
   return (
     <div>
       <h2 className="text-lg font-medium mb-4">Player rosters</h2>
 
-      <details className={`${card} mb-6`}>
-        <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
-          Upload roster
-        </summary>
-        <UploadRosterForm leagues={leagues} />
-      </details>
+      {myLeagueReadOnly ? (
+        <div className={`${card} mb-6 px-4 py-3 text-sm text-black/60 dark:text-white/60`}>
+          Upload roster — this league is read-only.
+        </div>
+      ) : (
+        <details className={`${card} mb-6`}>
+          <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
+            Upload roster
+          </summary>
+          <UploadRosterForm
+            leagues={leagues?.map((l) => ({ id: l.id, name: l.name, readOnly: isLeagueReadOnly(l) }))}
+          />
+        </details>
+      )}
 
       {rosters.length === 0 ? (
         <p className="text-black/60 dark:text-white/60">No rosters yet.</p>

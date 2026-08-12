@@ -9,6 +9,7 @@ import { requireSession, requireAdminOrLeagueAdmin, AuthError, type Role } from 
 import { ValidationError } from "@/lib/errors";
 import { toActionResult, type ActionResult } from "@/lib/actions/result";
 import { deleteUser, setUserActive } from "@/lib/services/user.service";
+import { assertLeagueNotReadOnly } from "@/lib/services/league.service";
 
 export async function logoutAction() {
   await signOut({ redirectTo: "/login" });
@@ -50,6 +51,12 @@ export async function registerUserAction(
 
     if (role !== "ADMIN" && !targetLeagueId) {
       throw new ValidationError("A league must be selected for this user");
+    }
+
+    if (targetLeagueId) {
+      const league = await prisma.league.findUnique({ where: { id: targetLeagueId } });
+      if (!league) throw new ValidationError("League not found");
+      assertLeagueNotReadOnly(league);
     }
 
     const passwordHash = await bcrypt.hash(password, 10);

@@ -93,10 +93,19 @@ model User {
 }
 
 model League {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  type      String
-  createdAt DateTime @default(now())
+  id                       String    @id @default(cuid())
+  name                     String    @unique
+  type                     String
+  // Informational only — doesn't gate anything. Only endDate drives
+  // read-only mode (see isLeagueReadOnly in league.service.ts).
+  startDate                DateTime?
+  endDate                  DateTime?
+  // Nullable = unlimited/no cap configured. These become plan limits once
+  // pricing tiers exist; every existing league has none of this data today.
+  maxTournaments           Int?
+  maxTeamsPerTournament    Int?
+  maxSponsorsPerTournament Int?
+  createdAt                DateTime  @default(now())
 
   users       User[]
   rosters     PlayerRoster[]

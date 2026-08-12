@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { ValidationError } from "@/lib/errors";
+import { assertLeagueNotReadOnly } from "@/lib/services/league.service";
 
 export async function deleteUser(userId: string, requestingUserId: string) {
   if (userId === requestingUserId) {
@@ -9,6 +10,7 @@ export async function deleteUser(userId: string, requestingUserId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
     include: {
+      league: true,
       _count: {
         select: {
           createdRosters: true,
@@ -20,6 +22,7 @@ export async function deleteUser(userId: string, requestingUserId: string) {
     },
   });
   if (!user) throw new ValidationError("User not found");
+  if (user.league) assertLeagueNotReadOnly(user.league);
 
   const blockers: string[] = [];
   if (user._count.createdRosters > 0) blockers.push(`${user._count.createdRosters} roster(s)`);

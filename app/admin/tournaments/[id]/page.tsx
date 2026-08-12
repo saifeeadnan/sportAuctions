@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
+import { isLeagueReadOnly } from "@/lib/services/league.service";
 import { getRulesDocumentMeta } from "@/lib/services/tournamentDocument.service";
 import { listTournamentSponsors, listKnownSponsors } from "@/lib/services/tournamentSponsor.service";
 import { DeleteAuctionButton } from "@/components/admin/DeleteAuctionButton";
@@ -52,7 +53,7 @@ export default async function TournamentDetailPage({
 
   // Filtered by the tournament's own league (not the caller's) — a site ADMIN
   // editing one specific tournament should only see that league's managers.
-  const [managers, auctions, rulesDocument, sponsors, knownSponsors, leagueRosters] = await Promise.all([
+  const [managers, auctions, rulesDocument, sponsors, knownSponsors, leagueRosters, league] = await Promise.all([
     prisma.user.findMany({
       where: { role: "TEAM_MANAGER", leagueId: tournament.leagueId },
       orderBy: { name: "asc" },
@@ -67,9 +68,11 @@ export default async function TournamentDetailPage({
           where: { leagueId: tournament.leagueId },
           orderBy: { name: "asc" },
         }),
+    prisma.league.findUniqueOrThrow({ where: { id: tournament.leagueId }, select: { endDate: true } }),
   ]);
 
   const canAddTeam = tournament.teams.length < tournament.numTeams;
+  const readOnly = isLeagueReadOnly(league);
 
   return (
     <div className="flex flex-col gap-6">
@@ -112,7 +115,11 @@ export default async function TournamentDetailPage({
             </div>
           </details>
 
-          {canAddTeam ? (
+          {readOnly ? (
+            <div className={`${card} px-4 py-3 text-sm text-black/40 dark:text-white/40`}>
+              Add team — league is read-only
+            </div>
+          ) : canAddTeam ? (
             <details className={card}>
               <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
                 Add team
@@ -125,12 +132,18 @@ export default async function TournamentDetailPage({
             </div>
           )}
 
-          <details className={card}>
-            <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
-              Add sponsor
-            </summary>
-            <AddTournamentSponsorForm tournamentId={tournament.id} knownSponsors={knownSponsors} />
-          </details>
+          {readOnly ? (
+            <div className={`${card} px-4 py-3 text-sm text-black/40 dark:text-white/40`}>
+              Add sponsor — league is read-only
+            </div>
+          ) : (
+            <details className={card}>
+              <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
+                Add sponsor
+              </summary>
+              <AddTournamentSponsorForm tournamentId={tournament.id} knownSponsors={knownSponsors} />
+            </details>
+          )}
 
           {!tournament.rosterId && (
             <details className={card}>
@@ -141,7 +154,11 @@ export default async function TournamentDetailPage({
             </details>
           )}
 
-          {tournament.rosterId ? (
+          {readOnly ? (
+            <div className={`${card} flex items-center px-4 py-3 text-sm text-black/40 dark:text-white/40`}>
+              New auction — league is read-only
+            </div>
+          ) : tournament.rosterId ? (
             <Link
               href={`/admin/tournaments/${tournament.id}/auctions/new`}
               className={`${card} flex items-center px-4 py-3 text-sm font-medium hover:border-black/15 dark:hover:border-white/20 transition-colors`}
@@ -210,6 +227,7 @@ export default async function TournamentDetailPage({
                     teamId={team.id}
                     teamName={team.name}
                     entryCount={team._count.entries}
+                    readOnly={readOnly}
                     compact
                   />
                 </div>

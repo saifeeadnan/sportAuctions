@@ -15,6 +15,9 @@ export default async function TeamRosterPage({
 }) {
   const { id, entryId } = await params;
   const { leagueId } = await requireAdminOrLeagueAdmin();
+  // Enabling analytics is a site-Admin-only capability — leagueId is null
+  // only for a site ADMIN (see scopeLeagueId in lib/auth/guards.ts).
+  const isSiteAdmin = leagueId === null;
 
   const entry = await prisma.teamAuctionEntry.findUnique({
     where: { id: entryId },
@@ -54,22 +57,24 @@ export default async function TeamRosterPage({
         </p>
       </div>
 
-      <section className="flex items-center justify-between gap-3">
-        <div>
-          <h2 className="text-sm font-medium">Auction analytics dashboard</h2>
-          <p className="text-sm text-black/60 dark:text-white/60">
-            {entry.analyticsEnabled
-              ? "Enabled — this team's manager can set a bidding strategy and see live guidance."
-              : "Not enabled for this team."}
-          </p>
-        </div>
-        <ToggleAnalyticsEnabledButton
-          auctionId={id}
-          teamAuctionEntryId={entryId}
-          teamName={entry.team.name}
-          isEnabled={entry.analyticsEnabled}
-        />
-      </section>
+      {isSiteAdmin && (
+        <section className="flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-medium">Auction analytics dashboard</h2>
+            <p className="text-sm text-black/60 dark:text-white/60">
+              {entry.analyticsEnabled
+                ? "Enabled — this team's manager can set a bidding strategy and see live guidance."
+                : "Not enabled for this team."}
+            </p>
+          </div>
+          <ToggleAnalyticsEnabledButton
+            auctionId={id}
+            teamAuctionEntryId={entryId}
+            teamName={entry.team.name}
+            isEnabled={entry.analyticsEnabled}
+          />
+        </section>
+      )}
 
       <section>
         <h2 className="text-lg font-medium mb-3">Confirmed roster ({confirmedPlayers.length})</h2>

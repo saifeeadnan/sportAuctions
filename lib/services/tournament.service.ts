@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { ValidationError } from "@/lib/errors";
+import { assertLeagueNotReadOnly } from "@/lib/services/league.service";
 
 export type CreateTournamentInput = {
   name: string;
@@ -24,18 +25,35 @@ export async function createTournament(input: CreateTournamentInput) {
     throw new ValidationError("End date cannot be before start date");
   }
 
-  let leagueId: string;
+  let league;
   if (input.rosterId) {
     const roster = await prisma.playerRoster.findUnique({ where: { id: input.rosterId } });
     if (!roster) throw new ValidationError("Roster not found");
     // A tournament always inherits its league from its roster, so it can
     // never disagree with the roster it's built on.
-    leagueId = roster.leagueId;
+    league = await prisma.league.findUnique({ where: { id: roster.leagueId } });
+    if (!league) throw new ValidationError("League not found");
   } else {
     if (!input.leagueId) throw new ValidationError("Select a league or a roster");
-    const league = await prisma.league.findUnique({ where: { id: input.leagueId } });
+    league = await prisma.league.findUnique({ where: { id: input.leagueId } });
     if (!league) throw new ValidationError("League not found");
-    leagueId = league.id;
+  }
+  const leagueId = league.id;
+
+  assertLeagueNotReadOnly(league);
+
+  if (league.maxTournaments != null) {
+    const count = await prisma.tournament.count({ where: { leagueId } });
+    if (count >= league.maxTournaments) {
+      throw new ValidationError(
+        `"${league.name}" already has the maximum of ${league.maxTournaments} tournament(s)`
+      );
+    }
+  }
+  if (league.maxTeamsPerTournament != null && input.numTeams > league.maxTeamsPerTournament) {
+    throw new ValidationError(
+      `"${league.name}" allows at most ${league.maxTeamsPerTournament} team(s) per tournament`
+    );
   }
 
   return prisma.tournament.create({
@@ -104,9 +122,10 @@ export async function createTeam(input: CreateTeamInput) {
 
   const tournament = await prisma.tournament.findUnique({
     where: { id: input.tournamentId },
-    include: { _count: { select: { teams: true } } },
+    include: { _count: { select: { teams: true } }, league: true },
   });
   if (!tournament) throw new ValidationError("Tournament not found");
+  assertLeagueNotReadOnly(tournament.league);
 
   if (tournament._count.teams >= tournament.numTeams) {
     throw new ValidationError(
@@ -142,9 +161,10 @@ export async function createTeam(input: CreateTeamInput) {
 export async function deleteTeam(teamId: string) {
   const team = await prisma.team.findUnique({
     where: { id: teamId },
-    include: { _count: { select: { entries: true } } },
+    include: { _count: { select: { entries: true } }, tournament: { include: { league: true } } },
   });
   if (!team) throw new ValidationError("Team not found");
+  assertLeagueNotReadOnly(team.tournament.league);
 
   if (team._count.entries > 0) {
     throw new ValidationError(

@@ -7,9 +7,12 @@ import {
   InvalidStateTransitionError,
 } from "@/lib/errors";
 import { computeReserveUnit } from "@/lib/services/budget.service";
+import { assertAuctionLeagueNotReadOnly } from "@/lib/services/league.service";
 import { emitAuctionEvent } from "@/server/ws/broadcaster";
 
 export async function selectNextPlayer(auctionId: string, auctionPlayerId: string) {
+  await assertAuctionLeagueNotReadOnly(auctionId);
+
   const auction = await prisma.auction.findUnique({ where: { id: auctionId } });
   if (!auction) throw new ValidationError("Auction not found");
   if (auction.status !== "BIDDING") {
@@ -76,6 +79,7 @@ async function allocatePlayerToTeam(
     force?: boolean;
   } = {}
 ) {
+  await assertAuctionLeagueNotReadOnly(auctionId);
   if (price <= 0) throw new ValidationError("Price must be greater than 0");
 
   const [auctionPlayer, entry, categories] = await Promise.all([
@@ -241,6 +245,8 @@ export async function placeBid(
   teamAuctionEntryId: string,
   amount: number
 ) {
+  await assertAuctionLeagueNotReadOnly(auctionId);
+
   const [auctionPlayer, entry] = await Promise.all([
     prisma.auctionPlayer.findUnique({
       where: { id: auctionPlayerId },
@@ -338,6 +344,8 @@ export async function placeBid(
 }
 
 export async function markUnsold(auctionId: string, auctionPlayerId: string) {
+  await assertAuctionLeagueNotReadOnly(auctionId);
+
   const auctionPlayer = await prisma.auctionPlayer.findUnique({
     where: { id: auctionPlayerId },
     include: { player: true },
@@ -371,6 +379,8 @@ export async function markUnsold(auctionId: string, auctionPlayerId: string) {
  * AVAILABLE and refunding the team's budget and slot.
  */
 export async function removePlayerFromTeam(auctionId: string, auctionPlayerId: string) {
+  await assertAuctionLeagueNotReadOnly(auctionId);
+
   const auction = await prisma.auction.findUnique({ where: { id: auctionId } });
   if (!auction) throw new ValidationError("Auction not found");
   if (auction.status === "CREATED") {
@@ -430,6 +440,8 @@ export async function removePlayerFromTeam(auctionId: string, auctionPlayerId: s
 }
 
 export async function concludeAuction(auctionId: string) {
+  await assertAuctionLeagueNotReadOnly(auctionId);
+
   const auction = await prisma.auction.findUnique({ where: { id: auctionId } });
   if (!auction) throw new ValidationError("Auction not found");
   if (auction.status !== "BIDDING") {

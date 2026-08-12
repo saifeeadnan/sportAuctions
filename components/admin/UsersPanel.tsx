@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { requireAdminOrLeagueAdmin } from "@/lib/auth/guards";
-import { listLeagues } from "@/lib/services/league.service";
+import { listLeagues, isLeagueReadOnly } from "@/lib/services/league.service";
 import { registerUserAction } from "@/lib/actions/auth.actions";
 import { ActionResultForm } from "@/components/ui/ActionResultForm";
 import { DeleteUserButton } from "@/components/admin/DeleteUserButton";
@@ -48,13 +48,24 @@ export async function UsersPanel({
   const creatableRoles: RoleTab[] =
     realLeagueId === null ? [...ROLES] : ROLES.filter((r) => r !== "ADMIN" && r !== "LEAGUE_ADMIN");
 
-  const [allUsers, leagues] = await Promise.all([
+  const [allUsers, leagues, myLeague] = await Promise.all([
     prisma.user.findMany({
       where: displayLeagueId ? { leagueId: displayLeagueId } : {},
       orderBy: { createdAt: "desc" },
+      include: { league: { select: { endDate: true } } },
     }),
     realLeagueId === null ? listLeagues() : Promise.resolve(null),
+    realLeagueId !== null
+      ? prisma.league.findUnique({ where: { id: realLeagueId }, select: { endDate: true } })
+      : Promise.resolve(null),
   ]);
+
+  // A League Admin has no league picker (always their own fixed league), so
+  // if it's read-only the whole "create" form is blocked outright. A site
+  // ADMIN instead sees read-only leagues marked (not removed) in the picker
+  // below, since an ADMIN account needs no league at all and other roles
+  // might still go to a different, active league.
+  const myLeagueReadOnly = myLeague != null && isLeagueReadOnly(myLeague);
 
   const counts = Object.fromEntries(
     ROLES.map((r) => [r, allUsers.filter((u) => u.role === r).length])
@@ -66,6 +77,11 @@ export async function UsersPanel({
     <div>
       <h2 className="text-lg font-medium mb-4">Users</h2>
 
+      {myLeagueReadOnly ? (
+        <div className={`${card} mb-6 px-4 py-3 text-sm text-black/60 dark:text-white/60`}>
+          Create user — this league is read-only.
+        </div>
+      ) : (
       <details className={`${card} mb-6`}>
         <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
           Create user
@@ -106,8 +122,9 @@ export async function UsersPanel({
               >
                 {leagues.length === 0 && <option value="">— No leagues yet —</option>}
                 {leagues.map((l) => (
-                  <option key={l.id} value={l.id}>
+                  <option key={l.id} value={l.id} disabled={isLeagueReadOnly(l)}>
                     {l.name}
+                    {isLeagueReadOnly(l) ? " (read-only)" : ""}
                   </option>
                 ))}
               </select>
@@ -122,6 +139,7 @@ export async function UsersPanel({
           </button>
         </ActionResultForm>
       </details>
+      )}
 
       <div className={`${tabsTrack} mb-4`}>
         {visibleRoleTabs.map((r) => (
@@ -168,6 +186,7 @@ export async function UsersPanel({
                         userId={user.id}
                         userName={user.name}
                         isSelf={user.id === session.user.id}
+                        readOnly={user.league != null && isLeagueReadOnly(user.league)}
                       />
                     </div>
                   </td>

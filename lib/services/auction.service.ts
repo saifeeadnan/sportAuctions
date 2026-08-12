@@ -7,6 +7,7 @@ import {
   SquadCapExceededError,
 } from "@/lib/errors";
 import { computeManagerSlotPrice } from "@/lib/services/budget.service";
+import { assertLeagueNotReadOnly, assertAuctionLeagueNotReadOnly } from "@/lib/services/league.service";
 import { resolveOverlaps } from "@/lib/services/overlapResolution.service";
 import { findManagerSelfAuctionPlayerId } from "@/lib/services/preAuctionDraft.service";
 import { getAuctionState } from "@/lib/services/auctionState.service";
@@ -62,8 +63,12 @@ export async function createAuction(input: CreateAuctionInput) {
     }
   }
 
-  const tournament = await prisma.tournament.findUnique({ where: { id: input.tournamentId } });
+  const tournament = await prisma.tournament.findUnique({
+    where: { id: input.tournamentId },
+    include: { league: true },
+  });
   if (!tournament) throw new ValidationError("Tournament not found");
+  assertLeagueNotReadOnly(tournament.league);
   if (!tournament.rosterId) {
     throw new ValidationError("Attach a player roster to this tournament before creating an auction");
   }
@@ -127,6 +132,8 @@ export async function createAuction(input: CreateAuctionInput) {
  * itself creates.
  */
 export async function addPlayerToAuction(auctionId: string, playerId: string, categoryId: string) {
+  await assertAuctionLeagueNotReadOnly(auctionId);
+
   const auction = await prisma.auction.findUnique({
     where: { id: auctionId },
     include: { tournament: true },
@@ -172,6 +179,8 @@ export async function updateAuctionPlayerCategory(
   auctionPlayerId: string,
   categoryId: string
 ) {
+  await assertAuctionLeagueNotReadOnly(auctionId);
+
   const auctionPlayer = await prisma.auctionPlayer.findUnique({ where: { id: auctionPlayerId } });
   if (!auctionPlayer || auctionPlayer.auctionId !== auctionId) {
     throw new ValidationError("Player not found in this auction");
@@ -203,6 +212,7 @@ export async function updateCategoryBidIncrement(categoryId: string, bidIncremen
     include: { auction: true },
   });
   if (!category) throw new ValidationError("Category not found");
+  await assertAuctionLeagueNotReadOnly(category.auctionId);
 
   // Only blocked while a player is actually on the clock — a bid increment
   // is read fresh at the moment each bid is placed, not baked into any
@@ -341,6 +351,8 @@ export async function startBidding(auctionId: string) {
  * admin-assigned players are untouched — those happened before bidding started.
  */
 export async function resetAuctionToPreBidding(auctionId: string) {
+  await assertAuctionLeagueNotReadOnly(auctionId);
+
   const auction = await prisma.auction.findUnique({ where: { id: auctionId } });
   if (!auction) throw new ValidationError("Auction not found");
   if (auction.status !== "BIDDING") {
@@ -458,6 +470,8 @@ export async function updateAuctionTeamSettings(
   auctionId: string,
   input: { newTeamBudget?: number; newSquadSize?: number }
 ) {
+  await assertAuctionLeagueNotReadOnly(auctionId);
+
   if (input.newTeamBudget == null && input.newSquadSize == null) {
     throw new ValidationError("Provide a new team budget and/or a new squad size");
   }

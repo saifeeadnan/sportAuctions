@@ -1,8 +1,32 @@
 import { prisma } from "@/lib/prisma";
 import { ValidationError } from "@/lib/errors";
+import { assertLeagueNotReadOnly } from "@/lib/services/league.service";
 
 const MAX_SIZE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/jpg", "image/png"]);
+
+/** Shared by addTournamentSponsor and addExistingTournamentSponsor — loads
+ * the tournament with its league, checks read-only, and enforces the
+ * per-tournament sponsor cap (not league-wide — each TournamentSponsor row
+ * belongs to exactly one tournament). */
+async function loadTournamentForSponsorCreate(tournamentId: string) {
+  const tournament = await prisma.tournament.findUnique({
+    where: { id: tournamentId },
+    include: { league: true },
+  });
+  if (!tournament) throw new ValidationError("Tournament not found");
+  assertLeagueNotReadOnly(tournament.league);
+
+  if (tournament.league.maxSponsorsPerTournament != null) {
+    const count = await prisma.tournamentSponsor.count({ where: { tournamentId } });
+    if (count >= tournament.league.maxSponsorsPerTournament) {
+      throw new ValidationError(
+        `This tournament already has the maximum of ${tournament.league.maxSponsorsPerTournament} sponsor(s)`
+      );
+    }
+  }
+  return tournament;
+}
 
 export type SponsorLogoFile = { type: string; data: Buffer };
 
@@ -31,8 +55,7 @@ export async function addTournamentSponsor(input: AddTournamentSponsorInput) {
     throw new ValidationError("Only JPG or PNG images are allowed for the sponsor logo");
   }
 
-  const tournament = await prisma.tournament.findUnique({ where: { id: input.tournamentId } });
-  if (!tournament) throw new ValidationError("Tournament not found");
+  await loadTournamentForSponsorCreate(input.tournamentId);
 
   return prisma.tournamentSponsor.create({
     data: {
@@ -104,8 +127,7 @@ export async function listKnownSponsors(
 }
 
 export async function addExistingTournamentSponsor(tournamentId: string, sourceSponsorId: string) {
-  const tournament = await prisma.tournament.findUnique({ where: { id: tournamentId } });
-  if (!tournament) throw new ValidationError("Tournament not found");
+  await loadTournamentForSponsorCreate(tournamentId);
 
   const source = await prisma.tournamentSponsor.findUnique({ where: { id: sourceSponsorId } });
   if (!source) throw new ValidationError("Sponsor not found");

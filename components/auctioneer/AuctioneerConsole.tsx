@@ -31,7 +31,13 @@ function shortName(fullName: string): string {
   return `${first} ${lastInitial}.`;
 }
 
-export function AuctioneerConsole({ initialState }: { initialState: AuctionState }) {
+export function AuctioneerConsole({
+  initialState,
+  readOnly = false,
+}: {
+  initialState: AuctionState;
+  readOnly?: boolean;
+}) {
   const router = useRouter();
   const { state, connected, lastSale } = useAuctionSocket(initialState.id, initialState);
   const [selectedTeamId, setSelectedTeamId] = useState("");
@@ -309,10 +315,18 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
           >
             Refresh
           </button>
-          <button onClick={handleConclude} disabled={loading} className={`${buttonDanger} px-3 py-1.5 text-xs`}>
+          <button
+            onClick={handleConclude}
+            disabled={loading || readOnly}
+            className={`${buttonDanger} px-3 py-1.5 text-xs`}
+          >
             Conclude auction
           </button>
-          <button onClick={handleReset} disabled={loading} className={`${buttonSecondary} px-3 py-1.5 text-xs`}>
+          <button
+            onClick={handleReset}
+            disabled={loading || readOnly}
+            className={`${buttonSecondary} px-3 py-1.5 text-xs`}
+          >
             Reset auction
           </button>
         </div>
@@ -327,7 +341,7 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
             <button
               type="button"
               onClick={handleRandomPick}
-              disabled={!!onClock || queue.length === 0}
+              disabled={!!onClock || queue.length === 0 || readOnly}
               className={`${buttonSecondary} px-3 py-1.5 text-xs`}
             >
               Random pick
@@ -368,7 +382,7 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
                   </span>
                   <button
                     onClick={() => handleSelect(p.id)}
-                    disabled={!!onClock}
+                    disabled={!!onClock || readOnly}
                     className={`${buttonSecondary} px-2 py-0.5 text-xs shrink-0`}
                   >
                     Put on clock
@@ -401,7 +415,7 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
                 {onClock.currentBid && onClock.currentBidderEntryId && (
                   <button
                     onClick={handleRecordSaleToLeader}
-                    disabled={loading}
+                    disabled={loading || readOnly}
                     className={buttonPrimary}
                   >
                     {loading
@@ -461,14 +475,14 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
                     <div className="flex gap-2">
                       <button
                         onClick={handlePlaceBid}
-                        disabled={loading || !selectedTeamId || !price}
+                        disabled={loading || !selectedTeamId || !price || readOnly}
                         className={buttonSecondary}
                       >
                         Place bid
                       </button>
                       <button
                         onClick={handleRecordSale}
-                        disabled={loading || !selectedTeamId || !price}
+                        disabled={loading || !selectedTeamId || !price || readOnly}
                         className={buttonPrimary}
                       >
                         Record sale
@@ -477,7 +491,11 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
                   </div>
                 </details>
 
-                <button onClick={handleUnsold} disabled={loading} className={`${buttonSecondary} self-center`}>
+                <button
+                  onClick={handleUnsold}
+                  disabled={loading || readOnly}
+                  className={`${buttonSecondary} self-center`}
+                >
                   Mark unsold
                 </button>
               </div>
@@ -531,7 +549,7 @@ export function AuctioneerConsole({ initialState }: { initialState: AuctionState
                             </span>
                             <button
                               onClick={() => handleRemove(p.id, p.name, p.soldToTeamName)}
-                              disabled={loading}
+                              disabled={loading || readOnly}
                               aria-label={`Remove ${p.name} and return to pool`}
                               title="Remove from team and return to pool"
                               className={`${buttonDanger} p-1 shrink-0`}
