@@ -77,17 +77,26 @@ export function SponsorRibbon({ sponsors }: { sponsors: Sponsor[] }) {
         {orderedSponsors.map((sponsor, i) => {
           const isFeatured = i === featured;
           const logo = (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={`/api/tournament-sponsors/${sponsor.id}`}
-              alt={sponsor.name}
-              title={sponsor.name}
-              className={`h-28 w-28 rounded object-contain bg-white dark:bg-white/10 border p-2 transition-all duration-700 ${
-                isFeatured
-                  ? "border-indigo-400 dark:border-indigo-500 shadow-[0_0_0_4px_rgba(99,102,241,0.25)] scale-[1.08]"
-                  : "border-black/10 dark:border-white/10"
-              }`}
-            />
+            <div className="group flex flex-col items-center gap-1">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={`/api/tournament-sponsors/${sponsor.id}`}
+                alt={sponsor.name}
+                title={sponsor.name}
+                className={`h-28 w-28 rounded object-contain bg-white dark:bg-white/10 border p-2 transition-all duration-700 ${
+                  isFeatured
+                    ? "border-indigo-400 dark:border-indigo-500 shadow-[0_0_0_4px_rgba(99,102,241,0.25)] scale-[1.08]"
+                    : "border-black/10 dark:border-white/10"
+                }`}
+              />
+              <span
+                className={`text-xs text-center max-w-28 truncate transition-opacity duration-300 ${
+                  isFeatured ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                }`}
+              >
+                {sponsor.name}
+              </span>
+            </div>
           );
           return sponsor.websiteUrl ? (
             <SponsorLink
