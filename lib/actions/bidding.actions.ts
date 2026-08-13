@@ -14,6 +14,9 @@ import {
   adminAssignPlayer,
   removePlayerFromTeam,
   placeBid,
+  removePlayerPostAuction,
+  addPlayerPostAuction,
+  replacePlayerPostAuction,
 } from "@/lib/services/bidding.service";
 
 export async function selectNextPlayerAction(
@@ -132,5 +135,61 @@ export async function adminAssignPlayerAction(
     await adminAssignPlayer(auctionId, auctionPlayerId, teamAuctionEntryId, price);
     revalidatePath(`/admin/auctions/${auctionId}`);
     revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
+  });
+}
+
+// Post-auction roster fixes (e.g. an injury replacement) — Admin/League Admin
+// only, never Auctioneer, and only once the auction is COMPLETED (enforced
+// service-side by assertAuctionCompleted).
+export async function removePlayerPostAuctionAction(
+  auctionId: string,
+  auctionPlayerId: string,
+  teamAuctionEntryId: string
+): Promise<ActionResult> {
+  return toActionResult(async () => {
+    const { leagueId } = await requireAdminOrLeagueAdmin();
+    await loadScopedAuction(auctionId, leagueId);
+    await removePlayerPostAuction(auctionId, auctionPlayerId);
+    revalidatePath(`/admin/auctions/${auctionId}`);
+    revalidatePath(`/admin/auctions/${auctionId}/teams/${teamAuctionEntryId}`);
+  });
+}
+
+export async function addPlayerPostAuctionAction(
+  auctionId: string,
+  teamAuctionEntryId: string,
+  playerId: string,
+  categoryId: string,
+  price: number
+): Promise<ActionResult> {
+  return toActionResult(async () => {
+    const { leagueId } = await requireAdminOrLeagueAdmin();
+    await loadScopedAuction(auctionId, leagueId);
+    await addPlayerPostAuction(auctionId, teamAuctionEntryId, playerId, categoryId, price);
+    revalidatePath(`/admin/auctions/${auctionId}`);
+    revalidatePath(`/admin/auctions/${auctionId}/teams/${teamAuctionEntryId}`);
+  });
+}
+
+export async function replacePlayerPostAuctionAction(
+  auctionId: string,
+  outgoingAuctionPlayerId: string,
+  incomingPlayerId: string,
+  incomingCategoryId: string,
+  price: number,
+  teamAuctionEntryId: string
+): Promise<ActionResult> {
+  return toActionResult(async () => {
+    const { leagueId } = await requireAdminOrLeagueAdmin();
+    await loadScopedAuction(auctionId, leagueId);
+    await replacePlayerPostAuction(
+      auctionId,
+      outgoingAuctionPlayerId,
+      incomingPlayerId,
+      incomingCategoryId,
+      price
+    );
+    revalidatePath(`/admin/auctions/${auctionId}`);
+    revalidatePath(`/admin/auctions/${auctionId}/teams/${teamAuctionEntryId}`);
   });
 }

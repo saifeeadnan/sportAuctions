@@ -439,6 +439,278 @@ export async function removePlayerFromTeam(auctionId: string, auctionPlayerId: s
   return { player: updatedPlayer, entry: updatedEntry };
 }
 
+function assertAuctionCompleted(auction: { status: $Enums.AuctionStatus }) {
+  if (auction.status !== "COMPLETED") {
+    throw new InvalidStateTransitionError(
+      "Roster changes are only available after the auction has concluded"
+    );
+  }
+}
+
+/**
+ * Finds (or creates) the AuctionPlayer row a post-auction roster edit should
+ * point an incoming player at. The replacement pool is the whole tournament
+ * roster, not just this auction's existing pool — a player who was never
+ * added to this auction at all is a valid replacement, mirroring how
+ * addPlayerToAuction (auction.service.ts) creates a fresh row on the fly
+ * mid-auction. Runs inside the caller's own transaction since it both reads
+ * and writes.
+ */
+async function resolveIncomingAuctionPlayer(
+  tx: Prisma.TransactionClient,
+  auctionId: string,
+  tournamentRosterId: string | null,
+  playerId: string,
+  categoryId: string
+): Promise<{ auctionPlayerId: string }> {
+  const existing = await tx.auctionPlayer.findUnique({
+    where: { auctionId_playerId: { auctionId, playerId } },
+    include: { player: true, soldToEntry: { include: { team: true } } },
+  });
+
+  if (existing) {
+    if (existing.status === "SOLD") {
+      throw new ValidationError(
+        `${existing.player.name} is already on "${existing.soldToEntry?.team.name}"'s roster in this auction`
+      );
+    }
+    // The only other status a leftover player can be in once an auction has
+    // concluded is UNSOLD — reuse the row, letting the admin correct its
+    // category in the same step.
+    await tx.auctionPlayer.update({ where: { id: existing.id }, data: { categoryId } });
+    return { auctionPlayerId: existing.id };
+  }
+
+  const player = await tx.player.findUnique({ where: { id: playerId } });
+  if (!player || player.rosterId !== tournamentRosterId) {
+    throw new ValidationError("Player does not belong to this tournament's roster");
+  }
+  const category = await tx.auctionCategory.findUnique({ where: { id: categoryId } });
+  if (!category || category.auctionId !== auctionId) {
+    throw new ValidationError("Category does not belong to this auction");
+  }
+
+  const created = await tx.auctionPlayer.create({
+    data: { auctionId, playerId, categoryId, status: "UNSOLD" },
+  });
+  return { auctionPlayerId: created.id };
+}
+
+/**
+ * Drops a player from a team after the auction has concluded — e.g. an
+ * injury or suspension with no immediate replacement — refunding the price
+ * and freeing the slot. The player rejoins the pool as UNSOLD (not
+ * AVAILABLE), the same bucket concludeAuction already put every other
+ * leftover player in, so a completed auction's player statuses stay
+ * consistent.
+ */
+export async function removePlayerPostAuction(auctionId: string, auctionPlayerId: string) {
+  await assertAuctionLeagueNotReadOnly(auctionId);
+
+  const auction = await prisma.auction.findUnique({ where: { id: auctionId } });
+  if (!auction) throw new ValidationError("Auction not found");
+  assertAuctionCompleted(auction);
+
+  const auctionPlayer = await prisma.auctionPlayer.findUnique({
+    where: { id: auctionPlayerId },
+    include: { player: true },
+  });
+  if (!auctionPlayer || auctionPlayer.auctionId !== auctionId) {
+    throw new ValidationError("Player not found in this auction");
+  }
+  if (auctionPlayer.status !== "SOLD" || !auctionPlayer.soldToEntryId) {
+    throw new InvalidStateTransitionError(
+      `Player is not currently allocated to a team (status: ${auctionPlayer.status})`
+    );
+  }
+
+  const entry = await prisma.teamAuctionEntry.findUniqueOrThrow({
+    where: { id: auctionPlayer.soldToEntryId },
+  });
+  const refund = auctionPlayer.soldPrice ?? new Prisma.Decimal(0);
+
+  const [updatedPlayer, updatedEntry] = await prisma.$transaction([
+    prisma.auctionPlayer.update({
+      where: { id: auctionPlayerId },
+      data: { status: "UNSOLD", soldVia: null, soldToEntryId: null, soldPrice: null, soldAt: null },
+      include: { player: true },
+    }),
+    prisma.teamAuctionEntry.update({
+      where: { id: entry.id },
+      data: {
+        budgetRemaining: new Prisma.Decimal(entry.budgetRemaining).plus(refund),
+        slotsFilled: { decrement: 1 },
+      },
+      include: { team: true },
+    }),
+  ]);
+
+  return { player: updatedPlayer, entry: updatedEntry };
+}
+
+/**
+ * Adds a player to a team that finished the auction with an open slot —
+ * e.g. it never got fully staffed. Standalone counterpart to
+ * removePlayerPostAuction; replacePlayerPostAuction below combines both.
+ */
+export async function addPlayerPostAuction(
+  auctionId: string,
+  teamAuctionEntryId: string,
+  playerId: string,
+  categoryId: string,
+  price: number
+) {
+  await assertAuctionLeagueNotReadOnly(auctionId);
+  if (price <= 0) throw new ValidationError("Price must be greater than 0");
+
+  const auction = await prisma.auction.findUnique({
+    where: { id: auctionId },
+    include: { tournament: true },
+  });
+  if (!auction) throw new ValidationError("Auction not found");
+  assertAuctionCompleted(auction);
+
+  const entry = await prisma.teamAuctionEntry.findUnique({
+    where: { id: teamAuctionEntryId },
+    include: { team: true },
+  });
+  if (!entry || entry.auctionId !== auctionId) {
+    throw new ValidationError("Team is not part of this auction");
+  }
+  if (entry.slotsFilled >= entry.slotsTotal) {
+    throw new SquadCapExceededError(`Team "${entry.team.name}" has already filled its squad`);
+  }
+  const priceDecimal = new Prisma.Decimal(price);
+  if (priceDecimal.greaterThan(entry.budgetRemaining)) {
+    throw new InsufficientBudgetError(
+      `Team "${entry.team.name}" does not have enough budget remaining for this price`
+    );
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const { auctionPlayerId } = await resolveIncomingAuctionPlayer(
+      tx,
+      auctionId,
+      auction.tournament.rosterId,
+      playerId,
+      categoryId
+    );
+
+    const updatedPlayer = await tx.auctionPlayer.update({
+      where: { id: auctionPlayerId },
+      data: {
+        status: "SOLD",
+        soldVia: "ADMIN_REPLACED",
+        soldToEntryId: teamAuctionEntryId,
+        soldPrice: priceDecimal,
+        soldAt: new Date(),
+      },
+      include: { player: true },
+    });
+    const updatedEntry = await tx.teamAuctionEntry.update({
+      where: { id: teamAuctionEntryId },
+      data: {
+        budgetRemaining: new Prisma.Decimal(entry.budgetRemaining).minus(priceDecimal),
+        slotsFilled: { increment: 1 },
+      },
+      include: { team: true },
+    });
+
+    return { player: updatedPlayer, entry: updatedEntry };
+  });
+}
+
+/**
+ * The injury-replacement flow: swaps one player out for another on the same
+ * team in a single atomic transaction, so a mid-swap failure can never leave
+ * a team short a player. Budget shifts by exactly the price difference;
+ * slotsFilled is unchanged since one player leaves as another arrives.
+ */
+export async function replacePlayerPostAuction(
+  auctionId: string,
+  outgoingAuctionPlayerId: string,
+  incomingPlayerId: string,
+  incomingCategoryId: string,
+  price: number
+) {
+  await assertAuctionLeagueNotReadOnly(auctionId);
+  if (price <= 0) throw new ValidationError("Price must be greater than 0");
+
+  const auction = await prisma.auction.findUnique({
+    where: { id: auctionId },
+    include: { tournament: true },
+  });
+  if (!auction) throw new ValidationError("Auction not found");
+  assertAuctionCompleted(auction);
+
+  const outgoing = await prisma.auctionPlayer.findUnique({
+    where: { id: outgoingAuctionPlayerId },
+    include: { player: true },
+  });
+  if (!outgoing || outgoing.auctionId !== auctionId) {
+    throw new ValidationError("Player not found in this auction");
+  }
+  if (outgoing.status !== "SOLD" || !outgoing.soldToEntryId) {
+    throw new InvalidStateTransitionError(
+      `Player is not currently allocated to a team (status: ${outgoing.status})`
+    );
+  }
+  if (outgoing.playerId === incomingPlayerId) {
+    throw new ValidationError("Replacement player must be different from the outgoing player");
+  }
+
+  const priceDecimal = new Prisma.Decimal(price);
+  const entryId = outgoing.soldToEntryId;
+
+  return prisma.$transaction(async (tx) => {
+    const entry = await tx.teamAuctionEntry.findUniqueOrThrow({
+      where: { id: entryId },
+      include: { team: true },
+    });
+
+    const newBudgetRemaining = new Prisma.Decimal(entry.budgetRemaining)
+      .plus(outgoing.soldPrice ?? 0)
+      .minus(priceDecimal);
+    if (newBudgetRemaining.lessThan(0)) {
+      throw new InsufficientBudgetError(
+        `Team "${entry.team.name}" does not have enough budget remaining for this price`
+      );
+    }
+
+    const { auctionPlayerId: incomingAuctionPlayerId } = await resolveIncomingAuctionPlayer(
+      tx,
+      auctionId,
+      auction.tournament.rosterId,
+      incomingPlayerId,
+      incomingCategoryId
+    );
+
+    const updatedOutgoing = await tx.auctionPlayer.update({
+      where: { id: outgoingAuctionPlayerId },
+      data: { status: "UNSOLD", soldVia: null, soldToEntryId: null, soldPrice: null, soldAt: null },
+      include: { player: true },
+    });
+    const updatedIncoming = await tx.auctionPlayer.update({
+      where: { id: incomingAuctionPlayerId },
+      data: {
+        status: "SOLD",
+        soldVia: "ADMIN_REPLACED",
+        soldToEntryId: entryId,
+        soldPrice: priceDecimal,
+        soldAt: new Date(),
+      },
+      include: { player: true },
+    });
+    const updatedEntry = await tx.teamAuctionEntry.update({
+      where: { id: entryId },
+      data: { budgetRemaining: newBudgetRemaining },
+      include: { team: true },
+    });
+
+    return { outgoing: updatedOutgoing, incoming: updatedIncoming, entry: updatedEntry };
+  });
+}
+
 export async function concludeAuction(auctionId: string) {
   await assertAuctionLeagueNotReadOnly(auctionId);
 

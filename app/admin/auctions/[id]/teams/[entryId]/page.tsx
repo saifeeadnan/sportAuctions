@@ -2,9 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
+import { isLeagueReadOnly } from "@/lib/services/league.service";
 import { ConfirmedRosterTable } from "@/components/roster/ConfirmedRosterTable";
 import { DeleteDraftPickButton } from "@/components/admin/DeleteDraftPickButton";
 import { ToggleAnalyticsEnabledButton } from "@/components/admin/ToggleAnalyticsEnabledButton";
+import { PostAuctionRosterForm } from "@/components/admin/PostAuctionRosterForm";
 import { card } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 
@@ -26,22 +28,55 @@ export default async function TeamRosterPage({
   if (!entry || entry.auctionId !== id) notFound();
   assertInScope(leagueId, entry.auction.tournament.leagueId);
 
-  const [confirmedPlayers, draftPicks] = await Promise.all([
-    prisma.auctionPlayer.findMany({
-      where: { soldToEntryId: entryId },
-      include: { player: true, category: true },
-      orderBy: { player: { name: "asc" } },
-    }),
-    prisma.preAuctionSubmission.findMany({
-      where: { teamAuctionEntryId: entryId },
-      include: { auctionPlayer: { include: { player: true, category: true } } },
-      orderBy: { auctionPlayer: { player: { name: "asc" } } },
-    }),
-  ]);
+  const [confirmedPlayers, draftPicks, league, rosterPlayers, auctionPlayers, categories] =
+    await Promise.all([
+      prisma.auctionPlayer.findMany({
+        where: { soldToEntryId: entryId },
+        include: { player: true, category: true },
+        orderBy: { player: { name: "asc" } },
+      }),
+      prisma.preAuctionSubmission.findMany({
+        where: { teamAuctionEntryId: entryId },
+        include: { auctionPlayer: { include: { player: true, category: true } } },
+        orderBy: { auctionPlayer: { player: { name: "asc" } } },
+      }),
+      prisma.league.findUniqueOrThrow({
+        where: { id: entry.auction.tournament.leagueId },
+        select: { endDate: true },
+      }),
+      entry.auction.tournament.rosterId
+        ? prisma.player.findMany({
+            where: { rosterId: entry.auction.tournament.rosterId },
+            orderBy: { name: "asc" },
+          })
+        : Promise.resolve([]),
+      prisma.auctionPlayer.findMany({
+        where: { auctionId: id },
+        include: { category: true },
+      }),
+      prisma.auctionCategory.findMany({ where: { auctionId: id } }),
+    ]);
 
   const showDraftPicks =
     entry.status === "PRE_AUCTION_DRAFTING" || entry.status === "PRE_AUCTION_SUBMITTED";
   const canDeleteDraftPicks = entry.status === "PRE_AUCTION_DRAFTING";
+  const readOnly = isLeagueReadOnly(league);
+
+  // Every roster player not currently SOLD to a team in this auction is a
+  // valid replacement — whether or not they were ever added to the pool.
+  const auctionPlayerByPlayerId = new Map(auctionPlayers.map((ap) => [ap.playerId, ap]));
+  const replacementCandidates = rosterPlayers
+    .filter((p) => auctionPlayerByPlayerId.get(p.id)?.status !== "SOLD")
+    .map((p) => {
+      const ap = auctionPlayerByPlayerId.get(p.id);
+      return {
+        playerId: p.id,
+        playerName: p.name,
+        inPool: !!ap,
+        categoryId: ap?.categoryId ?? null,
+        categoryName: ap?.category.name ?? null,
+      };
+    });
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 flex flex-col gap-8">
@@ -89,6 +124,37 @@ export default async function TeamRosterPage({
           }))}
         />
       </section>
+
+      {entry.auction.status === "COMPLETED" && (
+        <section>
+          <h2 className="text-lg font-medium mb-1">Roster changes</h2>
+          <p className="text-sm text-black/60 dark:text-white/60 mb-3">
+            For fixing a final roster after the auction — e.g. replacing an injured player.
+          </p>
+          {readOnly ? (
+            <div className={`${card} px-4 py-3 text-sm text-black/40 dark:text-white/40`}>
+              This league is read-only — roster changes can no longer be made.
+            </div>
+          ) : (
+            <PostAuctionRosterForm
+              auctionId={id}
+              teamAuctionEntryId={entryId}
+              confirmedPlayers={confirmedPlayers.map((ap) => ({
+                auctionPlayerId: ap.id,
+                playerName: ap.player.name,
+                categoryName: ap.category.name,
+                soldPrice: ap.soldPrice != null ? String(ap.soldPrice) : null,
+              }))}
+              replacementCandidates={replacementCandidates}
+              categories={categories.map((c) => ({
+                id: c.id,
+                name: c.name,
+                basePrice: String(c.basePrice),
+              }))}
+            />
+          )}
+        </section>
+      )}
 
       {showDraftPicks && (
         <section>

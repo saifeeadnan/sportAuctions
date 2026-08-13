@@ -1,0 +1,2 @@
+-- AlterEnum
+ALTER TYPE "SoldVia" ADD VALUE 'ADMIN_REPLACED';

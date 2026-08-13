@@ -50,6 +50,7 @@ enum SoldVia {
   PRE_AUCTION_DRAFT
   LIVE_BID
   ADMIN_ASSIGNED
+  ADMIN_REPLACED
 }
 
 enum TeamAuctionEntryStatus {
