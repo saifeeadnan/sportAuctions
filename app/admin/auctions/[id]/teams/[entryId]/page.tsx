@@ -81,7 +81,15 @@ export default async function TeamRosterPage({
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 flex flex-col gap-8">
       <div>
-        <h1 className="text-xl font-semibold mb-1">{entry.team.name}</h1>
+        <div className="flex items-center justify-between gap-3 mb-1">
+          <h1 className="text-xl font-semibold">{entry.team.name}</h1>
+          <a
+            href={`/api/auctions/${id}/teams/${entryId}/roster-card`}
+            className="text-sm underline underline-offset-2 shrink-0"
+          >
+            Download roster card
+          </a>
+        </div>
         <p className="text-sm text-black/60 dark:text-white/60">
           {entry.auction.tournament.name} &middot; {entry.auction.name} &middot; status:{" "}
           {entry.status}

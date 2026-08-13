@@ -112,6 +112,12 @@ export default async function ManagerTeamDetailPage({
                   Analytics dashboard
                 </Link>
               )}
+              <a
+                href={`/api/auctions/${entry.auctionId}/teams/${entry.id}/roster-card`}
+                className="text-sm underline underline-offset-2"
+              >
+                Download roster card
+              </a>
             </div>
           </section>
         ))
