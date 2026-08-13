@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import sharp from "sharp";
 import { ImageResponse } from "next/og";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -9,14 +10,9 @@ import { getTeamSponsorImageContent } from "@/lib/services/teamSponsorImage.serv
 
 const SIZE = 1080;
 const MAX_PLAYERS_SHOWN = 15;
+const PLAYER_PHOTO_SIZE = 250;
+const SPONSOR_LOGO_SIZE = 200;
 const AVATAR_COLORS = ["#6366F1", "#F0653F", "#38BDF8", "#4ADE80", "#F472B6", "#FBBF24"];
-const EXTENSION_MIME: Record<string, string> = {
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-  png: "image/png",
-  webp: "image/webp",
-  gif: "image/gif",
-};
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/);
@@ -36,25 +32,49 @@ function colorFor(name: string): string {
  * disk, no network round-trip) or a full external URL with no uptime
  * guarantee (fetched with a short timeout). Either way, any failure just
  * falls back to an initials avatar rather than failing the whole card.
+ *
+ * Source photos can be multi-megabyte, multi-megapixel camera originals —
+ * Satori has to decode each embedded image to a raw pixel buffer to
+ * composite it, and leaving them full-size was enough to get the whole
+ * process OOM-killed on a small hosting instance. Resizing down to roughly
+ * display size first (via sharp) keeps that decode cheap regardless of how
+ * large the source file is.
  */
 async function loadPhotoAsDataUri(photoUrl: string, timeoutMs = 4000): Promise<string | null> {
   try {
+    let buffer: Buffer;
     if (photoUrl.startsWith("/")) {
       const filePath = path.join(process.cwd(), "public", photoUrl);
-      const buffer = await readFile(filePath);
-      const ext = path.extname(photoUrl).slice(1).toLowerCase();
-      const mimeType = EXTENSION_MIME[ext] ?? "image/jpeg";
-      return `data:${mimeType};base64,${buffer.toString("base64")}`;
+      buffer = await readFile(filePath);
+    } else {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
+      const res = await fetch(photoUrl, { signal: controller.signal });
+      clearTimeout(timeout);
+      if (!res.ok) return null;
+      buffer = Buffer.from(await res.arrayBuffer());
     }
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), timeoutMs);
-    const res = await fetch(photoUrl, { signal: controller.signal });
-    clearTimeout(timeout);
-    if (!res.ok) return null;
-    const contentType = res.headers.get("content-type") ?? "image/jpeg";
-    const buffer = Buffer.from(await res.arrayBuffer());
-    return `data:${contentType};base64,${buffer.toString("base64")}`;
+    const resized = await sharp(buffer)
+      .resize(PLAYER_PHOTO_SIZE, PLAYER_PHOTO_SIZE, { fit: "cover" })
+      .jpeg({ quality: 82 })
+      .toBuffer();
+    return `data:image/jpeg;base64,${resized.toString("base64")}`;
+  } catch {
+    return null;
+  }
+}
+
+/** Same over-sized-source concern as player photos — an admin-uploaded logo
+ * could be an arbitrarily large PNG/JPEG. Resized before embedding, keeping
+ * the original format (and transparency, for a PNG logo) rather than
+ * normalizing to JPEG the way player photos are. */
+async function resizeSponsorLogo(data: Buffer, mimeType: string): Promise<string | null> {
+  try {
+    const resized = await sharp(data)
+      .resize(SPONSOR_LOGO_SIZE, SPONSOR_LOGO_SIZE, { fit: "inside", withoutEnlargement: true })
+      .toBuffer();
+    return `data:${mimeType};base64,${resized.toString("base64")}`;
   } catch {
     return null;
   }
@@ -94,15 +114,20 @@ export async function GET(
     const shown = confirmedPlayers.slice(0, MAX_PLAYERS_SHOWN);
     const overflowCount = confirmedPlayers.length - shown.length;
 
-    const [sponsorImage, playerPhotoDataUris] = await Promise.all([
-      getTeamSponsorImageContent(entry.teamId),
-      Promise.all(
-        shown.map((ap) => (ap.player.photoUrl ? loadPhotoAsDataUri(ap.player.photoUrl) : null))
-      ),
-    ]);
+    // Processed one at a time (not Promise.all) — each source photo can be a
+    // multi-megabyte camera original, and decoding several of those
+    // concurrently is exactly what was spiking memory enough to get the
+    // whole process OOM-killed; sequential keeps the peak bounded.
+    const sponsorImage = await getTeamSponsorImageContent(entry.teamId);
+    const playerPhotoDataUris: (string | null)[] = [];
+    for (const ap of shown) {
+      playerPhotoDataUris.push(
+        ap.player.photoUrl ? await loadPhotoAsDataUri(ap.player.photoUrl) : null
+      );
+    }
 
     const sponsorDataUri = sponsorImage
-      ? `data:${sponsorImage.mimeType};base64,${Buffer.from(sponsorImage.data).toString("base64")}`
+      ? await resizeSponsorLogo(Buffer.from(sponsorImage.data), sponsorImage.mimeType)
       : null;
 
     const downloadFilename = `${entry.team.name.replace(/[^a-z0-9-]+/gi, "-")}-roster.png`;
