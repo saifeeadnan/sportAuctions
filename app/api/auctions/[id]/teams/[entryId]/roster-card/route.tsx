@@ -89,7 +89,7 @@ export async function GET(
 
     const entry = await prisma.teamAuctionEntry.findUnique({
       where: { id: entryId },
-      include: { team: true, auction: { include: { tournament: { include: { league: true } } } } },
+      include: { team: true, auction: { include: { tournament: true } } },
     });
     if (!entry || entry.auctionId !== auctionId) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -184,28 +184,19 @@ export async function GET(
                 {initials(entry.team.name)}
               </div>
             )}
-            <div
-              style={{
-                fontSize: 54,
-                fontWeight: 700,
-                color: "#FFFFFF",
-                marginTop: 20,
-                textAlign: "center",
-              }}
-            >
-              {entry.team.name}
-            </div>
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "center",
-                fontSize: 24,
-                color: "#9CA3AF",
-                marginTop: 6,
-              }}
-            >
-              {entry.auction.tournament.name} · {entry.auction.tournament.league.name}
-            </div>
+            {!sponsorDataUri && (
+              <div
+                style={{
+                  fontSize: 54,
+                  fontWeight: 700,
+                  color: "#FFFFFF",
+                  marginTop: 20,
+                  textAlign: "center",
+                }}
+              >
+                {entry.team.name}
+              </div>
+            )}
           </div>
 
           {/* Player grid */}
