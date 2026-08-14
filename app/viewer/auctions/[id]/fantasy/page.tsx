@@ -8,7 +8,6 @@ import {
   isFantasyEditingLocked,
   getMaxRosterSize,
 } from "@/lib/services/fantasyTeam.service";
-import { getRulesDocumentIfViewable } from "@/lib/services/tournamentDocument.service";
 import { listTournamentSponsors } from "@/lib/services/tournamentSponsor.service";
 import { FantasyTeamForm } from "@/components/viewer/FantasyTeamForm";
 import { RosterRibbon } from "@/components/roster/RosterRibbon";
@@ -58,7 +57,6 @@ export default async function FantasyTeamPage({
   const existingTeam = await getFantasyTeam(id, session.user.id);
   const standings = existingTeam ? await getFantasyStandings(id) : null;
   const myStanding = standings?.standings.find((s) => s.team.userId === session.user.id);
-  const rulesDocument = await getRulesDocumentIfViewable(auction.tournament.id, session.user);
   const sponsors = await listTournamentSponsors(auction.tournament.id);
 
   return (
@@ -69,36 +67,24 @@ export default async function FantasyTeamPage({
           {auction.tournament.name} &middot; {auction.name} &middot; budget:{" "}
           {String(auction.teamBudget)}
         </p>
-        {rulesDocument && (
-          <a
-            href={`/tournaments/${auction.tournament.id}/rules`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-sm underline underline-offset-2"
-          >
-            View tournament rules
-          </a>
-        )}
       </div>
 
       {!locked && (
         <p className="text-sm text-black/60 dark:text-white/60">
-          You can keep editing your fantasy team until the tournament starts on{" "}
-          <span className="font-medium">{formatCalendarDate(auction.tournament.startDate)}</span> — after
-          that, whatever you&apos;ve saved becomes final automatically.
+          Editable until {formatCalendarDate(auction.tournament.startDate)}.
         </p>
       )}
 
       {locked && !existingTeam && (
         <p className="text-black/60 dark:text-white/60">
-          The tournament has started and you didn&apos;t save a fantasy team in time.
+          You didn&apos;t save a fantasy team in time.
         </p>
       )}
 
       {locked && existingTeam ? (
         <>
           <p className="text-sm text-black/60 dark:text-white/60">
-            Your fantasy team is locked in — {existingTeam.picks.length} player(s), total spend{" "}
+            Locked in — {existingTeam.picks.length} player(s), total spend{" "}
             {existingTeam.picks.reduce((sum, p) => sum + Number(p.price), 0)}.
           </p>
 

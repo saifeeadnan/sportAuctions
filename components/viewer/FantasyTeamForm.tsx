@@ -5,14 +5,12 @@ import { useRouter } from "next/navigation";
 import { submitFantasyTeamAction } from "@/lib/actions/fantasyTeam.actions";
 import type { RatedPlayer } from "@/lib/teamStrength";
 import { TeamStrengthSummary } from "@/components/manager/TeamStrengthSummary";
-import { RosterRibbon } from "@/components/roster/RosterRibbon";
 import { card, buttonPrimary, tabsTrack, tabItem } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 
 type PlayerOption = RatedPlayer & {
   id: string;
   name: string;
-  photoUrl: string | null;
   categoryName: string;
   status: string;
   price: string;
@@ -174,27 +172,6 @@ export function FantasyTeamForm({
           >
             {loading ? "Saving…" : "Save fantasy team"}
           </button>
-        </div>
-      </details>
-
-      <details className={card} open>
-        <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
-          Your fantasy team so far ({selected.size})
-        </summary>
-        <div className="px-4 pb-4">
-          <RosterRibbon
-            grid
-            highlightId={lockedPlayerId}
-            players={players
-              .filter((p) => selected.has(p.id))
-              .map((p) => ({
-                id: p.id,
-                playerName: p.name,
-                photoUrl: p.photoUrl,
-                position: p.position,
-                soldPrice: p.price,
-              }))}
-          />
         </div>
       </details>
     </div>
