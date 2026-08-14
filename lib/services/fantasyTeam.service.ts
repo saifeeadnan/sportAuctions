@@ -71,7 +71,7 @@ export async function listEligibleCompletedAuctionsForViewer(userId: string, lea
 export async function getFantasyEligibility(auctionId: string, userId: string, leagueId: string | null) {
   const auction = await prisma.auction.findUnique({
     where: { id: auctionId },
-    include: { tournament: true },
+    include: { tournament: { include: { league: true } } },
   });
   if (!auction) return { eligible: false as const, reason: "Auction not found" };
   if (leagueId !== null && auction.tournament.leagueId !== leagueId) {

@@ -62,15 +62,10 @@ export default async function FantasyTeamPage({
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 flex flex-col gap-6">
       <p className="text-sm text-black/60 dark:text-white/60">
-        {auction.tournament.name} &middot; {auction.name} &middot; budget:{" "}
-        {String(auction.teamBudget)}
+        {auction.tournament.league.name} / {auction.tournament.name} / {auction.name}
+        {!locked && <> &middot; Editable until {formatCalendarDate(auction.tournament.startDate)}.</>}
+        {locked && <> &middot; budget: {String(auction.teamBudget)}</>}
       </p>
-
-      {!locked && (
-        <p className="text-sm text-black/60 dark:text-white/60">
-          Editable until {formatCalendarDate(auction.tournament.startDate)}.
-        </p>
-      )}
 
       {locked && !existingTeam && (
         <p className="text-black/60 dark:text-white/60">

@@ -100,17 +100,15 @@ export function FantasyTeamForm({
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm">
-        Selected {selected.size}/{cap} (including you) &middot; Total price:{" "}
-        {formatAmount(totalPrice)} &middot; Budget remaining after selection:{" "}
+        Budget: {budget} &middot; Used: {formatAmount(totalPrice)} &middot; Left:{" "}
         <span className={budgetRemainingAfterSelection < 0 ? "text-red-600 dark:text-red-400" : ""}>
           {formatAmount(budgetRemainingAfterSelection)}
         </span>
       </p>
-      <TeamStrengthSummary players={teamSoFar} squadSize={cap} />
 
       <details className={card} open>
         <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
-          Build your team
+          Build
         </summary>
         <div className="px-4 pb-4 flex flex-col gap-4">
           <div className={tabsTrack}>
@@ -179,9 +177,10 @@ export function FantasyTeamForm({
 
       <details className={card}>
         <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
-          Fantasy team so far ({selected.size})
+          Current team ({selected.size})
         </summary>
-        <div className="px-4 pb-4">
+        <div className="px-4 pb-4 flex flex-col gap-4">
+          <TeamStrengthSummary players={teamSoFar} squadSize={cap} />
           <RosterRibbon
             grid
             highlightId={lockedPlayerId}
