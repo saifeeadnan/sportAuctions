@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { SponsorLink } from "@/components/tournament/SponsorLink";
 
-type Sponsor = { id: string; name: string; websiteUrl: string | null };
+type Sponsor = { id: string; name: string; websiteUrl: string | null; logoUrl: string | null };
 
 const ROTATE_INTERVAL_MS = 4500;
 const SHUFFLE_SEED_KEY = "sponsorRibbonShuffleSeed";
@@ -79,7 +79,7 @@ export function SponsorRibbon({ sponsors }: { sponsors: Sponsor[] }) {
             <div className="group flex flex-col items-center gap-1">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
-                src={`/api/tournament-sponsors/${sponsor.id}`}
+                src={sponsor.logoUrl ?? `/api/tournament-sponsors/${sponsor.id}`}
                 alt={sponsor.name}
                 title={sponsor.name}
                 className={`h-28 w-28 rounded object-contain bg-white dark:bg-white/10 border p-2 transition-all duration-700 ${

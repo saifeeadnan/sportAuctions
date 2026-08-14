@@ -34,7 +34,10 @@ export type AddTournamentSponsorInput = {
   tournamentId: string;
   name: string;
   websiteUrl?: string;
-  file: SponsorLogoFile;
+  /** Exactly one of `file` or `logoUrl` must be provided — a sponsor's logo
+   * is either uploaded bytes or an external URL, never both. */
+  file?: SponsorLogoFile;
+  logoUrl?: string;
 };
 
 function normalizeWebsiteUrl(url?: string): string | undefined {
@@ -45,14 +48,44 @@ function normalizeWebsiteUrl(url?: string): string | undefined {
   return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
 }
 
+function validateLogoUrl(url: string): string {
+  const trimmed = url.trim();
+  if (!trimmed) throw new ValidationError("Logo URL is required");
+  try {
+    new URL(trimmed);
+  } catch {
+    throw new ValidationError("Logo URL must be a valid URL");
+  }
+  return trimmed;
+}
+
 export async function addTournamentSponsor(input: AddTournamentSponsorInput) {
   if (!input.name.trim()) throw new ValidationError("Sponsor name is required");
-  if (input.file.data.length === 0) throw new ValidationError("Logo file is empty");
-  if (input.file.data.length > MAX_SIZE_BYTES) {
-    throw new ValidationError("Logo must be 5MB or smaller");
+  if (input.file && input.logoUrl) {
+    throw new ValidationError("Provide either a logo file or a logo URL, not both");
   }
-  if (!ALLOWED_MIME_TYPES.has(input.file.type)) {
-    throw new ValidationError("Only JPG or PNG images are allowed for the sponsor logo");
+  if (!input.file && !input.logoUrl) {
+    throw new ValidationError("Provide a logo file or a logo URL");
+  }
+
+  let logoUrl: string | undefined;
+  let mimeType: string | undefined;
+  let data: Uint8Array<ArrayBuffer> | undefined;
+
+  if (input.file) {
+    if (input.file.data.length === 0) throw new ValidationError("Logo file is empty");
+    if (input.file.data.length > MAX_SIZE_BYTES) {
+      throw new ValidationError("Logo must be 5MB or smaller");
+    }
+    if (!ALLOWED_MIME_TYPES.has(input.file.type)) {
+      throw new ValidationError("Only JPG or PNG images are allowed for the sponsor logo");
+    }
+    mimeType = input.file.type;
+    // Prisma's Bytes field wants a plain Uint8Array backed by a real
+    // ArrayBuffer, not Node's Buffer.
+    data = new Uint8Array(input.file.data);
+  } else {
+    logoUrl = validateLogoUrl(input.logoUrl!);
   }
 
   await loadTournamentForSponsorCreate(input.tournamentId);
@@ -62,10 +95,9 @@ export async function addTournamentSponsor(input: AddTournamentSponsorInput) {
       tournamentId: input.tournamentId,
       name: input.name.trim(),
       websiteUrl: normalizeWebsiteUrl(input.websiteUrl),
-      mimeType: input.file.type,
-      // Prisma's Bytes field wants a plain Uint8Array backed by a real
-      // ArrayBuffer, not Node's Buffer.
-      data: new Uint8Array(input.file.data),
+      logoUrl,
+      mimeType,
+      data,
     },
   });
 }
@@ -78,7 +110,7 @@ export async function deleteTournamentSponsor(sponsorId: string) {
 export async function listTournamentSponsors(tournamentId: string) {
   return prisma.tournamentSponsor.findMany({
     where: { tournamentId },
-    select: { id: true, name: true, websiteUrl: true, createdAt: true },
+    select: { id: true, name: true, websiteUrl: true, logoUrl: true, createdAt: true },
     orderBy: { createdAt: "asc" },
   });
 }
@@ -94,7 +126,12 @@ export async function getTournamentSponsorLogoContent(sponsorId: string) {
   });
 }
 
-export type KnownSponsor = { id: string; name: string; websiteUrl: string | null };
+export type KnownSponsor = {
+  id: string;
+  name: string;
+  websiteUrl: string | null;
+  logoUrl: string | null;
+};
 
 /** Distinct-by-name sponsors already used somewhere in scope, for the
  * "choose existing" picker — excludes names already attached to `tournamentId`
@@ -111,7 +148,7 @@ export async function listKnownSponsors(
 
   const rows = await prisma.tournamentSponsor.findMany({
     where: leagueId ? { tournament: { leagueId } } : {},
-    select: { id: true, name: true, websiteUrl: true },
+    select: { id: true, name: true, websiteUrl: true, logoUrl: true },
     orderBy: { createdAt: "desc" },
   });
 
@@ -121,7 +158,7 @@ export async function listKnownSponsors(
     const key = row.name.toLowerCase();
     if (seen.has(key) || existingNames.has(key)) continue;
     seen.add(key);
-    distinct.push({ id: row.id, name: row.name, websiteUrl: row.websiteUrl });
+    distinct.push({ id: row.id, name: row.name, websiteUrl: row.websiteUrl, logoUrl: row.logoUrl });
   }
   return distinct;
 }
@@ -137,10 +174,12 @@ export async function addExistingTournamentSponsor(tournamentId: string, sourceS
       tournamentId,
       name: source.name,
       websiteUrl: source.websiteUrl,
+      logoUrl: source.logoUrl,
       mimeType: source.mimeType,
       // Re-wrap the driver-read Bytes value — same Uint8Array<ArrayBuffer>
-      // gotcha as writing freshly-uploaded bytes.
-      data: new Uint8Array(source.data),
+      // gotcha as writing freshly-uploaded bytes. A URL-backed source has no
+      // bytes to copy — its logoUrl above already carries everything needed.
+      data: source.data ? (new Uint8Array(source.data) as Uint8Array<ArrayBuffer>) : undefined,
     },
   });
 }

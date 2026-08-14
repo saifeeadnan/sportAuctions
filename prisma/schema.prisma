@@ -202,8 +202,9 @@ model TournamentSponsor {
   tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   name         String
   websiteUrl   String?
-  mimeType     String
-  data         Bytes
+  logoUrl      String?
+  mimeType     String?
+  data         Bytes?
   createdAt    DateTime   @default(now())
 
   clicks SponsorClickEvent[]

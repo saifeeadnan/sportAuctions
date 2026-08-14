@@ -13,17 +13,18 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const formData = await req.formData();
     const name = String(formData.get("name") ?? "");
     const websiteUrl = String(formData.get("websiteUrl") ?? "");
+    const logoUrl = String(formData.get("logoUrl") ?? "");
     const file = formData.get("logo") as File | null;
-    if (!file) {
-      return NextResponse.json({ error: "No logo file provided" }, { status: 400 });
+    if (!file && !logoUrl) {
+      return NextResponse.json({ error: "Provide a logo file or a logo URL" }, { status: 400 });
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer());
     const sponsor = await addTournamentSponsor({
       tournamentId,
       name,
       websiteUrl: websiteUrl || undefined,
-      file: { type: file.type, data: buffer },
+      file: file ? { type: file.type, data: Buffer.from(await file.arrayBuffer()) } : undefined,
+      logoUrl: logoUrl || undefined,
     });
 
     return NextResponse.json({ sponsorId: sponsor.id });

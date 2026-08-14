@@ -15,7 +15,10 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     const { id: sponsorId } = await params;
 
     const logo = await getTournamentSponsorLogoContent(sponsorId);
-    if (!logo) {
+    // A URL-backed sponsor has no stored bytes — its <img> never points here
+    // in the first place, but treat a direct hit the same as "not found"
+    // rather than serving an empty body.
+    if (!logo || !logo.data || !logo.mimeType) {
       return NextResponse.json({ error: "Sponsor not found" }, { status: 404 });
     }
 

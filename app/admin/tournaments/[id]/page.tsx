@@ -90,10 +90,12 @@ export default async function TournamentDetailPage({
         />
       </div>
 
-      <section>
-        <h2 className="text-lg font-medium mb-3">Actions</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <details className={card}>
+      <details className={card}>
+        <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
+          Actions
+        </summary>
+        <div className="divide-y divide-black/5 dark:divide-white/5 border-t border-black/5 dark:border-white/5">
+          <details>
             <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
               {rulesDocument ? "Replace rules document" : "Upload rules document"}
             </summary>
@@ -116,28 +118,28 @@ export default async function TournamentDetailPage({
           </details>
 
           {readOnly ? (
-            <div className={`${card} px-4 py-3 text-sm text-black/40 dark:text-white/40`}>
+            <div className="px-4 py-3 text-sm text-black/40 dark:text-white/40">
               Add team — league is read-only
             </div>
           ) : canAddTeam ? (
-            <details className={card}>
+            <details>
               <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
                 Add team
               </summary>
               <AddTeamForm tournamentId={tournament.id} managers={managers} />
             </details>
           ) : (
-            <div className={`${card} px-4 py-3 text-sm text-black/60 dark:text-white/60`}>
+            <div className="px-4 py-3 text-sm text-black/60 dark:text-white/60">
               Maximum number of teams reached.
             </div>
           )}
 
           {readOnly ? (
-            <div className={`${card} px-4 py-3 text-sm text-black/40 dark:text-white/40`}>
+            <div className="px-4 py-3 text-sm text-black/40 dark:text-white/40">
               Add sponsor — league is read-only
             </div>
           ) : (
-            <details className={card}>
+            <details>
               <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
                 Add sponsor
               </summary>
@@ -146,7 +148,7 @@ export default async function TournamentDetailPage({
           )}
 
           {!tournament.rosterId && (
-            <details className={card}>
+            <details>
               <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
                 Attach roster
               </summary>
@@ -155,23 +157,23 @@ export default async function TournamentDetailPage({
           )}
 
           {readOnly ? (
-            <div className={`${card} flex items-center px-4 py-3 text-sm text-black/40 dark:text-white/40`}>
+            <div className="px-4 py-3 text-sm text-black/40 dark:text-white/40">
               New auction — league is read-only
             </div>
           ) : tournament.rosterId ? (
             <Link
               href={`/admin/tournaments/${tournament.id}/auctions/new`}
-              className={`${card} flex items-center px-4 py-3 text-sm font-medium hover:border-black/15 dark:hover:border-white/20 transition-colors`}
+              className="block px-4 py-3 text-sm font-medium hover:bg-black/[0.02] dark:hover:bg-white/[0.03] transition-colors"
             >
               New auction
             </Link>
           ) : (
-            <div className={`${card} flex items-center px-4 py-3 text-sm text-black/60 dark:text-white/60`}>
+            <div className="px-4 py-3 text-sm text-black/60 dark:text-white/60">
               Attach a roster before creating an auction.
             </div>
           )}
         </div>
-      </section>
+      </details>
 
       <details className={card}>
         <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
@@ -192,7 +194,7 @@ export default async function TournamentDetailPage({
                   </div>
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={`/api/tournament-sponsors/${sponsor.id}`}
+                    src={sponsor.logoUrl ?? `/api/tournament-sponsors/${sponsor.id}`}
                     alt={sponsor.name}
                     className="h-20 w-20 rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-2"
                   />
@@ -219,10 +221,10 @@ export default async function TournamentDetailPage({
         {tournament.teams.length === 0 ? (
           <p className="text-black/60 dark:text-white/60 mb-4">No teams yet.</p>
         ) : (
-          <ul className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+          <ul className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
             {tournament.teams.map((team) => (
-              <li key={team.id} className={`${cardInteractive} relative flex flex-col items-center gap-2 p-4`}>
-                <div className="absolute top-2 right-2">
+              <li key={team.id} className={`${cardInteractive} relative flex flex-col items-center gap-1 p-3`}>
+                <div className="absolute top-1.5 right-1.5">
                   <DeleteTeamButton
                     teamId={team.id}
                     teamName={team.name}
@@ -233,25 +235,25 @@ export default async function TournamentDetailPage({
                 </div>
                 <Link
                   href={`/admin/tournaments/${tournament.id}/teams/${team.id}`}
-                  className="flex flex-col items-center gap-2"
+                  className="flex flex-col items-center gap-1"
                 >
                   {team.sponsorImage ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={`/api/teams/${team.id}/sponsor-image`}
                       alt={`${team.name} sponsor`}
-                      className="h-20 w-20 rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-2"
+                      className="h-14 w-14 rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-1.5"
                     />
                   ) : (
-                    <div className="h-20 w-20 rounded border border-dashed border-black/10 dark:border-white/10 flex items-center justify-center text-xs text-black/30 dark:text-white/30">
+                    <div className="h-14 w-14 rounded border border-dashed border-black/10 dark:border-white/10 flex items-center justify-center text-[10px] text-black/30 dark:text-white/30">
                       No logo
                     </div>
                   )}
-                  <span className="font-medium underline underline-offset-2 text-center">
+                  <span className="text-sm font-medium underline underline-offset-2 text-center">
                     {team.name}
                   </span>
                 </Link>
-                <span className="text-sm text-black/60 dark:text-white/60 text-center">
+                <span className="text-xs text-black/60 dark:text-white/60 text-center">
                   {team.manager ? team.manager.name : "No manager assigned"}
                   {team.managerOccupiesSlot ? " (occupies a slot)" : ""}
                 </span>

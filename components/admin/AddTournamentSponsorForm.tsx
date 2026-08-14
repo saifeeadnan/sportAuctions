@@ -26,6 +26,7 @@ export function AddTournamentSponsorForm({
   const [mode, setMode] = useState<"existing" | "upload">(
     knownSponsors.length > 0 ? "existing" : "upload"
   );
+  const [logoSource, setLogoSource] = useState<"file" | "url">("file");
   const [selectedSponsorId, setSelectedSponsorId] = useState(knownSponsors[0]?.id ?? "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -124,16 +125,45 @@ export function AddTournamentSponsorForm({
             Website (optional)
             <input name="websiteUrl" type="text" placeholder="example.com" className={inputClass} />
           </label>
-          <label className="flex flex-col gap-1 text-sm">
-            Logo (JPG or PNG)
-            <input
-              name="logo"
-              type="file"
-              required
-              accept="image/jpeg,image/png"
-              className={`text-sm ${inputClass}`}
-            />
-          </label>
+          <div className={tabsTrack}>
+            <button
+              type="button"
+              onClick={() => setLogoSource("file")}
+              className={tabItem(logoSource === "file")}
+            >
+              Upload file
+            </button>
+            <button
+              type="button"
+              onClick={() => setLogoSource("url")}
+              className={tabItem(logoSource === "url")}
+            >
+              Use image URL
+            </button>
+          </div>
+          {logoSource === "file" ? (
+            <label className="flex flex-col gap-1 text-sm">
+              Logo (JPG or PNG)
+              <input
+                name="logo"
+                type="file"
+                required
+                accept="image/jpeg,image/png"
+                className={`text-sm ${inputClass}`}
+              />
+            </label>
+          ) : (
+            <label className="flex flex-col gap-1 text-sm">
+              Logo URL
+              <input
+                name="logoUrl"
+                type="text"
+                required
+                placeholder="https://example.com/logo.png"
+                className={inputClass}
+              />
+            </label>
+          )}
           {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
           <button type="submit" disabled={loading} className={`${buttonPrimary} mt-2 self-start`}>
             {loading ? "Adding…" : "Add sponsor"}

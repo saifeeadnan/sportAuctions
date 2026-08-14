@@ -77,6 +77,14 @@ export function FantasyTeamForm({
   }
 
   async function handleSubmit() {
+    if (
+      selected.size < cap &&
+      !window.confirm(
+        `Your fantasy team has ${selected.size} of ${cap} players. Save it anyway?`
+      )
+    ) {
+      return;
+    }
     setLoading(true);
     setError(null);
     const result = await submitFantasyTeamAction(auctionId, Array.from(selected));
