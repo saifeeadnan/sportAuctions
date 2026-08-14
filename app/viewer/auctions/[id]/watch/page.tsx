@@ -7,7 +7,7 @@ import { getAuctionState, findSoldTeamEntryIdForLoginId } from "@/lib/services/a
 import { getRulesDocumentIfViewable } from "@/lib/services/tournamentDocument.service";
 import { listTournamentSponsors } from "@/lib/services/tournamentSponsor.service";
 import { LiveAuctionView } from "@/components/auction/LiveAuctionView";
-import { SponsorRow } from "@/components/tournament/SponsorRow";
+import { SponsorRibbon } from "@/components/tournament/SponsorRibbon";
 
 export default async function WatchPage({
   params,
@@ -47,9 +47,9 @@ export default async function WatchPage({
             View tournament rules
           </a>
         )}
-        <SponsorRow sponsors={sponsors} />
       </div>
       <LiveAuctionView initialState={state} highlightTeamEntryId={myTeamEntryId ?? undefined} />
+      <SponsorRibbon sponsors={sponsors} />
     </div>
   );
 }

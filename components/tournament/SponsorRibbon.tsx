@@ -39,8 +39,7 @@ function getSessionShuffleSeed(): number {
   return seed;
 }
 
-/** A horizontal strip of sponsor logos for the bottom of a page — larger and
- * more prominent than SponsorRow's inline "Sponsored by" mention. A gentle
+/** A horizontal strip of sponsor logos for the bottom of a page. A gentle
  * glow/scale spotlight rotates through sponsors one at a time so the ribbon
  * catches peripheral attention on a page where people are mostly watching
  * the bid clock — slow and quiet rather than a loud/jumpy effect that would

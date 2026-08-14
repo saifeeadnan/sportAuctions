@@ -6,13 +6,14 @@ import {
   getFantasyStandings,
   listFantasyPlayerPool,
   isFantasyEditingLocked,
+  getMaxRosterSize,
 } from "@/lib/services/fantasyTeam.service";
 import { getRulesDocumentIfViewable } from "@/lib/services/tournamentDocument.service";
 import { listTournamentSponsors } from "@/lib/services/tournamentSponsor.service";
 import { FantasyTeamForm } from "@/components/viewer/FantasyTeamForm";
 import { RosterRibbon } from "@/components/roster/RosterRibbon";
 import { TeamStrengthSummary } from "@/components/manager/TeamStrengthSummary";
-import { SponsorRow } from "@/components/tournament/SponsorRow";
+import { SponsorRibbon } from "@/components/tournament/SponsorRibbon";
 import { Badge } from "@/components/ui/Badge";
 import { card } from "@/lib/ui";
 import { formatCalendarDate } from "@/lib/dates";
@@ -78,8 +79,9 @@ export default async function FantasyTeamPage({
             View tournament rules
           </a>
         )}
-        <SponsorRow sponsors={sponsors} />
       </div>
+
+      <SponsorRibbon sponsors={sponsors} />
 
       {!locked && (
         <p className="text-sm text-black/60 dark:text-white/60">
@@ -148,7 +150,7 @@ export default async function FantasyTeamPage({
       ) : !locked ? (
         <FantasyTeamForm
           auctionId={auction.id}
-          cap={auction.tournament.squadSize}
+          cap={await getMaxRosterSize(auction.id)}
           budget={String(auction.teamBudget)}
           players={await listFantasyPlayerPool(auction.id)}
           lockedPlayerId={eligibility.selfAuctionPlayerId}

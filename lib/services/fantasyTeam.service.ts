@@ -21,6 +21,22 @@ function fantasyPrice(auctionPlayer: {
   return auctionPlayer.category.basePrice;
 }
 
+/**
+ * The real cap for a fantasy team — not the tournament's configured squad
+ * size, but however many players any one real team actually ended up with,
+ * which can be lower (e.g. a category went undersold). A team's
+ * TeamAuctionEntry.slotsTotal can never exceed the configured squad size, so
+ * this is always <= it, never higher.
+ */
+export async function getMaxRosterSize(auctionId: string): Promise<number> {
+  const grouped = await prisma.auctionPlayer.groupBy({
+    by: ["soldToEntryId"],
+    where: { auctionId, status: "SOLD", soldToEntryId: { not: null } },
+    _count: { _all: true },
+  });
+  return grouped.reduce((max, g) => Math.max(max, g._count._all), 0);
+}
+
 /** The viewer's own auction-player entry for this specific auction, if they
  * were part of its pool — this is what guarantees them a spot on their own
  * fantasy team, the same way a manager's own pick is auto-included in the
@@ -241,10 +257,9 @@ export async function submitFantasyTeam(
   uniqueIds.add(selfAuctionPlayer.id);
 
   const idsArray = Array.from(uniqueIds);
-  if (idsArray.length > auction.tournament.squadSize) {
-    throw new SquadCapExceededError(
-      `A fantasy team cannot exceed ${auction.tournament.squadSize} player(s)`
-    );
+  const maxRosterSize = await getMaxRosterSize(auctionId);
+  if (idsArray.length > maxRosterSize) {
+    throw new SquadCapExceededError(`A fantasy team cannot exceed ${maxRosterSize} player(s)`);
   }
 
   const players = await prisma.auctionPlayer.findMany({
