@@ -81,8 +81,6 @@ export default async function FantasyTeamPage({
         )}
       </div>
 
-      <SponsorRibbon sponsors={sponsors} />
-
       {!locked && (
         <p className="text-sm text-black/60 dark:text-white/60">
           You can keep editing your fantasy team until the tournament starts on{" "}
@@ -134,18 +132,25 @@ export default async function FantasyTeamPage({
             players={existingTeam.picks.map((p) => toRatedPlayer(p.auctionPlayer.player))}
             squadSize={auction.tournament.squadSize}
           />
-          <RosterRibbon
-            grid
-            highlightId={eligibility.selfAuctionPlayerId}
-            players={existingTeam.picks.map((p) => ({
-              id: p.auctionPlayerId,
-              playerName: p.auctionPlayer.player.name,
-              photoUrl: p.auctionPlayer.player.photoUrl,
-              position: p.auctionPlayer.player.position,
-              soldPrice: String(p.price),
-              points: p.auctionPlayer.points != null ? String(p.auctionPlayer.points) : null,
-            }))}
-          />
+          <details className={card} open>
+            <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
+              Your fantasy team ({existingTeam.picks.length})
+            </summary>
+            <div className="px-4 pb-4">
+              <RosterRibbon
+                grid
+                highlightId={eligibility.selfAuctionPlayerId}
+                players={existingTeam.picks.map((p) => ({
+                  id: p.auctionPlayerId,
+                  playerName: p.auctionPlayer.player.name,
+                  photoUrl: p.auctionPlayer.player.photoUrl,
+                  position: p.auctionPlayer.player.position,
+                  soldPrice: String(p.price),
+                  points: p.auctionPlayer.points != null ? String(p.auctionPlayer.points) : null,
+                }))}
+              />
+            </div>
+          </details>
         </>
       ) : !locked ? (
         <FantasyTeamForm
@@ -157,6 +162,8 @@ export default async function FantasyTeamPage({
           initialSelected={existingTeam?.picks.map((p) => p.auctionPlayerId) ?? []}
         />
       ) : null}
+
+      <SponsorRibbon sponsors={sponsors} />
     </div>
   );
 }

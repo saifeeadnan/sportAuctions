@@ -108,79 +108,95 @@ export function FantasyTeamForm({
       </p>
       <TeamStrengthSummary players={teamSoFar} squadSize={cap} />
 
-      <div>
-        <h2 className="text-sm font-medium mb-2">Your fantasy team so far ({selected.size})</h2>
-        <RosterRibbon
-          grid
-          highlightId={lockedPlayerId}
-          players={players
-            .filter((p) => selected.has(p.id))
-            .map((p) => ({
-              id: p.id,
-              playerName: p.name,
-              photoUrl: p.photoUrl,
-              position: p.position,
-              soldPrice: p.price,
-            }))}
-        />
-      </div>
+      <details className={card} open>
+        <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
+          Build your team
+        </summary>
+        <div className="px-4 pb-4 flex flex-col gap-4">
+          <div className={tabsTrack}>
+            {categories.map((cat) => {
+              const selectedInCategory = players.filter(
+                (p) => p.categoryName === cat && selected.has(p.id)
+              ).length;
+              const totalInCategory = players.filter((p) => p.categoryName === cat).length;
+              return (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setActiveCategory(cat)}
+                  className={tabItem(activeCategory === cat)}
+                >
+                  {cat} ({selectedInCategory}/{totalInCategory})
+                </button>
+              );
+            })}
+          </div>
 
-      <div className={tabsTrack}>
-        {categories.map((cat) => {
-          const selectedInCategory = players.filter(
-            (p) => p.categoryName === cat && selected.has(p.id)
-          ).length;
-          const totalInCategory = players.filter((p) => p.categoryName === cat).length;
-          return (
-            <button
-              key={cat}
-              type="button"
-              onClick={() => setActiveCategory(cat)}
-              className={tabItem(activeCategory === cat)}
-            >
-              {cat} ({selectedInCategory}/{totalInCategory})
-            </button>
-          );
-        })}
-      </div>
+          <ul className="flex flex-col gap-1.5">
+            {visiblePlayers.map((p) => {
+              const isLocked = p.id === lockedPlayerId;
+              const isUnsold = p.status !== "SOLD";
+              const wouldExceedBudget =
+                !selected.has(p.id) && totalPrice + Number(p.price) > budgetTotal;
+              return (
+                <li key={p.id}>
+                  <label className={`${card} flex items-center gap-2 text-sm px-3 py-2`}>
+                    <input
+                      type="checkbox"
+                      checked={selected.has(p.id)}
+                      onChange={() => toggle(p.id)}
+                      disabled={
+                        isLocked ||
+                        (!selected.has(p.id) &&
+                          (selected.size >= cap || wouldExceedBudget || isUnsold))
+                      }
+                    />
+                    <span className="flex-1">
+                      {p.name} {p.position ? `(${p.position})` : ""}
+                      {isLocked ? " — you (always included)" : ""}
+                    </span>
+                    <Badge variant={p.status === "SOLD" ? "success" : "neutral"}>
+                      {p.status === "SOLD" ? "Sold" : "Unsold"}
+                    </Badge>
+                    <span className="text-black/60 dark:text-white/60">{p.price}</span>
+                  </label>
+                </li>
+              );
+            })}
+          </ul>
 
-      <ul className="flex flex-col gap-1.5">
-        {visiblePlayers.map((p) => {
-          const isLocked = p.id === lockedPlayerId;
-          const isUnsold = p.status !== "SOLD";
-          const wouldExceedBudget =
-            !selected.has(p.id) && totalPrice + Number(p.price) > budgetTotal;
-          return (
-            <li key={p.id}>
-              <label className={`${card} flex items-center gap-2 text-sm px-3 py-2`}>
-                <input
-                  type="checkbox"
-                  checked={selected.has(p.id)}
-                  onChange={() => toggle(p.id)}
-                  disabled={
-                    isLocked ||
-                    (!selected.has(p.id) && (selected.size >= cap || wouldExceedBudget || isUnsold))
-                  }
-                />
-                <span className="flex-1">
-                  {p.name} {p.position ? `(${p.position})` : ""}
-                  {isLocked ? " — you (always included)" : ""}
-                </span>
-                <Badge variant={p.status === "SOLD" ? "success" : "neutral"}>
-                  {p.status === "SOLD" ? "Sold" : "Unsold"}
-                </Badge>
-                <span className="text-black/60 dark:text-white/60">{p.price}</span>
-              </label>
-            </li>
-          );
-        })}
-      </ul>
+          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
 
-      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+          <button
+            onClick={handleSubmit}
+            disabled={loading}
+            className={`${buttonPrimary} self-start`}
+          >
+            {loading ? "Saving…" : "Save fantasy team"}
+          </button>
+        </div>
+      </details>
 
-      <button onClick={handleSubmit} disabled={loading} className={`${buttonPrimary} self-start`}>
-        {loading ? "Saving…" : "Save fantasy team"}
-      </button>
+      <details className={card} open>
+        <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
+          Your fantasy team so far ({selected.size})
+        </summary>
+        <div className="px-4 pb-4">
+          <RosterRibbon
+            grid
+            highlightId={lockedPlayerId}
+            players={players
+              .filter((p) => selected.has(p.id))
+              .map((p) => ({
+                id: p.id,
+                playerName: p.name,
+                photoUrl: p.photoUrl,
+                position: p.position,
+                soldPrice: p.price,
+              }))}
+          />
+        </div>
+      </details>
     </div>
   );
 }
