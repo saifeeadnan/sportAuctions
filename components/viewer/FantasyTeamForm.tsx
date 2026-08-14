@@ -128,6 +128,7 @@ export function FantasyTeamForm({
       <ul className="flex flex-col gap-1.5">
         {visiblePlayers.map((p) => {
           const isLocked = p.id === lockedPlayerId;
+          const isUnsold = p.status !== "SOLD";
           const wouldExceedBudget =
             !selected.has(p.id) && totalPrice + Number(p.price) > budgetTotal;
           return (
@@ -138,7 +139,8 @@ export function FantasyTeamForm({
                   checked={selected.has(p.id)}
                   onChange={() => toggle(p.id)}
                   disabled={
-                    isLocked || (!selected.has(p.id) && (selected.size >= cap || wouldExceedBudget))
+                    isLocked ||
+                    (!selected.has(p.id) && (selected.size >= cap || wouldExceedBudget || isUnsold))
                   }
                 />
                 <span className="flex-1">

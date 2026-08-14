@@ -254,6 +254,13 @@ export async function submitFantasyTeam(
   if (players.length !== idsArray.length) {
     throw new ValidationError("One or more selected players are not part of this auction");
   }
+  // Nobody actually acquired an unsold player, so there's no real-world team
+  // for them to represent — the guaranteed self-pick is exempt, matching how
+  // it's already force-included above regardless of status.
+  const unsoldPicks = players.filter((ap) => ap.status !== "SOLD" && ap.id !== selfAuctionPlayer.id);
+  if (unsoldPicks.length > 0) {
+    throw new ValidationError("Unsold players can't be picked for a fantasy team");
+  }
 
   const totalPrice = players.reduce(
     (sum, ap) => sum.plus(fantasyPrice(ap)),
