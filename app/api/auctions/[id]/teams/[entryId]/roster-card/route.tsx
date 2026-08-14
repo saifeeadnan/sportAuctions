@@ -7,6 +7,7 @@ import { prisma } from "@/lib/prisma";
 import { requireSession, scopeLeagueId, assertInScope, AuthError } from "@/lib/auth/guards";
 import { toErrorResponse } from "@/lib/api/errors";
 import { getTeamSponsorImageContent } from "@/lib/services/teamSponsorImage.service";
+import { isSafePublicUrl } from "@/lib/security/ssrf";
 
 const SIZE = 1080;
 const MAX_PLAYERS_SHOWN = 15;
@@ -47,9 +48,17 @@ async function loadPhotoAsDataUri(photoUrl: string, timeoutMs = 4000): Promise<s
       const filePath = path.join(process.cwd(), "public", photoUrl);
       buffer = await readFile(filePath);
     } else {
+      // SSRF guard — this is a server-side fetch of a URL an admin typed
+      // into a roster upload, so it must never be trusted to point at an
+      // internal/private address (e.g. a cloud metadata endpoint).
+      if (!(await isSafePublicUrl(photoUrl))) return null;
+
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), timeoutMs);
-      const res = await fetch(photoUrl, { signal: controller.signal });
+      // Redirects are rejected rather than followed — a redirect target
+      // could point at an internal address even when the original URL
+      // passed the safety check above.
+      const res = await fetch(photoUrl, { signal: controller.signal, redirect: "manual" });
       clearTimeout(timeout);
       if (!res.ok) return null;
       buffer = Buffer.from(await res.arrayBuffer());
