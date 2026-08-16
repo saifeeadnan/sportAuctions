@@ -32,7 +32,7 @@ export default async function TournamentDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { leagueId } = await requireAdminOrLeagueAdmin();
+  const { leagueIds } = await requireAdminOrLeagueAdmin();
 
   const tournament = await prisma.tournament.findUnique({
     where: { id },
@@ -49,19 +49,20 @@ export default async function TournamentDetailPage({
     },
   });
   if (!tournament) notFound();
-  assertInScope(leagueId, tournament.leagueId);
+  assertInScope(leagueIds, tournament.leagueId);
 
   // Filtered by the tournament's own league (not the caller's) — a site ADMIN
   // editing one specific tournament should only see that league's managers.
-  const [managers, auctions, rulesDocument, sponsors, knownSponsors, leagueRosters, league] = await Promise.all([
-    prisma.user.findMany({
+  const [managerMemberships, auctions, rulesDocument, sponsors, knownSponsors, leagueRosters, league] = await Promise.all([
+    prisma.leagueMembership.findMany({
       where: { role: "TEAM_MANAGER", leagueId: tournament.leagueId },
-      orderBy: { name: "asc" },
+      select: { user: { select: { id: true, name: true, loginId: true } } },
+      orderBy: { user: { name: "asc" } },
     }),
     prisma.auction.findMany({ where: { tournamentId: id }, orderBy: { createdAt: "desc" } }),
     getRulesDocumentMeta(id),
     listTournamentSponsors(id),
-    listKnownSponsors(id, leagueId),
+    listKnownSponsors(id, leagueIds),
     tournament.rosterId
       ? Promise.resolve([])
       : prisma.playerRoster.findMany({
@@ -70,6 +71,7 @@ export default async function TournamentDetailPage({
         }),
     prisma.league.findUniqueOrThrow({ where: { id: tournament.leagueId }, select: { endDate: true } }),
   ]);
+  const managers = managerMemberships.map((m) => m.user);
 
   const canAddTeam = tournament.teams.length < tournament.numTeams;
   const readOnly = isLeagueReadOnly(league);

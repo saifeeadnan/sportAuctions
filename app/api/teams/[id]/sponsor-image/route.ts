@@ -10,9 +10,9 @@ import {
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { leagueId } = await requireAdminOrLeagueAdmin();
+    const { leagueIds } = await requireAdminOrLeagueAdmin();
     const { id: teamId } = await params;
-    await loadScopedTeam(teamId, leagueId);
+    await loadScopedTeam(teamId, leagueIds);
 
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
@@ -55,9 +55,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { leagueId } = await requireAdminOrLeagueAdmin();
+    const { leagueIds } = await requireAdminOrLeagueAdmin();
     const { id: teamId } = await params;
-    await loadScopedTeam(teamId, leagueId);
+    await loadScopedTeam(teamId, leagueIds);
 
     await deleteTeamSponsorImage(teamId);
     return NextResponse.json({ ok: true });

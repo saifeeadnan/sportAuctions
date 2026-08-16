@@ -34,8 +34,6 @@ async function buildFantasyEligibleFixture() {
       loginId: viewerLoginId,
       passwordHash: await bcrypt.hash("password123", 4),
       name: "Fantasy Viewer",
-      role: "VIEWER",
-      leagueId: fx.league.id,
     },
   });
   await prisma.player.update({ where: { id: selfPlayer.id }, data: { loginId: viewerLoginId } });
@@ -117,8 +115,6 @@ describe("fantasy team cap follows the actual max roster size, not the configure
         loginId: viewerLoginId,
         passwordHash: await bcrypt.hash("password123", 4),
         name: "Fantasy Viewer",
-        role: "VIEWER",
-        leagueId: fx.league.id,
       },
     });
     await prisma.player.update({

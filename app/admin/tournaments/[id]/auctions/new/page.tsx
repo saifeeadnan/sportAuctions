@@ -11,13 +11,13 @@ export default async function NewAuctionPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { leagueId } = await requireAdminOrLeagueAdmin();
+  const { leagueIds } = await requireAdminOrLeagueAdmin();
   const tournament = await prisma.tournament.findUnique({
     where: { id },
     include: { roster: { include: { players: { orderBy: { name: "asc" } } } } },
   });
   if (!tournament) notFound();
-  assertInScope(leagueId, tournament.leagueId);
+  assertInScope(leagueIds, tournament.leagueId);
 
   const league = await prisma.league.findUniqueOrThrow({
     where: { id: tournament.leagueId },

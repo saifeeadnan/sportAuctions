@@ -16,8 +16,8 @@ import {
 
 export async function deleteRosterAction(rosterId: string): Promise<ActionResult> {
   return toActionResult(async () => {
-    const { leagueId } = await requireAdminOrLeagueAdmin();
-    await loadScopedRoster(rosterId, leagueId);
+    const { leagueIds } = await requireAdminOrLeagueAdmin();
+    await loadScopedRoster(rosterId, leagueIds);
     await deleteRoster(rosterId);
     revalidatePath("/admin/rosters");
     revalidatePath("/");
@@ -26,8 +26,8 @@ export async function deleteRosterAction(rosterId: string): Promise<ActionResult
 
 export async function renameRosterAction(rosterId: string, name: string): Promise<ActionResult> {
   return toActionResult(async () => {
-    const { leagueId } = await requireAdminOrLeagueAdmin();
-    await loadScopedRoster(rosterId, leagueId);
+    const { leagueIds } = await requireAdminOrLeagueAdmin();
+    await loadScopedRoster(rosterId, leagueIds);
     await renameRoster(rosterId, name);
     revalidatePath(`/admin/rosters/${rosterId}`);
     revalidatePath("/admin/rosters");
@@ -70,8 +70,8 @@ export async function createPlayerAction(
   formData: FormData
 ): Promise<ActionResult> {
   return toActionResult(async () => {
-    const { leagueId } = await requireAdminOrLeagueAdmin();
-    await loadScopedRoster(rosterId, leagueId);
+    const { leagueIds } = await requireAdminOrLeagueAdmin();
+    await loadScopedRoster(rosterId, leagueIds);
     await createPlayer(rosterId, parsePlayerInput(formData));
     revalidatePath(`/admin/rosters/${rosterId}`);
   });
@@ -84,8 +84,8 @@ export async function updatePlayerAction(
   formData: FormData
 ): Promise<ActionResult> {
   const result = await toActionResult(async () => {
-    const { leagueId } = await requireAdminOrLeagueAdmin();
-    await loadScopedRoster(rosterId, leagueId);
+    const { leagueIds } = await requireAdminOrLeagueAdmin();
+    await loadScopedRoster(rosterId, leagueIds);
     await updatePlayer(playerId, parsePlayerInput(formData));
     revalidatePath(`/admin/rosters/${rosterId}`);
   });
@@ -95,8 +95,8 @@ export async function updatePlayerAction(
 
 export async function deletePlayerAction(rosterId: string, playerId: string): Promise<ActionResult> {
   return toActionResult(async () => {
-    const { leagueId } = await requireAdminOrLeagueAdmin();
-    await loadScopedRoster(rosterId, leagueId);
+    const { leagueIds } = await requireAdminOrLeagueAdmin();
+    await loadScopedRoster(rosterId, leagueIds);
     await deletePlayer(playerId);
     revalidatePath(`/admin/rosters/${rosterId}`);
   });

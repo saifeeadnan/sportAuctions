@@ -27,7 +27,11 @@ export async function Nav() {
                   className="flex items-center gap-2 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white transition-colors"
                 >
                   <span className="hidden sm:inline truncate max-w-[10rem]">{session.user.name}</span>
-                  <Badge variant="info">{session.user.role}</Badge>
+                  <Badge variant="info">
+                    {session.user.isSiteAdmin
+                      ? "ADMIN"
+                      : (session.user.memberships[0]?.role ?? "VIEWER")}
+                  </Badge>
                 </Link>
                 <form action={logoutAction}>
                   <button type="submit" className={`${buttonSecondary} px-3 py-1.5 text-xs`}>

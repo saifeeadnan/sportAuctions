@@ -1,18 +1,18 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { scopeLeagueId } from "@/lib/auth/guards";
+import { allLeagueIds } from "@/lib/auth/guards";
 import { cardInteractive } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 
 export default async function AuctioneerHomePage() {
   const session = await auth();
-  const leagueId = scopeLeagueId(session!);
+  const leagueIds = allLeagueIds(session!);
 
   const auctions = await prisma.auction.findMany({
     where: {
       status: { in: ["PRE_AUCTION_LOCKED", "BIDDING"] },
-      tournament: leagueId ? { leagueId } : undefined,
+      tournament: leagueIds ? { leagueId: { in: leagueIds } } : undefined,
     },
     include: { tournament: true },
     orderBy: { createdAt: "desc" },

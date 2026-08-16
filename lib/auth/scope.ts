@@ -5,57 +5,64 @@ import { assertInScope, requireAdminOrLeagueAdmin } from "@/lib/auth/guards";
 /**
  * Resolves the effective league scope for an admin list view, honoring the
  * sidebar's league switcher. A League Admin is always confined to their own
- * league regardless of the URL — only a site Admin's (unrestricted) view can
- * be narrowed this way, and it's a display filter, not a security boundary,
- * so it must never be used in place of `requireAdminOrLeagueAdmin` for
- * mutations or by-ID access checks.
+ * league membership(s) regardless of the URL — only a site Admin's
+ * (unrestricted) view, or a multi-league League Admin narrowing to one of
+ * their own leagues, can be filtered this way. Display filter only, never a
+ * substitute for `requireAdminOrLeagueAdmin` on mutations or by-ID checks.
  */
 export async function resolveAdminScope(selectedLeagueId?: string) {
-  const { session, leagueId } = await requireAdminOrLeagueAdmin();
-  const effectiveLeagueId = leagueId !== null ? leagueId : selectedLeagueId || null;
-  return { session, leagueId: effectiveLeagueId };
+  const { session, leagueIds } = await requireAdminOrLeagueAdmin();
+  if (leagueIds === null) {
+    // Site admin — unrestricted, narrowed via the sidebar filter if selected.
+    return { session, leagueIds: selectedLeagueId ? [selectedLeagueId] : null };
+  }
+  // League admin — always confined to their own league(s); narrow to one of
+  // them if the sidebar selects a specific one, otherwise show all of them.
+  const effectiveLeagueIds =
+    selectedLeagueId && leagueIds.includes(selectedLeagueId) ? [selectedLeagueId] : leagueIds;
+  return { session, leagueIds: effectiveLeagueIds };
 }
 
-export async function loadScopedRoster(rosterId: string, leagueId: string | null) {
+export async function loadScopedRoster(rosterId: string, leagueIds: string[] | null) {
   const roster = await prisma.playerRoster.findUnique({ where: { id: rosterId } });
   if (!roster) throw new ValidationError("Roster not found");
-  assertInScope(leagueId, roster.leagueId);
+  assertInScope(leagueIds, roster.leagueId);
   return roster;
 }
 
-export async function loadScopedTournament(tournamentId: string, leagueId: string | null) {
+export async function loadScopedTournament(tournamentId: string, leagueIds: string[] | null) {
   const tournament = await prisma.tournament.findUnique({ where: { id: tournamentId } });
   if (!tournament) throw new ValidationError("Tournament not found");
-  assertInScope(leagueId, tournament.leagueId);
+  assertInScope(leagueIds, tournament.leagueId);
   return tournament;
 }
 
-export async function loadScopedAuction(auctionId: string, leagueId: string | null) {
+export async function loadScopedAuction(auctionId: string, leagueIds: string[] | null) {
   const auction = await prisma.auction.findUnique({
     where: { id: auctionId },
     include: { tournament: true },
   });
   if (!auction) throw new ValidationError("Auction not found");
-  assertInScope(leagueId, auction.tournament.leagueId);
+  assertInScope(leagueIds, auction.tournament.leagueId);
   return auction;
 }
 
-export async function loadScopedTeam(teamId: string, leagueId: string | null) {
+export async function loadScopedTeam(teamId: string, leagueIds: string[] | null) {
   const team = await prisma.team.findUnique({
     where: { id: teamId },
     include: { tournament: true },
   });
   if (!team) throw new ValidationError("Team not found");
-  assertInScope(leagueId, team.tournament.leagueId);
+  assertInScope(leagueIds, team.tournament.leagueId);
   return team;
 }
 
-export async function loadScopedTournamentSponsor(sponsorId: string, leagueId: string | null) {
+export async function loadScopedTournamentSponsor(sponsorId: string, leagueIds: string[] | null) {
   const sponsor = await prisma.tournamentSponsor.findUnique({
     where: { id: sponsorId },
     include: { tournament: true },
   });
   if (!sponsor) throw new ValidationError("Sponsor not found");
-  assertInScope(leagueId, sponsor.tournament.leagueId);
+  assertInScope(leagueIds, sponsor.tournament.leagueId);
   return sponsor;
 }

@@ -6,9 +6,9 @@ import { addTournamentSponsor } from "@/lib/services/tournamentSponsor.service";
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { leagueId } = await requireAdminOrLeagueAdmin();
+    const { leagueIds } = await requireAdminOrLeagueAdmin();
     const { id: tournamentId } = await params;
-    await loadScopedTournament(tournamentId, leagueId);
+    await loadScopedTournament(tournamentId, leagueIds);
 
     const formData = await req.formData();
     const name = String(formData.get("name") ?? "");

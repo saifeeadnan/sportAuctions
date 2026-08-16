@@ -11,16 +11,19 @@ export default async function AdminLayout({
   children: React.ReactNode;
 }) {
   const session = await requireRole("ADMIN", "LEAGUE_ADMIN");
-  const isSiteAdmin = session.user.role === "ADMIN";
+  const isSiteAdmin = session.user.isSiteAdmin;
   const leagues = isSiteAdmin ? await listLeagues() : null;
 
-  // A League Admin has no sidebar switcher (they're always confined to one
-  // league, never a choice), but they still deserve the same logo/name
-  // banner the site ADMIN gets after picking a league from the sidebar.
+  // A League Admin has no sidebar switcher (they're always confined to their
+  // own league(s), never a choice), but they still deserve the same
+  // logo/name banner the site ADMIN gets after picking a league from the
+  // sidebar. Multi-league League Admins get their first membership's league
+  // here — a dedicated switcher for them is deferred Phase 5 polish.
+  const myLeagueId = session.user.memberships.find((m) => m.role === "LEAGUE_ADMIN")?.leagueId;
   const myLeague =
-    !isSiteAdmin && session.user.leagueId
+    !isSiteAdmin && myLeagueId
       ? await prisma.league.findUnique({
-          where: { id: session.user.leagueId },
+          where: { id: myLeagueId },
           include: { logo: { select: { id: true } } },
         })
       : null;

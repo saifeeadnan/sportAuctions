@@ -236,7 +236,7 @@ export async function updateCategoryBidIncrement(categoryId: string, bidIncremen
 export async function openPreAuction(auctionId: string) {
   const auction = await prisma.auction.findUnique({
     where: { id: auctionId },
-    include: { tournament: { include: { teams: { include: { manager: true } } } } },
+    include: { tournament: { include: { teams: true } } },
   });
   if (!auction) throw new ValidationError("Auction not found");
   if (auction.status !== "CREATED") {
@@ -257,6 +257,20 @@ export async function openPreAuction(auctionId: string) {
     }
   }
 
+  // A manager's base price is per-league (LeagueMembership.managerBasePrice),
+  // not a single global value — fetched in one batch for every team's manager
+  // in this tournament's own league.
+  const managerIds = auction.tournament.teams
+    .map((t) => t.managerId)
+    .filter((id): id is string => !!id);
+  const managerMemberships = await prisma.leagueMembership.findMany({
+    where: { userId: { in: managerIds }, leagueId: auction.tournament.leagueId },
+    select: { userId: true, managerBasePrice: true },
+  });
+  const managerBasePriceByManagerId = new Map(
+    managerMemberships.map((m) => [m.userId, m.managerBasePrice])
+  );
+
   return prisma.$transaction(async (tx) => {
     for (const team of auction.tournament.teams) {
       const selfPlayerId = team.managerId ? selfPlayerIdByManagerId.get(team.managerId) : null;
@@ -266,7 +280,7 @@ export async function openPreAuction(auctionId: string) {
         ? new Prisma.Decimal(0)
         : computeManagerSlotPrice(
             team.managerOccupiesSlot,
-            team.manager?.managerBasePrice ?? null,
+            team.managerId ? (managerBasePriceByManagerId.get(team.managerId) ?? null) : null,
             null
           );
       const budgetRemaining = new Prisma.Decimal(auction.teamBudget).minus(managerSlotPrice);

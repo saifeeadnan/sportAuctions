@@ -25,7 +25,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const password = credentials?.password as string | undefined;
         if (!loginId || !password) return null;
 
-        const user = await prisma.user.findUnique({ where: { loginId } });
+        const user = await prisma.user.findUnique({
+          where: { loginId },
+          // Only active (approved) memberships grant session access — a
+          // pending self-registration for a second league shouldn't let
+          // someone act in that league until its admin approves it.
+          include: { memberships: { where: { isActive: true }, select: { leagueId: true, role: true } } },
+        });
         if (!user) return null;
 
         const valid = await bcrypt.compare(password, user.passwordHash);
@@ -51,8 +57,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         return {
           id: user.id,
           name: user.name,
-          role: user.role,
-          leagueId: user.leagueId,
+          isSiteAdmin: user.isSiteAdmin,
+          memberships: user.memberships,
           analyticsSessionId: analyticsSession?.id ?? "",
         };
       },

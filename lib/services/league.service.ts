@@ -130,7 +130,7 @@ export async function listLeagues() {
   return prisma.league.findMany({
     orderBy: { createdAt: "desc" },
     include: {
-      _count: { select: { users: true, rosters: true, tournaments: true } },
+      _count: { select: { memberships: true, rosters: true, tournaments: true } },
       logo: { select: { id: true } },
     },
   });
@@ -139,20 +139,21 @@ export async function listLeagues() {
 export async function deleteLeague(leagueId: string) {
   const league = await prisma.league.findUnique({
     where: { id: leagueId },
-    include: { _count: { select: { users: true, rosters: true, tournaments: true } } },
+    include: { _count: { select: { memberships: true, rosters: true, tournaments: true } } },
   });
   if (!league) throw new ValidationError("League not found");
 
   const blockers: string[] = [];
-  if (league._count.users > 0) blockers.push(`${league._count.users} user(s)`);
+  if (league._count.memberships > 0) blockers.push(`${league._count.memberships} member(s)`);
   if (league._count.rosters > 0) blockers.push(`${league._count.rosters} roster(s)`);
   if (league._count.tournaments > 0) blockers.push(`${league._count.tournaments} tournament(s)`);
 
   if (blockers.length > 0) {
-    // Users hang off a league via ON DELETE SET NULL — the DB alone wouldn't
-    // stop this delete, but silently detaching a non-admin user from every
-    // league would break the "every non-admin belongs to exactly one league"
-    // invariant the rest of the app relies on for scoping.
+    // LeagueMembership cascade-deletes with the league (onDelete: Cascade) —
+    // the DB alone wouldn't stop this delete, but silently removing every
+    // person's access to a league they still actively belong to would be a
+    // surprising, unrecoverable side effect of what looks like tidying up an
+    // empty league.
     throw new ValidationError(
       `Cannot delete "${league.name}" — it has ${blockers.join(", ")}. Reassign or remove those first.`
     );

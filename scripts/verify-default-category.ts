@@ -17,7 +17,7 @@ async function main() {
     where: { name: "DefCat Test Roster" },
     include: { players: true },
   });
-  const admin = await prisma.user.findFirstOrThrow({ where: { role: "ADMIN" } });
+  const admin = await prisma.user.findFirstOrThrow({ where: { isSiteAdmin: true } });
 
   await prisma.tournament.deleteMany({ where: { name: "DefCat Verify Tournament" } });
 

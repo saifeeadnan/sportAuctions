@@ -12,7 +12,7 @@ export default async function AuctionResultsPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { leagueId } = await requireAdminOrLeagueAdmin();
+  const { leagueIds } = await requireAdminOrLeagueAdmin();
 
   const auction = await prisma.auction.findUnique({
     where: { id },
@@ -29,7 +29,7 @@ export default async function AuctionResultsPage({
     },
   });
   if (!auction) notFound();
-  assertInScope(leagueId, auction.tournament.leagueId);
+  assertInScope(leagueIds, auction.tournament.leagueId);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 flex flex-col gap-8">

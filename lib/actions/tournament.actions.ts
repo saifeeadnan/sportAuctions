@@ -22,22 +22,23 @@ export async function createTournamentAction(
   formData: FormData
 ): Promise<ActionResult> {
   const result = await toActionResult(async () => {
-    const { session, leagueId } = await requireAdminOrLeagueAdmin();
+    const { session, leagueIds } = await requireAdminOrLeagueAdmin();
 
     const rosterId = String(formData.get("rosterId") ?? "");
     if (rosterId) {
-      await loadScopedRoster(rosterId, leagueId);
+      await loadScopedRoster(rosterId, leagueIds);
     }
-    // The session's own scoped leagueId always wins when present (a League
-    // Admin can't be redirected to another league by a tampered form field);
-    // a submitted leagueId is only trusted for an unscoped site ADMIN, same
-    // idiom as app/api/rosters/upload/route.ts.
+    // The session's own scoped leagueId always wins when it's unambiguous (a
+    // single-league League Admin can't be redirected to another league by a
+    // tampered form field); a submitted leagueId is trusted for an unscoped
+    // site ADMIN or a multi-league League Admin, same idiom as
+    // app/api/rosters/upload/route.ts.
     const submittedLeagueId = String(formData.get("leagueId") ?? "");
 
     return createTournament({
       name: String(formData.get("name") ?? ""),
       rosterId: rosterId || undefined,
-      leagueId: leagueId ?? submittedLeagueId,
+      leagueId: leagueIds?.length === 1 ? leagueIds[0] : submittedLeagueId,
       numTeams: Number(formData.get("numTeams")),
       squadSize: Number(formData.get("squadSize")),
       startDate: new Date(String(formData.get("startDate"))),
@@ -58,11 +59,11 @@ export async function attachRosterToTournamentAction(
   formData: FormData
 ): Promise<ActionResult> {
   return toActionResult(async () => {
-    const { leagueId } = await requireAdminOrLeagueAdmin();
-    await loadScopedTournament(tournamentId, leagueId);
+    const { leagueIds } = await requireAdminOrLeagueAdmin();
+    await loadScopedTournament(tournamentId, leagueIds);
 
     const rosterId = String(formData.get("rosterId") ?? "");
-    await loadScopedRoster(rosterId, leagueId);
+    await loadScopedRoster(rosterId, leagueIds);
 
     await attachRosterToTournament(tournamentId, rosterId);
     revalidatePath(`/admin/tournaments/${tournamentId}`);
@@ -71,8 +72,8 @@ export async function attachRosterToTournamentAction(
 
 export async function deleteTournamentAction(tournamentId: string): Promise<ActionResult> {
   return toActionResult(async () => {
-    const { leagueId } = await requireAdminOrLeagueAdmin();
-    await loadScopedTournament(tournamentId, leagueId);
+    const { leagueIds } = await requireAdminOrLeagueAdmin();
+    await loadScopedTournament(tournamentId, leagueIds);
     await deleteTournament(tournamentId);
     revalidatePath("/admin/tournaments");
     revalidatePath("/");
@@ -85,8 +86,8 @@ export async function updateTournamentDatesAction(
   endDate: string
 ): Promise<ActionResult> {
   return toActionResult(async () => {
-    const { leagueId } = await requireAdminOrLeagueAdmin();
-    await loadScopedTournament(tournamentId, leagueId);
+    const { leagueIds } = await requireAdminOrLeagueAdmin();
+    await loadScopedTournament(tournamentId, leagueIds);
     await updateTournamentDates(tournamentId, {
       startDate: new Date(startDate),
       endDate: new Date(endDate),
@@ -98,8 +99,8 @@ export async function updateTournamentDatesAction(
 
 export async function deleteTeamAction(teamId: string): Promise<ActionResult> {
   return toActionResult(async () => {
-    const { leagueId } = await requireAdminOrLeagueAdmin();
-    const team = await loadScopedTeam(teamId, leagueId);
+    const { leagueIds } = await requireAdminOrLeagueAdmin();
+    const team = await loadScopedTeam(teamId, leagueIds);
     await deleteTeam(teamId);
     revalidatePath(`/admin/tournaments/${team.tournamentId}`);
   });

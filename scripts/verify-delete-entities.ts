@@ -15,7 +15,7 @@ const assert = (cond: boolean, msg: string) => {
 };
 
 async function main() {
-  const admin = await prisma.user.findFirstOrThrow({ where: { role: "ADMIN" } });
+  const admin = await prisma.user.findFirstOrThrow({ where: { isSiteAdmin: true } });
   const roster = await prisma.playerRoster.findFirstOrThrow({ where: { name: "Demo Season Roster" } });
 
   // --- Tournament deletion ---
@@ -85,7 +85,7 @@ async function main() {
   const passwordHash = await bcrypt.hash("test123", 10);
   await prisma.user.deleteMany({ where: { loginId: "deletable-viewer@sportsauction.local" } });
   const viewer = await prisma.user.create({
-    data: { loginId: "deletable-viewer@sportsauction.local", name: "Deletable Viewer", role: "VIEWER", passwordHash },
+    data: { loginId: "deletable-viewer@sportsauction.local", name: "Deletable Viewer", passwordHash },
   });
 
   await deleteUser(viewer.id, admin.id);
@@ -106,7 +106,12 @@ async function main() {
   // Cannot delete a user who created rosters/tournaments/etc (admin has created things).
   try {
     const otherAdmin = await prisma.user.create({
-      data: { loginId: "throwaway-check@sportsauction.local", name: "Throwaway", role: "ADMIN", passwordHash },
+      data: {
+        loginId: "throwaway-check@sportsauction.local",
+        name: "Throwaway",
+        isSiteAdmin: true,
+        passwordHash,
+      },
     });
     await deleteUser(admin.id, otherAdmin.id);
     throw new Error("Expected deleteUser to reject deleting a user with linked records");

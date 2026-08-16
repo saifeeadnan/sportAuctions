@@ -12,7 +12,7 @@ const assert = (cond: boolean, msg: string) => {
 };
 
 async function main() {
-  const admin = await prisma.user.findFirstOrThrow({ where: { role: "ADMIN" } });
+  const admin = await prisma.user.findFirstOrThrow({ where: { isSiteAdmin: true } });
   const league = await prisma.league.findFirstOrThrow();
 
   // Case 1: roster with no tournaments -> should delete cleanly, players cascade.

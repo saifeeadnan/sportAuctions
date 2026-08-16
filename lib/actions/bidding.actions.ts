@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { requireRole, requireAdminOrLeagueAdmin, scopeLeagueId } from "@/lib/auth/guards";
+import { requireRole, requireAdminOrLeagueAdmin, allLeagueIds } from "@/lib/auth/guards";
 import { loadScopedAuction } from "@/lib/auth/scope";
 import { prisma } from "@/lib/prisma";
 import { ValidationError } from "@/lib/errors";
@@ -25,7 +25,7 @@ export async function selectNextPlayerAction(
 ): Promise<ActionResult> {
   return toActionResult(async () => {
     const session = await requireRole("AUCTIONEER", "ADMIN", "LEAGUE_ADMIN");
-    await loadScopedAuction(auctionId, scopeLeagueId(session));
+    await loadScopedAuction(auctionId, allLeagueIds(session));
     await selectNextPlayer(auctionId, auctionPlayerId);
     revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
     revalidatePath(`/admin/auctions/${auctionId}`);
@@ -41,7 +41,7 @@ export async function recordSaleAction(
 ): Promise<ActionResult> {
   return toActionResult(async () => {
     const session = await requireRole("AUCTIONEER", "ADMIN", "LEAGUE_ADMIN");
-    await loadScopedAuction(auctionId, scopeLeagueId(session));
+    await loadScopedAuction(auctionId, allLeagueIds(session));
     await recordSale(auctionId, auctionPlayerId, winningTeamAuctionEntryId, price, { force });
     revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
     revalidatePath(`/admin/auctions/${auctionId}`);
@@ -51,7 +51,7 @@ export async function recordSaleAction(
 export async function markUnsoldAction(auctionId: string, auctionPlayerId: string): Promise<ActionResult> {
   return toActionResult(async () => {
     const session = await requireRole("AUCTIONEER", "ADMIN", "LEAGUE_ADMIN");
-    await loadScopedAuction(auctionId, scopeLeagueId(session));
+    await loadScopedAuction(auctionId, allLeagueIds(session));
     await markUnsold(auctionId, auctionPlayerId);
     revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
     revalidatePath(`/admin/auctions/${auctionId}`);
@@ -61,7 +61,7 @@ export async function markUnsoldAction(auctionId: string, auctionPlayerId: strin
 export async function concludeAuctionAction(auctionId: string): Promise<ActionResult> {
   return toActionResult(async () => {
     const session = await requireRole("AUCTIONEER", "ADMIN", "LEAGUE_ADMIN");
-    await loadScopedAuction(auctionId, scopeLeagueId(session));
+    await loadScopedAuction(auctionId, allLeagueIds(session));
     await concludeAuction(auctionId);
     revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
     revalidatePath(`/admin/auctions/${auctionId}`);
@@ -74,7 +74,7 @@ export async function removePlayerFromTeamAction(
 ): Promise<ActionResult> {
   return toActionResult(async () => {
     const session = await requireRole("AUCTIONEER", "ADMIN", "LEAGUE_ADMIN");
-    await loadScopedAuction(auctionId, scopeLeagueId(session));
+    await loadScopedAuction(auctionId, allLeagueIds(session));
     await removePlayerFromTeam(auctionId, auctionPlayerId);
     revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
     revalidatePath(`/admin/auctions/${auctionId}`);
@@ -118,7 +118,7 @@ export async function adminPlaceBidAction(
 ): Promise<ActionResult> {
   return toActionResult(async () => {
     const session = await requireRole("AUCTIONEER", "ADMIN", "LEAGUE_ADMIN");
-    await loadScopedAuction(auctionId, scopeLeagueId(session));
+    await loadScopedAuction(auctionId, allLeagueIds(session));
     await placeBid(auctionId, auctionPlayerId, teamAuctionEntryId, amount);
   });
 }
@@ -130,8 +130,8 @@ export async function adminAssignPlayerAction(
   price: number
 ): Promise<ActionResult> {
   return toActionResult(async () => {
-    const { leagueId } = await requireAdminOrLeagueAdmin();
-    await loadScopedAuction(auctionId, leagueId);
+    const { leagueIds } = await requireAdminOrLeagueAdmin();
+    await loadScopedAuction(auctionId, leagueIds);
     await adminAssignPlayer(auctionId, auctionPlayerId, teamAuctionEntryId, price);
     revalidatePath(`/admin/auctions/${auctionId}`);
     revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
@@ -147,8 +147,8 @@ export async function removePlayerPostAuctionAction(
   teamAuctionEntryId: string
 ): Promise<ActionResult> {
   return toActionResult(async () => {
-    const { leagueId } = await requireAdminOrLeagueAdmin();
-    await loadScopedAuction(auctionId, leagueId);
+    const { leagueIds } = await requireAdminOrLeagueAdmin();
+    await loadScopedAuction(auctionId, leagueIds);
     await removePlayerPostAuction(auctionId, auctionPlayerId);
     revalidatePath(`/admin/auctions/${auctionId}`);
     revalidatePath(`/admin/auctions/${auctionId}/teams/${teamAuctionEntryId}`);
@@ -163,8 +163,8 @@ export async function addPlayerPostAuctionAction(
   price: number
 ): Promise<ActionResult> {
   return toActionResult(async () => {
-    const { leagueId } = await requireAdminOrLeagueAdmin();
-    await loadScopedAuction(auctionId, leagueId);
+    const { leagueIds } = await requireAdminOrLeagueAdmin();
+    await loadScopedAuction(auctionId, leagueIds);
     await addPlayerPostAuction(auctionId, teamAuctionEntryId, playerId, categoryId, price);
     revalidatePath(`/admin/auctions/${auctionId}`);
     revalidatePath(`/admin/auctions/${auctionId}/teams/${teamAuctionEntryId}`);
@@ -180,8 +180,8 @@ export async function replacePlayerPostAuctionAction(
   teamAuctionEntryId: string
 ): Promise<ActionResult> {
   return toActionResult(async () => {
-    const { leagueId } = await requireAdminOrLeagueAdmin();
-    await loadScopedAuction(auctionId, leagueId);
+    const { leagueIds } = await requireAdminOrLeagueAdmin();
+    await loadScopedAuction(auctionId, leagueIds);
     await replacePlayerPostAuction(
       auctionId,
       outgoingAuctionPlayerId,

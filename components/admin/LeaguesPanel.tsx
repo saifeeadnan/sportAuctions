@@ -105,14 +105,14 @@ export async function LeaguesPanel() {
                 </span>
                 <span className="flex items-center gap-3 flex-wrap">
                   <span className="text-sm text-black/60 dark:text-white/60">
-                    {league._count.users} users &middot; {league._count.rosters} rosters &middot;{" "}
+                    {league._count.memberships} users &middot; {league._count.rosters} rosters &middot;{" "}
                     {league._count.tournaments} tournaments
                   </span>
                   <CopyInviteLinkButton path={`/register?league=${league.id}`} />
                   <DeleteLeagueButton
                     leagueId={league.id}
                     leagueName={league.name}
-                    userCount={league._count.users}
+                    userCount={league._count.memberships}
                     rosterCount={league._count.rosters}
                     tournamentCount={league._count.tournaments}
                   />

@@ -45,7 +45,7 @@ export default async function RosterDetailPage({
   const { sort, dir } = await searchParams;
   const sortField = resolveSortField(sort);
   const sortDir = resolveSortDir(dir);
-  const { leagueId } = await requireAdminOrLeagueAdmin();
+  const { leagueIds } = await requireAdminOrLeagueAdmin();
 
   const orderByValue =
     sortField === "name" ? sortDir : { sort: sortDir, nulls: "last" as const };
@@ -60,7 +60,7 @@ export default async function RosterDetailPage({
   });
 
   if (!roster) notFound();
-  assertInScope(leagueId, roster.leagueId);
+  assertInScope(leagueIds, roster.leagueId);
 
   const rosterLeague = await prisma.league.findUniqueOrThrow({
     where: { id: roster.leagueId },

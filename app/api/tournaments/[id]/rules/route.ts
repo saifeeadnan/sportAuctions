@@ -11,9 +11,9 @@ import {
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { session, leagueId } = await requireAdminOrLeagueAdmin();
+    const { session, leagueIds } = await requireAdminOrLeagueAdmin();
     const { id: tournamentId } = await params;
-    await loadScopedTournament(tournamentId, leagueId);
+    await loadScopedTournament(tournamentId, leagueIds);
 
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
@@ -62,9 +62,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { leagueId } = await requireAdminOrLeagueAdmin();
+    const { leagueIds } = await requireAdminOrLeagueAdmin();
     const { id: tournamentId } = await params;
-    await loadScopedTournament(tournamentId, leagueId);
+    await loadScopedTournament(tournamentId, leagueIds);
 
     await deleteRulesDocument(tournamentId);
     return NextResponse.json({ ok: true });

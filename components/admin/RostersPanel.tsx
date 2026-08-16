@@ -7,15 +7,18 @@ import { UploadRosterForm } from "@/components/roster/UploadRosterForm";
 import { card, cardInteractive } from "@/lib/ui";
 
 export async function RostersPanel({ selectedLeagueId }: { selectedLeagueId?: string }) {
-  const { leagueId } = await resolveAdminScope(selectedLeagueId);
+  const { leagueIds } = await resolveAdminScope(selectedLeagueId);
+  // Single, definite leagueId for the "my league" banner/read-only check —
+  // only meaningful once scope has narrowed to exactly one league.
+  const leagueId = leagueIds?.length === 1 ? leagueIds[0] : undefined;
 
   const [rosters, leagues, myLeague] = await Promise.all([
     prisma.playerRoster.findMany({
-      where: leagueId ? { leagueId } : {},
+      where: leagueIds ? { leagueId: { in: leagueIds } } : {},
       orderBy: { createdAt: "desc" },
       include: { _count: { select: { players: true, tournaments: true } } },
     }),
-    leagueId ? Promise.resolve(null) : listLeagues(),
+    leagueIds ? Promise.resolve(null) : listLeagues(),
     leagueId ? prisma.league.findUnique({ where: { id: leagueId }, select: { endDate: true } }) : Promise.resolve(null),
   ]);
 

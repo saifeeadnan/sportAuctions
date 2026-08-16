@@ -13,9 +13,9 @@ function csvEscape(value: string): string {
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { leagueId } = await requireAdminOrLeagueAdmin();
+    const { leagueIds } = await requireAdminOrLeagueAdmin();
     const { id } = await params;
-    const auction = await loadScopedAuction(id, leagueId);
+    const auction = await loadScopedAuction(id, leagueIds);
 
     const entries = await prisma.teamAuctionEntry.findMany({
       where: { auctionId: id },

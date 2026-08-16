@@ -10,10 +10,13 @@ export default async function AdminFantasyTeamsIndexPage({
   searchParams: Promise<{ league?: string }>;
 }) {
   const { league } = await searchParams;
-  const { leagueId } = await resolveAdminScope(league);
+  const { leagueIds } = await resolveAdminScope(league);
 
   const auctions = await prisma.auction.findMany({
-    where: { status: "COMPLETED", tournament: leagueId ? { leagueId } : undefined },
+    where: {
+      status: "COMPLETED",
+      tournament: leagueIds ? { leagueId: { in: leagueIds } } : undefined,
+    },
     include: {
       tournament: true,
       _count: { select: { fantasyTeams: true } },

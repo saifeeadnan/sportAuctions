@@ -138,7 +138,7 @@ export type KnownSponsor = {
  * so the picker doesn't offer obvious duplicates. */
 export async function listKnownSponsors(
   tournamentId: string,
-  leagueId: string | null
+  leagueIds: string[] | null
 ): Promise<KnownSponsor[]> {
   const existing = await prisma.tournamentSponsor.findMany({
     where: { tournamentId },
@@ -147,7 +147,7 @@ export async function listKnownSponsors(
   const existingNames = new Set(existing.map((s) => s.name.toLowerCase()));
 
   const rows = await prisma.tournamentSponsor.findMany({
-    where: leagueId ? { tournament: { leagueId } } : {},
+    where: leagueIds ? { tournament: { leagueId: { in: leagueIds } } } : {},
     select: { id: true, name: true, websiteUrl: true, logoUrl: true },
     orderBy: { createdAt: "desc" },
   });

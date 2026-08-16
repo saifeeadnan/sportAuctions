@@ -13,14 +13,14 @@ export default async function EditPlayerPage({
   params: Promise<{ id: string; playerId: string }>;
 }) {
   const { id, playerId } = await params;
-  const { leagueId } = await requireAdminOrLeagueAdmin();
+  const { leagueIds } = await requireAdminOrLeagueAdmin();
 
   const player = await prisma.player.findUnique({
     where: { id: playerId },
     include: { roster: { select: { leagueId: true } } },
   });
   if (!player || player.rosterId !== id) notFound();
-  assertInScope(leagueId, player.roster.leagueId);
+  assertInScope(leagueIds, player.roster.leagueId);
 
   return (
     <div className="max-w-3xl">

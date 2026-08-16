@@ -1,18 +1,18 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { scopeLeagueId } from "@/lib/auth/guards";
+import { allLeagueIds } from "@/lib/auth/guards";
 import { cardInteractive } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 import { listEligibleCompletedAuctionsForViewer } from "@/lib/services/fantasyTeam.service";
 
 export default async function ManagerFantasyPage() {
   const session = await auth();
-  const leagueId = scopeLeagueId(session!);
+  const leagueIds = allLeagueIds(session!);
 
   const fantasyEligibleAuctions = await listEligibleCompletedAuctionsForViewer(
     session!.user.id,
-    leagueId
+    leagueIds
   );
 
   const submittedFantasyTeams = await prisma.fantasyTeam.findMany({

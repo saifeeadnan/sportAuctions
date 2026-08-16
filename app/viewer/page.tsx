@@ -1,19 +1,19 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { scopeLeagueId } from "@/lib/auth/guards";
+import { allLeagueIds } from "@/lib/auth/guards";
 import { cardInteractive } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 import { getRulesDocumentIfViewable } from "@/lib/services/tournamentDocument.service";
 
 export default async function ViewerHomePage() {
   const session = await auth();
-  const leagueId = session?.user ? scopeLeagueId(session) : null;
+  const leagueIds = session?.user ? allLeagueIds(session) : null;
 
   const auctions = await prisma.auction.findMany({
     where: {
       status: { in: ["BIDDING", "COMPLETED"] },
-      tournament: leagueId ? { leagueId } : undefined,
+      tournament: leagueIds ? { leagueId: { in: leagueIds } } : undefined,
     },
     include: { tournament: true },
     orderBy: { createdAt: "desc" },

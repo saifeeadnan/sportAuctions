@@ -6,19 +6,49 @@ import bcrypt from "bcryptjs";
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 
+type SeedRole = "ADMIN" | "LEAGUE_ADMIN" | "TEAM_MANAGER" | "AUCTIONEER" | "VIEWER";
+
+/**
+ * Creates (or reuses) the login identity, then — for every role except
+ * ADMIN, which is a site-wide flag rather than a league membership — upserts
+ * its LeagueMembership separately, so re-running this script against a DB
+ * where the user already exists still attaches the membership.
+ */
 async function upsertUser(
   loginId: string,
   name: string,
-  role: "ADMIN" | "TEAM_MANAGER" | "AUCTIONEER" | "VIEWER",
+  role: SeedRole,
   password: string,
-  managerBasePrice?: number
+  opts?: { leagueId?: string; managerBasePrice?: number }
 ) {
   const passwordHash = await bcrypt.hash(password, 10);
-  return prisma.user.upsert({
+  const user = await prisma.user.upsert({
     where: { loginId },
     update: {},
-    create: { loginId, name, role, passwordHash, managerBasePrice },
+    create: {
+      loginId,
+      name,
+      passwordHash,
+      isSiteAdmin: role === "ADMIN",
+      isActive: true,
+    },
   });
+
+  if (role !== "ADMIN" && opts?.leagueId) {
+    await prisma.leagueMembership.upsert({
+      where: { userId_leagueId: { userId: user.id, leagueId: opts.leagueId } },
+      update: {},
+      create: {
+        userId: user.id,
+        leagueId: opts.leagueId,
+        role,
+        isActive: true,
+        managerBasePrice: opts.managerBasePrice,
+      },
+    });
+  }
+
+  return user;
 }
 
 const SAMPLE_PLAYERS = [
@@ -40,18 +70,30 @@ const SAMPLE_PLAYERS = [
 ];
 
 async function main() {
-  const admin = await upsertUser(
-    "admin@sportsauction.local",
-    "Admin",
-    "ADMIN",
-    "admin123"
-  );
+  // Created first — every non-Admin seeded person below is attached to it
+  // via a LeagueMembership.
+  let league = await prisma.league.findUnique({ where: { name: "Demo League" } });
+  if (!league) {
+    league = await prisma.league.create({ data: { name: "Demo League", type: "Cricket" } });
+    console.log(`Created league "Demo League"`);
+  }
+
+  const admin = await upsertUser("admin@sportsauction.local", "Admin", "ADMIN", "admin123");
   console.log(`Admin: ${admin.loginId} (password: admin123)`);
 
   const managers = await Promise.all([
-    upsertUser("manager1@sportsauction.local", "Manager One", "TEAM_MANAGER", "manager123", 50),
-    upsertUser("manager2@sportsauction.local", "Manager Two", "TEAM_MANAGER", "manager123", 50),
-    upsertUser("manager3@sportsauction.local", "Manager Three", "TEAM_MANAGER", "manager123", 50),
+    upsertUser("manager1@sportsauction.local", "Manager One", "TEAM_MANAGER", "manager123", {
+      leagueId: league.id,
+      managerBasePrice: 50,
+    }),
+    upsertUser("manager2@sportsauction.local", "Manager Two", "TEAM_MANAGER", "manager123", {
+      leagueId: league.id,
+      managerBasePrice: 50,
+    }),
+    upsertUser("manager3@sportsauction.local", "Manager Three", "TEAM_MANAGER", "manager123", {
+      leagueId: league.id,
+      managerBasePrice: 50,
+    }),
   ]);
   console.log(`Managers: ${managers.map((m) => m.loginId).join(", ")} (password: manager123)`);
 
@@ -59,23 +101,15 @@ async function main() {
     "auctioneer1@sportsauction.local",
     "Auctioneer One",
     "AUCTIONEER",
-    "auction123"
+    "auction123",
+    { leagueId: league.id }
   );
   console.log(`Auctioneer: ${auctioneer.loginId} (password: auction123)`);
 
-  const viewer = await upsertUser(
-    "viewer1@sportsauction.local",
-    "Viewer One",
-    "VIEWER",
-    "viewer123"
-  );
+  const viewer = await upsertUser("viewer1@sportsauction.local", "Viewer One", "VIEWER", "viewer123", {
+    leagueId: league.id,
+  });
   console.log(`Viewer: ${viewer.loginId} (password: viewer123)`);
-
-  let league = await prisma.league.findUnique({ where: { name: "Demo League" } });
-  if (!league) {
-    league = await prisma.league.create({ data: { name: "Demo League", type: "Cricket" } });
-    console.log(`Created league "Demo League"`);
-  }
 
   let roster = await prisma.playerRoster.findFirst({ where: { name: "Demo Season Roster" } });
   if (!roster) {

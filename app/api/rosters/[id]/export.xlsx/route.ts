@@ -8,9 +8,9 @@ import { ROSTER_EXPORT_COLUMNS, rosterExportRows } from "@/lib/services/roster.s
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { leagueId } = await requireAdminOrLeagueAdmin();
+    const { leagueIds } = await requireAdminOrLeagueAdmin();
     const { id } = await params;
-    const roster = await loadScopedRoster(id, leagueId);
+    const roster = await loadScopedRoster(id, leagueIds);
 
     const players = await prisma.player.findMany({ where: { rosterId: id }, orderBy: { name: "asc" } });
     const header = ROSTER_EXPORT_COLUMNS.map((c) => c.header);

@@ -68,17 +68,23 @@ enum StrategyPreferenceType {
 }
 
 model User {
-  id               String   @id @default(cuid())
-  loginId          String   @unique
-  passwordHash     String
-  name             String
-  role             Role
-  managerBasePrice Decimal? @db.Decimal(10, 2)
-  leagueId         String?
-  league           League?  @relation(fields: [leagueId], references: [id])
-  isActive         Boolean  @default(true)
-  createdAt        DateTime @default(now())
+  id           String   @id @default(cuid())
+  loginId      String   @unique
+  passwordHash String
+  name         String
+  // Optional, unique when provided — not backfilled for existing accounts.
+  // Useful as a dedupe/lookup key when re-associating a returning person
+  // with a new league.
+  email        String?  @unique
+  phone        String?  @unique
+  // A site Admin isn't "a member of" any league — modeled as a flag rather
+  // than a LeagueMembership row with a null leagueId, so
+  // @@unique([userId, leagueId]) on LeagueMembership stays meaningful.
+  isSiteAdmin  Boolean  @default(false)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
 
+  memberships        LeagueMembership[]
   createdRosters     PlayerRoster[]
   managedTeams       Team[]
   createdTournaments Tournament[]
@@ -89,8 +95,32 @@ model User {
   analyticsSessions  AnalyticsSession[]
   sponsorClicks      SponsorClickEvent[]
 
-  @@index([leagueId])
   @@map("users")
+}
+
+/// One row per league a person belongs to, with the role they hold there.
+/// Replaces User.role/leagueId/managerBasePrice once every call site has
+/// migrated to reading membership data (see Migration B).
+model LeagueMembership {
+  id               String   @id @default(cuid())
+  userId           String
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  leagueId         String
+  league           League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  // Never ADMIN — a site Admin is User.isSiteAdmin, not a membership.
+  // Enforced in the service layer, same as every other business invariant
+  // in this codebase (no DB-level CHECK constraint).
+  role             Role
+  managerBasePrice Decimal? @db.Decimal(10, 2)
+  // Per-league approval gate — a self-registered membership starts false
+  // (pending that league's admin approval); admin-added memberships start
+  // true. Independent of User.isActive, which gates login itself.
+  isActive         Boolean  @default(true)
+  createdAt        DateTime @default(now())
+
+  @@unique([userId, leagueId])
+  @@index([leagueId])
+  @@map("league_memberships")
 }
 
 model League {
@@ -108,7 +138,7 @@ model League {
   maxSponsorsPerTournament Int?
   createdAt                DateTime  @default(now())
 
-  users       User[]
+  memberships LeagueMembership[]
   rosters     PlayerRoster[]
   tournaments Tournament[]
   logo        LeagueLogo?

@@ -58,6 +58,20 @@ export async function recordSponsorClick(input: RecordSponsorClickInput) {
 export type PaginationParams = { page?: number; pageSize?: number };
 export type PaginatedResult<T> = { items: T[]; total: number; page: number; pageSize: number };
 
+/** A person can hold several league memberships now — collapses them into
+ * the single role/league display string these analytics tables show. */
+function describeUserRole(user: {
+  isSiteAdmin: boolean;
+  memberships: { role: string; league: { name: string } }[];
+}): { role: string; leagueName: string | null } {
+  if (user.isSiteAdmin) return { role: "ADMIN", leagueName: null };
+  if (user.memberships.length === 0) return { role: "—", leagueName: null };
+  return {
+    role: user.memberships.map((m) => m.role).join(", "),
+    leagueName: user.memberships.map((m) => m.league.name).join(", "),
+  };
+}
+
 export async function getLoginSummary({
   page = 1,
   pageSize = 10,
@@ -68,7 +82,7 @@ export async function getLoginSummary({
   userAgent: string | null;
   user: { id: string; name: string; loginId: string; role: string; league: { name: string } | null };
 }>> {
-  const [total, items] = await Promise.all([
+  const [total, rawItems] = await Promise.all([
     prisma.loginEvent.count(),
     prisma.loginEvent.findMany({
       orderBy: { loginAt: "desc" },
@@ -80,11 +94,24 @@ export async function getLoginSummary({
         ipAddress: true,
         userAgent: true,
         user: {
-          select: { id: true, name: true, loginId: true, role: true, league: { select: { name: true } } },
+          select: {
+            id: true,
+            name: true,
+            loginId: true,
+            isSiteAdmin: true,
+            memberships: { select: { role: true, league: { select: { name: true } } } },
+          },
         },
       },
     }),
   ]);
+  const items = rawItems.map((event) => {
+    const { role, leagueName } = describeUserRole(event.user);
+    return {
+      ...event,
+      user: { id: event.user.id, name: event.user.name, loginId: event.user.loginId, role, league: leagueName ? { name: leagueName } : null },
+    };
+  });
   return { items, total, page, pageSize };
 }
 
@@ -106,7 +133,14 @@ export async function getTimeSpentSummary({
     select: {
       userId: true,
       activeMs: true,
-      user: { select: { name: true, loginId: true, role: true, league: { select: { name: true } } } },
+      user: {
+        select: {
+          name: true,
+          loginId: true,
+          isSiteAdmin: true,
+          memberships: { select: { role: true, league: { select: { name: true } } } },
+        },
+      },
     },
   });
 
@@ -123,12 +157,13 @@ export async function getTimeSpentSummary({
     }
   >();
   for (const s of sessions) {
+    const { role, leagueName } = describeUserRole(s.user);
     const entry = byUser.get(s.userId) ?? {
       userId: s.userId,
       name: s.user.name,
       loginId: s.user.loginId,
-      role: s.user.role,
-      leagueName: s.user.league?.name ?? null,
+      role,
+      leagueName,
       totalMs: 0,
       sessionCount: 0,
     };

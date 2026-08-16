@@ -4,7 +4,7 @@ import sharp from "sharp";
 import { ImageResponse } from "next/og";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireSession, scopeLeagueId, assertInScope, AuthError } from "@/lib/auth/guards";
+import { requireSession, allLeagueIds, assertInScope, AuthError } from "@/lib/auth/guards";
 import { toErrorResponse } from "@/lib/api/errors";
 import { getTeamSponsorImageContent } from "@/lib/services/teamSponsorImage.service";
 import { isSafePublicUrl } from "@/lib/security/ssrf";
@@ -105,12 +105,15 @@ export async function GET(
     }
 
     const session = await requireSession();
-    if (session.user.role === "TEAM_MANAGER") {
+    const isManager = session.user.memberships.some((m) => m.role === "TEAM_MANAGER");
+    const isAdminRole =
+      session.user.isSiteAdmin || session.user.memberships.some((m) => m.role === "LEAGUE_ADMIN");
+    if (isManager) {
       if (entry.team.managerId !== session.user.id) {
         throw new AuthError("You do not manage this team");
       }
-    } else if (session.user.role === "ADMIN" || session.user.role === "LEAGUE_ADMIN") {
-      assertInScope(scopeLeagueId(session), entry.auction.tournament.leagueId);
+    } else if (isAdminRole) {
+      assertInScope(allLeagueIds(session), entry.auction.tournament.leagueId);
     } else {
       throw new AuthError("Not authorized to view this team's roster card");
     }

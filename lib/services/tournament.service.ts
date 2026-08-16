@@ -134,12 +134,11 @@ export async function createTeam(input: CreateTeamInput) {
   }
 
   if (input.managerId) {
-    const manager = await prisma.user.findUnique({ where: { id: input.managerId } });
-    if (!manager || manager.role !== "TEAM_MANAGER") {
-      throw new ValidationError("Selected manager is not a valid team manager account");
-    }
-    if (manager.leagueId !== tournament.leagueId) {
-      throw new ValidationError("Selected manager does not belong to this tournament's league");
+    const membership = await prisma.leagueMembership.findUnique({
+      where: { userId_leagueId: { userId: input.managerId, leagueId: tournament.leagueId } },
+    });
+    if (!membership || membership.role !== "TEAM_MANAGER") {
+      throw new ValidationError("Selected manager is not a valid team manager account for this league");
     }
   }
 

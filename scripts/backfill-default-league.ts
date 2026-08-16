@@ -21,6 +21,10 @@ async function main() {
   // Tournament in the final schema, but this script's whole purpose is to run
   // in the window between migration 1 (nullable leagueId) and migration 2
   // (NOT NULL) — raw SQL sidesteps the generated client's now-stricter validation.
+  // User.role/leagueId are dropped entirely by the later multi-league-users
+  // Migration B, so that update is raw SQL too — this script is long since
+  // run and kept only as a historical record (see backfill-league-
+  // memberships.ts for the same precedent).
   const rosters = await prisma.$executeRawUnsafe(
     `UPDATE player_rosters SET "leagueId" = $1 WHERE "leagueId" IS NULL`,
     league.id
@@ -33,11 +37,11 @@ async function main() {
   );
   console.log(`Backfilled ${tournaments} tournament(s)`);
 
-  const users = await prisma.user.updateMany({
-    where: { role: { not: "ADMIN" }, leagueId: null },
-    data: { leagueId: league.id },
-  });
-  console.log(`Backfilled ${users.count} non-admin user(s)`);
+  const users = await prisma.$executeRawUnsafe(
+    `UPDATE users SET "leagueId" = $1 WHERE role != 'ADMIN' AND "leagueId" IS NULL`,
+    league.id
+  );
+  console.log(`Backfilled ${users} non-admin user(s)`);
 }
 
 main()

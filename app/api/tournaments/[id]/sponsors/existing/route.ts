@@ -6,9 +6,9 @@ import { addExistingTournamentSponsor } from "@/lib/services/tournamentSponsor.s
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { leagueId } = await requireAdminOrLeagueAdmin();
+    const { leagueIds } = await requireAdminOrLeagueAdmin();
     const { id: tournamentId } = await params;
-    await loadScopedTournament(tournamentId, leagueId);
+    await loadScopedTournament(tournamentId, leagueIds);
 
     const body = await req.json();
     const sourceSponsorId = typeof body?.sourceSponsorId === "string" ? body.sourceSponsorId : "";
@@ -18,7 +18,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     // Authorizes the SOURCE sponsor too — a League Admin must not be able to
     // copy a sponsor whose logo lives in a different league's tournament.
-    await loadScopedTournamentSponsor(sourceSponsorId, leagueId);
+    await loadScopedTournamentSponsor(sourceSponsorId, leagueIds);
 
     const sponsor = await addExistingTournamentSponsor(tournamentId, sourceSponsorId);
     return NextResponse.json({ sponsorId: sponsor.id });

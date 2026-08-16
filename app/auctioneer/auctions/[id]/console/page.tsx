@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
-import { scopeLeagueId } from "@/lib/auth/guards";
+import { allLeagueIds } from "@/lib/auth/guards";
 import { loadScopedAuction } from "@/lib/auth/scope";
 import { isLeagueReadOnly } from "@/lib/services/league.service";
 import { getAuctionState } from "@/lib/services/auctionState.service";
@@ -16,7 +16,7 @@ export default async function ConsolePage({
 }) {
   const { id } = await params;
   const session = await auth();
-  const auction = await loadScopedAuction(id, scopeLeagueId(session!));
+  const auction = await loadScopedAuction(id, allLeagueIds(session!));
   const state = await getAuctionState(id);
   if (!state) notFound();
 

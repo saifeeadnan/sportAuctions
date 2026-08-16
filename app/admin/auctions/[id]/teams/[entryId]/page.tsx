@@ -16,17 +16,17 @@ export default async function TeamRosterPage({
   params: Promise<{ id: string; entryId: string }>;
 }) {
   const { id, entryId } = await params;
-  const { leagueId } = await requireAdminOrLeagueAdmin();
+  const { leagueIds } = await requireAdminOrLeagueAdmin();
   // Enabling analytics is a site-Admin-only capability — leagueId is null
   // only for a site ADMIN (see scopeLeagueId in lib/auth/guards.ts).
-  const isSiteAdmin = leagueId === null;
+  const isSiteAdmin = leagueIds === null;
 
   const entry = await prisma.teamAuctionEntry.findUnique({
     where: { id: entryId },
     include: { team: true, auction: { include: { tournament: true } } },
   });
   if (!entry || entry.auctionId !== id) notFound();
-  assertInScope(leagueId, entry.auction.tournament.leagueId);
+  assertInScope(leagueIds, entry.auction.tournament.leagueId);
 
   const [confirmedPlayers, draftPicks, league, rosterPlayers, auctionPlayers, categories] =
     await Promise.all([

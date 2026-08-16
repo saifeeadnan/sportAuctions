@@ -11,16 +11,17 @@ export default async function Home() {
     return <LandingHero />;
   }
 
-  if (session.user.role === "ADMIN" || session.user.role === "LEAGUE_ADMIN") {
+  const roles = new Set(session.user.memberships.map((m) => m.role));
+  if (session.user.isSiteAdmin || roles.has("LEAGUE_ADMIN")) {
     redirect("/admin/rosters");
   }
-  if (session.user.role === "TEAM_MANAGER") {
+  if (roles.has("TEAM_MANAGER")) {
     redirect("/manager");
   }
-  if (session.user.role === "VIEWER") {
+  if (roles.has("VIEWER")) {
     redirect("/viewer");
   }
-  if (session.user.role === "AUCTIONEER") {
+  if (roles.has("AUCTIONEER")) {
     redirect("/auctioneer");
   }
 

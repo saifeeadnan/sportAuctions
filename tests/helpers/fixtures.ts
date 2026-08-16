@@ -25,24 +25,28 @@ export async function createFixtureAdmin() {
       loginId: unique("admin"),
       passwordHash: await bcrypt.hash("password123", 4),
       name: "Test Admin",
-      role: "ADMIN",
+      isSiteAdmin: true,
     },
   });
 }
 
 /** managerBasePrice defaults to 50 — the exact fee amount the ported
- * verify-*.ts scenarios were originally written against. */
+ * verify-*.ts scenarios were originally written against. Returns the plain
+ * User (not the LeagueMembership) since every existing caller just needs an
+ * id/name/loginId to use as a manager — the membership (role, base price,
+ * this league) is created alongside it but not part of the return shape. */
 export async function createFixtureManager(leagueId: string, managerBasePrice = 50) {
-  return prisma.user.create({
+  const user = await prisma.user.create({
     data: {
       loginId: unique("manager"),
       passwordHash: await bcrypt.hash("password123", 4),
       name: unique("Manager"),
-      role: "TEAM_MANAGER",
-      leagueId,
-      managerBasePrice,
     },
   });
+  await prisma.leagueMembership.create({
+    data: { userId: user.id, leagueId, role: "TEAM_MANAGER", managerBasePrice, isActive: true },
+  });
+  return user;
 }
 
 export async function createFixtureRoster(
@@ -82,6 +86,31 @@ export async function createFixtureTournament(input: {
       endDate: new Date(Date.now() + 24 * 60 * 60 * 1000),
     },
   });
+}
+
+/** A person with an actual LeagueMembership row (not just the legacy flat
+ * User columns createFixtureManager still uses) — for tests exercising the
+ * membership-based flows (registration re-association, admin membership
+ * actions). Returns the plaintext password alongside the user since tests
+ * verifying password checks need it. */
+export async function createFixtureUserWithMembership(
+  leagueId: string,
+  role: "LEAGUE_ADMIN" | "TEAM_MANAGER" | "AUCTIONEER" | "VIEWER" = "VIEWER",
+  opts: { isActive?: boolean; membershipActive?: boolean; password?: string } = {}
+) {
+  const password = opts.password ?? "password123";
+  const user = await prisma.user.create({
+    data: {
+      loginId: unique("user"),
+      passwordHash: await bcrypt.hash(password, 4),
+      name: unique("Person"),
+      isActive: opts.isActive ?? true,
+    },
+  });
+  const membership = await prisma.leagueMembership.create({
+    data: { userId: user.id, leagueId, role, isActive: opts.membershipActive ?? true },
+  });
+  return { user, membership, password };
 }
 
 export async function createFixtureTeam(

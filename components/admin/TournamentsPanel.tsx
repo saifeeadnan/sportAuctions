@@ -9,17 +9,23 @@ import { card, cardInteractive, buttonPrimary, inputClass, selectClass } from "@
 import { Badge } from "@/components/ui/Badge";
 
 export async function TournamentsPanel({ selectedLeagueId }: { selectedLeagueId?: string }) {
-  const { session, leagueId } = await resolveAdminScope(selectedLeagueId);
+  const { session, leagueIds } = await resolveAdminScope(selectedLeagueId);
   // Whether to show the leagueId picker must key off the caller's real,
-  // unrestricted role — not the display-narrowed `leagueId` above, which a
+  // unrestricted role — not the display-narrowed `leagueIds` above, which a
   // site ADMIN's sidebar league switcher can make non-null even though
   // createTournamentAction (via requireAdminOrLeagueAdmin) is still
   // unrestricted and needs an explicit leagueId whenever no roster is picked.
-  const isSiteAdmin = session.user.role === "ADMIN";
+  const isSiteAdmin = session.user.isSiteAdmin;
+  // A single, definite leagueId for display/default-value purposes — only
+  // meaningful when scope has narrowed to exactly one league (the common
+  // case: a single-league League Admin, or any admin with one selected via
+  // the sidebar). A multi-league League Admin with none selected has no
+  // singular "current" league; a dedicated picker for that case is deferred.
+  const leagueId = leagueIds?.length === 1 ? leagueIds[0] : undefined;
 
   const [tournaments, rosters, leagues, myLeague] = await Promise.all([
     prisma.tournament.findMany({
-      where: leagueId ? { leagueId } : {},
+      where: leagueIds ? { leagueId: { in: leagueIds } } : {},
       orderBy: { createdAt: "desc" },
       include: {
         roster: true,
@@ -28,7 +34,7 @@ export async function TournamentsPanel({ selectedLeagueId }: { selectedLeagueId?
       },
     }),
     prisma.playerRoster.findMany({
-      where: leagueId ? { leagueId } : {},
+      where: leagueIds ? { leagueId: { in: leagueIds } } : {},
       include: { league: true },
       orderBy: { name: "asc" },
     }),

@@ -63,16 +63,21 @@ export async function getRulesDocumentContent(tournamentId: string) {
   return prisma.tournamentDocument.findUnique({ where: { tournamentId } });
 }
 
-type ViewerUser = { id: string; role: string; leagueId: string | null };
+type ViewerUser = {
+  id: string;
+  isSiteAdmin: boolean;
+  memberships: { leagueId: string; role: string }[];
+};
 
 async function resolveCanView(
   tournament: { id: string; rosterId: string | null; leagueId: string },
   user: ViewerUser
 ): Promise<boolean> {
-  if (user.role === "ADMIN") return true;
-  if (user.role === "LEAGUE_ADMIN") return user.leagueId === tournament.leagueId;
+  if (user.isSiteAdmin) return true;
+  if (user.memberships.some((m) => m.role === "LEAGUE_ADMIN" && m.leagueId === tournament.leagueId))
+    return true;
 
-  if (user.role === "TEAM_MANAGER") {
+  if (user.memberships.some((m) => m.role === "TEAM_MANAGER" && m.leagueId === tournament.leagueId)) {
     // A manager should see a tournament's rules as soon as they're assigned a
     // team in it — well before any auction exists to draft/bid in, since
     // that's exactly when rules matter most.

@@ -12,7 +12,7 @@ export default async function LockReviewPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { leagueId } = await requireAdminOrLeagueAdmin();
+  const { leagueIds } = await requireAdminOrLeagueAdmin();
 
   const auction = await prisma.auction.findUnique({
     where: { id },
@@ -22,7 +22,7 @@ export default async function LockReviewPage({
     },
   });
   if (!auction) notFound();
-  assertInScope(leagueId, auction.tournament.leagueId);
+  assertInScope(leagueIds, auction.tournament.leagueId);
   // Viewable at any later stage too (read-only) — only truly unavailable
   // before pre-auction has even opened, since there's nothing to show yet.
   if (auction.status === "CREATED") notFound();

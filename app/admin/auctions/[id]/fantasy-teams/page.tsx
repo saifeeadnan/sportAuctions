@@ -14,14 +14,14 @@ export default async function FantasyTeamsPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { leagueId } = await requireAdminOrLeagueAdmin();
+  const { leagueIds } = await requireAdminOrLeagueAdmin();
 
   const auction = await prisma.auction.findUnique({
     where: { id },
     include: { tournament: true },
   });
   if (!auction) notFound();
-  assertInScope(leagueId, auction.tournament.leagueId);
+  assertInScope(leagueIds, auction.tournament.leagueId);
 
   const { hasPoints, standings } = await getFantasyStandings(id);
 

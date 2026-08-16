@@ -6,7 +6,7 @@ import { parseRosterFile, createRosterFromUpload } from "@/lib/services/roster.s
 
 export async function POST(req: Request) {
   try {
-    const { session, leagueId } = await requireAdminOrLeagueAdmin();
+    const { session, leagueIds } = await requireAdminOrLeagueAdmin();
 
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
@@ -21,9 +21,11 @@ export async function POST(req: Request) {
     const { validRows, errors } = parseRosterFile(buffer, file.name);
 
     if (mode === "commit") {
-      // A League Admin's roster always belongs to their own league; only a site
-      // Admin (unrestricted, leagueId === null) picks a league via the form.
-      const targetLeagueId = leagueId ?? String(formData.get("leagueId") ?? "");
+      // A single-league League Admin's roster always belongs to their own
+      // league; a site Admin (unrestricted) or a multi-league League Admin
+      // picks a league via the form.
+      const targetLeagueId =
+        leagueIds?.length === 1 ? leagueIds[0] : String(formData.get("leagueId") ?? "");
       if (!targetLeagueId) {
         throw new ValidationError("A league must be selected for this roster");
       }

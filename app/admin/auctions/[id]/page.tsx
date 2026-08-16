@@ -29,7 +29,7 @@ export default async function AuctionDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const { leagueId } = await requireAdminOrLeagueAdmin();
+  const { leagueIds } = await requireAdminOrLeagueAdmin();
 
   const auction = await prisma.auction.findUnique({
     where: { id },
@@ -41,7 +41,7 @@ export default async function AuctionDetailPage({
     },
   });
   if (!auction) notFound();
-  assertInScope(leagueId, auction.tournament.leagueId);
+  assertInScope(leagueIds, auction.tournament.leagueId);
 
   const [sponsors, league] = await Promise.all([
     listTournamentSponsors(auction.tournamentId),

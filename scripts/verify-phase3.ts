@@ -21,7 +21,7 @@ async function main() {
   const iconPlayers = players.slice(0, 5);
   const regularPlayers = players.slice(5);
 
-  const admin = await prisma.user.findFirstOrThrow({ where: { role: "ADMIN" } });
+  const admin = await prisma.user.findFirstOrThrow({ where: { isSiteAdmin: true } });
 
   const auction = await createAuction({
     tournamentId: tournament.id,

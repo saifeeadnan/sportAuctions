@@ -13,7 +13,7 @@ export default async function TournamentTeamRosterPage({
   params: Promise<{ id: string; teamId: string }>;
 }) {
   const { id, teamId } = await params;
-  const { leagueId } = await requireAdminOrLeagueAdmin();
+  const { leagueIds } = await requireAdminOrLeagueAdmin();
 
   const team = await prisma.team.findUnique({
     where: { id: teamId },
@@ -31,7 +31,7 @@ export default async function TournamentTeamRosterPage({
     },
   });
   if (!team || team.tournamentId !== id) notFound();
-  assertInScope(leagueId, team.tournament.leagueId);
+  assertInScope(leagueIds, team.tournament.leagueId);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 flex flex-col gap-6">

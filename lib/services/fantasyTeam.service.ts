@@ -51,14 +51,14 @@ async function findSelfAuctionPlayer(auctionId: string, rosterId: string, loginI
 }
 
 /** Completed auctions this viewer was actually part of (i.e. eligible for a fantasy team). */
-export async function listEligibleCompletedAuctionsForViewer(userId: string, leagueId: string | null) {
+export async function listEligibleCompletedAuctionsForViewer(userId: string, leagueIds: string[] | null) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
   if (!user?.loginId) return [];
 
   return prisma.auction.findMany({
     where: {
       status: "COMPLETED",
-      tournament: leagueId ? { leagueId } : undefined,
+      tournament: leagueIds ? { leagueId: { in: leagueIds } } : undefined,
       auctionPlayers: {
         some: { player: { loginId: { equals: user.loginId, mode: "insensitive" } } },
       },
@@ -68,13 +68,13 @@ export async function listEligibleCompletedAuctionsForViewer(userId: string, lea
   });
 }
 
-export async function getFantasyEligibility(auctionId: string, userId: string, leagueId: string | null) {
+export async function getFantasyEligibility(auctionId: string, userId: string, leagueIds: string[] | null) {
   const auction = await prisma.auction.findUnique({
     where: { id: auctionId },
     include: { tournament: { include: { league: true } } },
   });
   if (!auction) return { eligible: false as const, reason: "Auction not found" };
-  if (leagueId !== null && auction.tournament.leagueId !== leagueId) {
+  if (leagueIds !== null && !leagueIds.includes(auction.tournament.leagueId)) {
     return { eligible: false as const, reason: "Auction not found" };
   }
   if (auction.status !== "COMPLETED") {
@@ -214,14 +214,14 @@ export async function submitFantasyTeam(
   auctionId: string,
   userId: string,
   auctionPlayerIds: string[],
-  leagueId: string | null
+  leagueIds: string[] | null
 ) {
   const auction = await prisma.auction.findUnique({
     where: { id: auctionId },
     include: { tournament: true },
   });
   if (!auction) throw new ValidationError("Auction not found");
-  if (leagueId !== null && auction.tournament.leagueId !== leagueId) {
+  if (leagueIds !== null && !leagueIds.includes(auction.tournament.leagueId)) {
     throw new ValidationError("Auction not found");
   }
   if (auction.status !== "COMPLETED") {

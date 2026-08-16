@@ -8,18 +8,24 @@ export const authConfig: NextAuthConfig = {
   callbacks: {
     jwt: async ({ token, user }) => {
       if (user) {
-        token.id = (user as { id: string }).id;
-        token.role = (user as { role: string }).role;
-        token.leagueId = (user as { leagueId: string | null }).leagueId;
-        token.analyticsSessionId = (user as { analyticsSessionId: string }).analyticsSessionId;
+        const u = user as {
+          id: string;
+          isSiteAdmin: boolean;
+          memberships: { leagueId: string; role: string }[];
+          analyticsSessionId: string;
+        };
+        token.id = u.id;
+        token.isSiteAdmin = u.isSiteAdmin;
+        token.memberships = u.memberships;
+        token.analyticsSessionId = u.analyticsSessionId;
       }
       return token;
     },
     session: async ({ session, token }) => {
       if (session.user) {
         session.user.id = token.id as string;
-        session.user.role = token.role as string;
-        session.user.leagueId = token.leagueId as string | null;
+        session.user.isSiteAdmin = token.isSiteAdmin as boolean;
+        session.user.memberships = token.memberships as { leagueId: string; role: string }[];
         session.user.analyticsSessionId = token.analyticsSessionId as string;
       }
       return session;

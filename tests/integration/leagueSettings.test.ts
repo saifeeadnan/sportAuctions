@@ -326,25 +326,18 @@ describe("deleteTeam blocked when league is read-only", () => {
   });
 });
 
-describe("deleteUser blocked when league is read-only", () => {
-  it("blocks deleting a user whose league has gone read-only", async () => {
-    const league = await createFixtureLeague({ endDate: FUTURE });
+// deleteUser is now identity-level, used only for site-Admin accounts (which
+// aren't scoped to any league) — the read-only-league gate that used to live
+// here now belongs to deleteMembership instead, covered in
+// tests/integration/multiLeagueUsers.test.ts.
+describe("deleteUser", () => {
+  it("deletes an identity with no linked resources", async () => {
     const admin = await createFixtureAdmin();
-    const manager = await createFixtureManager(league.id);
+    const other = await createFixtureAdmin();
 
-    await updateLeagueSettings(league.id, { endDate: PAST });
+    await deleteUser(other.id, admin.id);
 
-    await expect(deleteUser(manager.id, admin.id)).rejects.toThrow(/read-only/);
-  });
-
-  it("allows deleting a user whose league is not read-only", async () => {
-    const league = await createFixtureLeague({ endDate: FUTURE });
-    const admin = await createFixtureAdmin();
-    const manager = await createFixtureManager(league.id);
-
-    await deleteUser(manager.id, admin.id);
-
-    const found = await prisma.user.findUnique({ where: { id: manager.id } });
+    const found = await prisma.user.findUnique({ where: { id: other.id } });
     expect(found).toBeNull();
   });
 });

@@ -6,9 +6,9 @@ import { parsePointsFile, applyPointsToAuction } from "@/lib/services/playerPoin
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { leagueId } = await requireAdminOrLeagueAdmin();
+    const { leagueIds } = await requireAdminOrLeagueAdmin();
     const { id: auctionId } = await params;
-    await loadScopedAuction(auctionId, leagueId);
+    await loadScopedAuction(auctionId, leagueIds);
 
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
