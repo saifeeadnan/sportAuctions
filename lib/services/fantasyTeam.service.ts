@@ -164,6 +164,50 @@ export async function getFantasyStandings(auctionId: string) {
   return { hasPoints, standings };
 }
 
+/** The N players picked by the most fantasy teams for this auction, grouped
+ * by auction category — a "who's popular" leaderboard per tier, alongside
+ * the full standings. Categories with no picks at all are omitted. */
+export async function getMostPickedPlayersByCategory(auctionId: string, limit = 5) {
+  const [categories, picks] = await Promise.all([
+    prisma.auctionCategory.findMany({ where: { auctionId }, orderBy: { basePrice: "desc" } }),
+    prisma.fantasyTeamPlayer.findMany({
+      where: { fantasyTeam: { auctionId } },
+      select: {
+        auctionPlayer: {
+          select: { categoryId: true, player: { select: { id: true, name: true, position: true } } },
+        },
+      },
+    }),
+  ]);
+
+  const countsByCategory = new Map<
+    string,
+    Map<string, { playerName: string; position: string | null; teamCount: number }>
+  >();
+  for (const { auctionPlayer } of picks) {
+    const { categoryId, player } = auctionPlayer;
+    let counts = countsByCategory.get(categoryId);
+    if (!counts) {
+      counts = new Map();
+      countsByCategory.set(categoryId, counts);
+    }
+    const entry = counts.get(player.id);
+    if (entry) entry.teamCount += 1;
+    else counts.set(player.id, { playerName: player.name, position: player.position, teamCount: 1 });
+  }
+
+  return categories
+    .map((category) => ({
+      categoryId: category.id,
+      categoryName: category.name,
+      players: Array.from(countsByCategory.get(category.id)?.entries() ?? [])
+        .map(([playerId, v]) => ({ playerId, ...v }))
+        .sort((a, b) => b.teamCount - a.teamCount || a.playerName.localeCompare(b.playerName))
+        .slice(0, limit),
+    }))
+    .filter((c) => c.players.length > 0);
+}
+
 export async function deleteFantasyTeam(fantasyTeamId: string) {
   const { count } = await prisma.fantasyTeam.deleteMany({ where: { id: fantasyTeamId } });
   if (count === 0) {
