@@ -8,6 +8,7 @@ import { getRulesDocumentIfViewable } from "@/lib/services/tournamentDocument.se
 import { listTournamentSponsors } from "@/lib/services/tournamentSponsor.service";
 import { LiveAuctionView } from "@/components/auction/LiveAuctionView";
 import { SponsorRibbon } from "@/components/tournament/SponsorRibbon";
+import { SponsorSplash } from "@/components/tournament/SponsorSplash";
 
 export default async function WatchPage({
   params,
@@ -34,6 +35,11 @@ export default async function WatchPage({
 
   return (
     <div>
+      <SponsorSplash
+        tournamentId={auction.tournamentId}
+        tournamentName={state.tournamentName}
+        sponsors={sponsors}
+      />
       <h1 className="text-xl font-semibold mb-1">{state.name}</h1>
       <div className="mb-6">
         <p className="text-sm text-black/60 dark:text-white/60">{state.tournamentName}</p>

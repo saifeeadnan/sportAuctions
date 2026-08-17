@@ -7,6 +7,7 @@ import { getStrategyForEntry } from "@/lib/services/auctionStrategy.service";
 import { LiveAuctionView } from "@/components/auction/LiveAuctionView";
 import type { InitialStrategy } from "@/lib/auction/guidance";
 import { SponsorRibbon } from "@/components/tournament/SponsorRibbon";
+import { SponsorSplash } from "@/components/tournament/SponsorSplash";
 
 export default async function ManagerLivePage({
   params,
@@ -55,6 +56,11 @@ export default async function ManagerLivePage({
 
   return (
     <div>
+      <SponsorSplash
+        tournamentId={entry.team.tournamentId}
+        tournamentName={state.tournamentName}
+        sponsors={sponsors}
+      />
       <h1 className="text-lg font-semibold mb-3">
         {state.name} <span className="text-black/50 dark:text-white/50 font-normal">&middot; {state.tournamentName}</span>
       </h1>

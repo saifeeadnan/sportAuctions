@@ -15,6 +15,7 @@ import { FantasyTeamForm } from "@/components/viewer/FantasyTeamForm";
 import { FantasyStandingsList } from "@/components/fantasy/FantasyStandingsList";
 import { MostPickedPlayersTable } from "@/components/fantasy/MostPickedPlayersTable";
 import { SponsorRibbon } from "@/components/tournament/SponsorRibbon";
+import { SponsorSplash } from "@/components/tournament/SponsorSplash";
 import { formatCalendarDate } from "@/lib/dates";
 
 export default async function FantasyTeamPage({
@@ -71,6 +72,11 @@ export default async function FantasyTeamPage({
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 flex flex-col gap-6">
+      <SponsorSplash
+        tournamentId={auction.tournament.id}
+        tournamentName={auction.tournament.name}
+        sponsors={sponsors}
+      />
       <p className="text-sm text-black/60 dark:text-white/60">
         {auction.tournament.league.name} / {auction.tournament.name} / {auction.name}
         {!locked && <> &middot; Editable until {formatCalendarDate(auction.tournament.startDate)}.</>}
