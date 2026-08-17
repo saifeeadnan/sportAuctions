@@ -34,7 +34,7 @@ const STILL_AVAILABLE_STATUSES = new Set(["AVAILABLE", "IN_PRE_AUCTION_POOL", "I
  * use for their category tabs) — every player carries their own category's
  * base price, so one pass over the whole pool is enough to rank categories
  * without a separate lookup. */
-function rankCategoriesByBasePrice(players: { categoryName: string; basePrice: string }[]): string[] {
+export function rankCategoriesByBasePrice(players: { categoryName: string; basePrice: string }[]): string[] {
   const basePriceByName = new Map<string, number>();
   for (const p of players) {
     if (!basePriceByName.has(p.categoryName)) {

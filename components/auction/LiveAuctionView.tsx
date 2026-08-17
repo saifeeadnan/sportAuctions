@@ -13,7 +13,7 @@ import { RosterRibbon } from "@/components/roster/RosterRibbon";
 import { BidControl } from "@/components/auction/BidControl";
 import { computeMaxBid } from "@/lib/auction/maxBid";
 import { computeBidGuidance, computeLiveCategoryAvgPrice, type InitialStrategy } from "@/lib/auction/guidance";
-import { openAnalyticsDashboardWindow } from "@/lib/auction/popupWindow";
+import { openAnalyticsDashboardWindow, openAnalyticsV2DashboardWindow } from "@/lib/auction/popupWindow";
 import { card, tabsTrack, tabItem } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 
@@ -295,27 +295,36 @@ export function LiveAuctionView({
       )}
 
       {analyticsEnabled && myTeam && (
-        <button
-          type="button"
-          onClick={() => openAnalyticsDashboardWindow(myTeam.id)}
-          className="fixed bottom-5 right-5 z-40 inline-flex items-center gap-2 rounded-full bg-indigo-600 dark:bg-indigo-500 text-white pl-4 pr-5 py-2.5 text-sm font-medium shadow-lg hover:bg-indigo-500 dark:hover:bg-indigo-400 transition-colors"
-        >
-          {guidance && (
-            <span
-              className={`h-2 w-2 rounded-full ${
-                guidance.signal === "BID"
-                  ? "bg-emerald-400"
-                  : guidance.signal === "PASS"
-                    ? "bg-amber-400"
-                    : guidance.signal === "SPOILER"
-                      ? "bg-red-400"
-                      : "bg-white/70"
-              }`}
-              aria-hidden
-            />
-          )}
-          Analytics ↗
-        </button>
+        <div className="fixed bottom-5 right-5 z-40 flex flex-col items-end gap-2">
+          <button
+            type="button"
+            onClick={() => openAnalyticsV2DashboardWindow(myTeam.id)}
+            className="inline-flex items-center gap-2 rounded-full border border-black/15 dark:border-white/15 bg-white dark:bg-neutral-900 pl-4 pr-5 py-2 text-sm font-medium shadow-lg hover:bg-black/[0.03] dark:hover:bg-white/[0.06] transition-colors"
+          >
+            Analytics v2 (beta) ↗
+          </button>
+          <button
+            type="button"
+            onClick={() => openAnalyticsDashboardWindow(myTeam.id)}
+            className="inline-flex items-center gap-2 rounded-full bg-indigo-600 dark:bg-indigo-500 text-white pl-4 pr-5 py-2.5 text-sm font-medium shadow-lg hover:bg-indigo-500 dark:hover:bg-indigo-400 transition-colors"
+          >
+            {guidance && (
+              <span
+                className={`h-2 w-2 rounded-full ${
+                  guidance.signal === "BID"
+                    ? "bg-emerald-400"
+                    : guidance.signal === "PASS"
+                      ? "bg-amber-400"
+                      : guidance.signal === "SPOILER"
+                        ? "bg-red-400"
+                        : "bg-white/70"
+                }`}
+                aria-hidden
+              />
+            )}
+            Analytics ↗
+          </button>
+        </div>
       )}
     </div>
   );

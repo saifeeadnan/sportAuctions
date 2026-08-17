@@ -315,8 +315,9 @@ model AuctionCategory {
   preAuctionEligible Boolean  @default(true)
   bidIncrement       Decimal? @db.Decimal(12, 2)
 
-  auctionPlayers AuctionPlayer[]
-  budgetTargets  AuctionCategoryBudgetTarget[]
+  auctionPlayers       AuctionPlayer[]
+  budgetTargets        AuctionCategoryBudgetTarget[]
+  rivalBudgetEstimates RivalCategoryBudgetEstimate[]
 
   @@unique([auctionId, name])
   @@map("auction_categories")
@@ -407,14 +408,16 @@ model TeamAuctionEntry {
   slotsTotal           Int
   analyticsEnabled     Boolean                @default(false)
 
-  draftSubmissions      PreAuctionSubmission[]
-  playersWon            AuctionPlayer[]               @relation("SoldPlayers")
-  currentlyLeadingOn    AuctionPlayer[]               @relation("CurrentBidder")
-  bids                  Bid[]
-  playerPreferences     AuctionPlayerPreference[]
-  categoryBudgetTargets AuctionCategoryBudgetTarget[]
-  predictionsMade       AuctionPlayerPrediction[]     @relation("PredictionsMadeBy")
-  predictedToWin        AuctionPlayerPrediction[]     @relation("PredictedWinner")
+  draftSubmissions       PreAuctionSubmission[]
+  playersWon             AuctionPlayer[]               @relation("SoldPlayers")
+  currentlyLeadingOn     AuctionPlayer[]               @relation("CurrentBidder")
+  bids                   Bid[]
+  playerPreferences      AuctionPlayerPreference[]
+  categoryBudgetTargets  AuctionCategoryBudgetTarget[]
+  predictionsMade        AuctionPlayerPrediction[]     @relation("PredictionsMadeBy")
+  predictedToWin         AuctionPlayerPrediction[]     @relation("PredictedWinner")
+  categoryEstimatesMade  RivalCategoryBudgetEstimate[] @relation("CategoryEstimatesMadeBy")
+  categoryEstimatesAbout RivalCategoryBudgetEstimate[] @relation("CategoryEstimateTarget")
 
   @@unique([teamId, auctionId])
   @@index([auctionId])
@@ -474,6 +477,30 @@ model AuctionPlayerPrediction {
   @@unique([teamAuctionEntryId, auctionPlayerId])
   @@index([teamAuctionEntryId])
   @@map("auction_player_predictions")
+}
+
+/**
+ * A manager's own private estimate of a team's (rival or their own) budget
+ * for a category — never visible to any team other than the one that made
+ * it. Feeds the Auction Analytics v2 console's rival-affordability panel
+ * (lib/auction-analytics/rivalCategoryEstimate.ts); the estimated count per
+ * category is derived live from this budget and the category's live
+ * average price, not stored separately.
+ */
+model RivalCategoryBudgetEstimate {
+  id                 String           @id @default(cuid())
+  teamAuctionEntryId String
+  teamAuctionEntry   TeamAuctionEntry @relation("CategoryEstimatesMadeBy", fields: [teamAuctionEntryId], references: [id], onDelete: Cascade)
+  targetEntryId      String
+  targetEntry        TeamAuctionEntry @relation("CategoryEstimateTarget", fields: [targetEntryId], references: [id], onDelete: Cascade)
+  categoryId         String
+  category           AuctionCategory  @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  estimatedBudget    Decimal          @db.Decimal(12, 2)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@unique([teamAuctionEntryId, targetEntryId, categoryId])
+  @@map("rival_category_budget_estimates")
 }
 
 model PreAuctionSubmission {
