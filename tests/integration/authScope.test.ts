@@ -38,7 +38,7 @@ describe("loadScopedAuction league scoping", () => {
       playerAssignments: fixture.players.map((p) => ({ playerId: p.id, categoryName: "Regular" })),
     });
 
-    await expect(loadScopedAuction(auction.id, fixture.league.id)).resolves.toMatchObject({
+    await expect(loadScopedAuction(auction.id, [fixture.league.id])).resolves.toMatchObject({
       id: auction.id,
     });
   });
@@ -63,7 +63,7 @@ describe("loadScopedAuction league scoping", () => {
       playerAssignments: fixtureA.players.map((p) => ({ playerId: p.id, categoryName: "Regular" })),
     });
 
-    await expect(loadScopedAuction(auctionInLeagueA.id, fixtureB.league.id)).rejects.toThrow(AuthError);
+    await expect(loadScopedAuction(auctionInLeagueA.id, [fixtureB.league.id])).rejects.toThrow(AuthError);
   });
 
   it("allows an unrestricted (site ADMIN) caller regardless of league", async () => {
