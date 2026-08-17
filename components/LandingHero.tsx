@@ -5,8 +5,9 @@ import { PoweredByBytzSport } from "@/components/ui/PoweredByBytzSport";
 
 const FEATURES: { title: string; description: string; icon: React.ReactNode }[] = [
   {
-    title: "Roster management",
-    description: "Upload player rosters with ratings, then reuse them across seasons.",
+    title: "Tournament management",
+    description:
+      "Set up leagues, tournaments, and teams, then upload player rosters with ratings to reuse season after season.",
     icon: (
       <path
         strokeLinecap="round"
@@ -16,21 +17,9 @@ const FEATURES: { title: string; description: string; icon: React.ReactNode }[] 
     ),
   },
   {
-    title: "Pre-auction draft",
+    title: "Auction management",
     description:
-      "Managers pick their targets ahead of time. Contested picks flow straight into the live pool automatically.",
-    icon: (
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M9 4.5h6a1 1 0 0 1 1 1V6h-8v-.5a1 1 0 0 1 1-1ZM6 6h12v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V6ZM9 12.5l2 2 4-4.5"
-      />
-    ),
-  },
-  {
-    title: "Live bidding console",
-    description:
-      "Run different auction types with budget and squad-slot guardrails, random pick order, and instant updates everywhere.",
+      "Run pre-auction drafts and live bidding with budget and squad-slot guardrails — plus a live Auction Analytics console with bid guidance and projected standings.",
     icon: (
       <path
         strokeLinecap="round"
@@ -40,20 +29,24 @@ const FEATURES: { title: string; description: string; icon: React.ReactNode }[] 
     ),
   },
   {
-    title: "Team strength analytics",
+    title: "Sponsor visibility",
     description:
-      "Watch squad balance and a computed strength score update live as every team fills out its roster.",
+      "Showcase tournament sponsors with a rotating logo ribbon on every auction and fantasy page, plus a welcome splash and click-through tracking for each sponsor.",
     icon: (
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M4 20V10M10 20V4M16 20v-7M22 20H2"
-      />
+      <>
+        <path
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          d="M2.5 12A9.5 6 0 0 1 21.5 12A9.5 6 0 0 1 2.5 12Z"
+        />
+        <circle cx="12" cy="12" r="3" strokeLinecap="round" strokeLinejoin="round" />
+      </>
     ),
   },
   {
     title: "Fantasy teams",
-    description: "Build your team from auction prices and climb the leaderboard.",
+    description:
+      "Build your team from real auction prices, see who the most-picked players are, and climb the live leaderboard.",
     icon: (
       <path
         strokeLinecap="round"
@@ -120,7 +113,7 @@ export function LandingHero() {
           <PoweredByBytzSport className="mt-4" />
         </div>
 
-        <div className="mt-20 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+        <div className="mt-20 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {FEATURES.map((f) => (
             <div key={f.title} className={`${card} p-5`}>
               <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 mb-3">
