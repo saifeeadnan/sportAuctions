@@ -2,11 +2,13 @@ import Link from "next/link";
 import {
   FANTASY_SORT_LABELS,
   fantasySortHref,
+  FANTASY_STANDINGS_PAGE_SIZE,
   type FantasySortDir,
   type FantasySortKey,
   type FantasyStanding,
 } from "@/lib/fantasyStandingsSort";
 import { DeleteFantasyTeamButton } from "@/components/admin/DeleteFantasyTeamButton";
+import { TablePagination } from "@/components/admin/TablePagination";
 import { Badge } from "@/components/ui/Badge";
 import { card } from "@/lib/ui";
 
@@ -69,6 +71,7 @@ export function FantasyStandingsList({
   hasPoints,
   sortKey,
   sortDir,
+  page = 1,
   highlightUserId,
   showDeleteButton = false,
 }: {
@@ -77,10 +80,14 @@ export function FantasyStandingsList({
   hasPoints: boolean;
   sortKey: FantasySortKey;
   sortDir: FantasySortDir;
+  page?: number;
   /** Highlights this user's own row (e.g. a viewer looking at the full list). */
   highlightUserId?: string;
   showDeleteButton?: boolean;
 }) {
+  const pageStart = (page - 1) * FANTASY_STANDINGS_PAGE_SIZE;
+  const pagedStandings = standings.slice(pageStart, pageStart + FANTASY_STANDINGS_PAGE_SIZE);
+
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -109,12 +116,12 @@ export function FantasyStandingsList({
       </div>
 
       <div className={card}>
-        {standings.map(({ team, totalSpend, totalPoints, selfAuctionPlayerId, rank }, i) => {
+        {pagedStandings.map(({ team, totalSpend, totalPoints, selfAuctionPlayerId, rank }, i) => {
           const isYou = team.userId === highlightUserId;
           return (
             <details
               key={team.id}
-              className={i < standings.length - 1 ? "border-b border-black/[0.08] dark:border-white/10" : ""}
+              className={i < pagedStandings.length - 1 ? "border-b border-black/[0.08] dark:border-white/10" : ""}
             >
               <summary
                 className={`cursor-pointer select-none px-4 py-2 text-sm font-medium flex items-center justify-between gap-3 flex-wrap ${
@@ -153,6 +160,14 @@ export function FantasyStandingsList({
           );
         })}
       </div>
+
+      <TablePagination
+        page={page}
+        pageSize={FANTASY_STANDINGS_PAGE_SIZE}
+        total={standings.length}
+        paramName="page"
+        otherParams={{ sort: sortKey, dir: sortDir }}
+      />
     </div>
   );
 }

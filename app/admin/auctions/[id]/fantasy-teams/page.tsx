@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
 import { getFantasyStandings, getMostPickedPlayersByCategory } from "@/lib/services/fantasyTeam.service";
-import { resolveFantasySort, sortFantasyStandings } from "@/lib/fantasyStandingsSort";
+import { resolveFantasySort, sortFantasyStandings, resolveFantasyPage } from "@/lib/fantasyStandingsSort";
 import { listTournamentSponsors } from "@/lib/services/tournamentSponsor.service";
 import { FantasyStandingsList } from "@/components/fantasy/FantasyStandingsList";
 import { MostPickedPlayersTable } from "@/components/fantasy/MostPickedPlayersTable";
@@ -16,7 +16,7 @@ export default async function FantasyTeamsPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ sort?: string; dir?: string }>;
+  searchParams: Promise<{ sort?: string; dir?: string; page?: string }>;
 }) {
   const { id } = await params;
   const { leagueIds } = await requireAdminOrLeagueAdmin();
@@ -30,8 +30,9 @@ export default async function FantasyTeamsPage({
 
   const { hasPoints, standings: rankedStandings } = await getFantasyStandings(id);
 
-  const { sort: rawSort, dir: rawDir } = await searchParams;
+  const { sort: rawSort, dir: rawDir, page: rawPage } = await searchParams;
   const { sortKey, sortDir } = resolveFantasySort(rawSort, rawDir);
+  const page = resolveFantasyPage(rawPage);
   const standings = sortFantasyStandings(rankedStandings, sortKey, sortDir);
   const sponsors = await listTournamentSponsors(auction.tournament.id);
 
@@ -60,6 +61,7 @@ export default async function FantasyTeamsPage({
             hasPoints={hasPoints}
             sortKey={sortKey}
             sortDir={sortDir}
+            page={page}
             showDeleteButton
           />
           <MostPickedPlayersTable categories={await getMostPickedPlayersByCategory(auction.id)} />

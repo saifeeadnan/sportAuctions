@@ -9,7 +9,7 @@ import {
   isFantasyEditingLocked,
   getMaxRosterSize,
 } from "@/lib/services/fantasyTeam.service";
-import { resolveFantasySort, sortFantasyStandings } from "@/lib/fantasyStandingsSort";
+import { resolveFantasySort, sortFantasyStandings, resolveFantasyPage } from "@/lib/fantasyStandingsSort";
 import { listTournamentSponsors } from "@/lib/services/tournamentSponsor.service";
 import { FantasyTeamForm } from "@/components/viewer/FantasyTeamForm";
 import { FantasyStandingsList } from "@/components/fantasy/FantasyStandingsList";
@@ -23,7 +23,7 @@ export default async function FantasyTeamPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ sort?: string; dir?: string }>;
+  searchParams: Promise<{ sort?: string; dir?: string; page?: string }>;
 }) {
   const { id } = await params;
   const session = await requireRole("VIEWER", "TEAM_MANAGER");
@@ -49,20 +49,28 @@ export default async function FantasyTeamPage({
   let standingsSection: React.ReactNode = null;
   if (locked) {
     const { hasPoints, standings: rankedStandings } = await getFantasyStandings(id);
-    const { sort: rawSort, dir: rawDir } = await searchParams;
+    const { sort: rawSort, dir: rawDir, page: rawPage } = await searchParams;
     const { sortKey, sortDir } = resolveFantasySort(rawSort, rawDir);
+    const page = resolveFantasyPage(rawPage);
     const standings = sortFantasyStandings(rankedStandings, sortKey, sortDir);
+    const myStanding = rankedStandings.find((s) => s.team.userId === session.user.id);
     standingsSection =
       standings.length === 0 ? (
         <p className="text-black/60 dark:text-white/60">No fantasy teams were submitted.</p>
       ) : (
         <>
+          {myStanding && (
+            <p className="text-sm font-medium">
+              Current rank: #{myStanding.rank} of {standings.length}
+            </p>
+          )}
           <FantasyStandingsList
             auctionId={auction.id}
             standings={standings}
             hasPoints={hasPoints}
             sortKey={sortKey}
             sortDir={sortDir}
+            page={page}
             highlightUserId={session.user.id}
           />
           <MostPickedPlayersTable categories={await getMostPickedPlayersByCategory(auction.id)} />

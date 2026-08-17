@@ -46,7 +46,8 @@ export function sortFantasyStandings<T extends FantasyStanding>(
 /** Clicking the already-active column flips its direction; clicking a
  * different column switches to it at that column's own default direction.
  * A relative `?...` href, so it works unchanged on whichever page renders
- * the sort links (admin overview or a viewer's read-only standings view). */
+ * the sort links (admin overview or a viewer's read-only standings view).
+ * Deliberately omits `page` — re-sorting always lands back on page 1. */
 export function fantasySortHref(key: FantasySortKey, sortKey: FantasySortKey, sortDir: FantasySortDir): string {
   const nextDir: FantasySortDir = key === sortKey ? (sortDir === "asc" ? "desc" : "asc") : DEFAULT_DIR[key];
   const p = new URLSearchParams();
@@ -54,4 +55,12 @@ export function fantasySortHref(key: FantasySortKey, sortKey: FantasySortKey, so
   if (nextDir !== DEFAULT_DIR[key]) p.set("dir", nextDir);
   const qs = p.toString();
   return qs ? `?${qs}` : "?";
+}
+
+export const FANTASY_STANDINGS_PAGE_SIZE = 15;
+
+/** Parses the raw `?page=` search param into a valid, defaulted page number. */
+export function resolveFantasyPage(rawPage?: string): number {
+  const n = Number(rawPage);
+  return Number.isInteger(n) && n > 0 ? n : 1;
 }
