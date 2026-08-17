@@ -21,7 +21,13 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         password: { label: "Password", type: "password" },
       },
       authorize: async (credentials, request) => {
-        const loginId = credentials?.loginId as string | undefined;
+        // Every path that creates or looks up a loginId elsewhere in the app
+        // (selfRegistration.service.ts, admin user creation) normalizes to
+        // trimmed lowercase before it touches the database — match that here
+        // too, or a login typed with different casing (e.g. a mobile
+        // keyboard auto-capitalizing the first letter) fails to find the
+        // user and looks exactly like a wrong password.
+        const loginId = (credentials?.loginId as string | undefined)?.trim().toLowerCase();
         const password = credentials?.password as string | undefined;
         if (!loginId || !password) return null;
 
