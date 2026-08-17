@@ -46,9 +46,14 @@ app.prepare().then(() => {
       });
       if (!auction) return;
 
-      const role = token.role as string | undefined;
-      const leagueId = token.leagueId as string | null | undefined;
-      const inScope = role === "ADMIN" || leagueId === auction.tournament.leagueId;
+      // token.role/token.leagueId (single-league shape) no longer exist since
+      // the multi-league-users migration — a session now carries isSiteAdmin
+      // + a memberships array (lib/auth/guards.ts's allLeagueIds/assertInScope
+      // pattern), which this check missed updating at the time.
+      const isSiteAdmin = token.isSiteAdmin as boolean | undefined;
+      const memberships = token.memberships as { leagueId: string; role: string }[] | undefined;
+      const inScope =
+        !!isSiteAdmin || (memberships ?? []).some((m) => m.leagueId === auction.tournament.leagueId);
       if (!inScope) return;
 
       socket.join(`auction:${auctionId}`);
