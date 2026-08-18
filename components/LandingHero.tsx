@@ -133,6 +133,13 @@ export function LandingHero() {
             </div>
           ))}
         </div>
+
+        <p className="mt-16 text-center text-xs text-black/50 dark:text-white/50">
+          Questions?{" "}
+          <a href="mailto:sales@myleagueforge.com" className="underline underline-offset-2 hover:text-black/70 dark:hover:text-white/70">
+            sales@myleagueforge.com
+          </a>
+        </p>
       </div>
     </div>
   );
