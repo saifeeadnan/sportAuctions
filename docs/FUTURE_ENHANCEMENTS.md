@@ -98,4 +98,21 @@ independently small enough to build on its own.
 
 ---
 
+## Sponsor tiers
+
+Every sponsor is treated identically today — `TournamentSponsor` (`prisma/schema.prisma`) has no
+concept of rank, and `SponsorRibbon` gives each one the same fixed `h-28 w-28` logo size and an
+equal share of the rotating "featured" spotlight, regardless of what that sponsor is actually
+paying for the placement. A tiered model (e.g. Title / Gold / Silver, or just a numeric priority)
+would let higher tiers get real, visible differentiation: a bigger logo, a larger slice of the
+featured-rotation time, and placement first in the ribbon instead of the current per-session
+shuffle. The one-time `SponsorSplash` modal shown on manager/viewer live pages could apply the
+same ordering/sizing so a title sponsor isn't buried among equally-sized logos there either.
+
+**Rough size:** small — a `tier` field (enum or int) on `TournamentSponsor` plus a migration, then
+`SponsorRibbon`'s existing per-sponsor size/rotation-weight logic and `SponsorSplash`'s ordering
+both read it instead of treating every sponsor the same. No new subsystem, no new page.
+
+---
+
 <!-- Add new items above this line, most recent first. -->
