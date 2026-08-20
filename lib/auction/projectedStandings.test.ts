@@ -12,6 +12,7 @@ function player(overrides: Partial<AuctionStatePlayer>): AuctionStatePlayer {
     id: "p",
     name: "Player",
     position: null,
+    age: null,
     photoUrl: null,
     previousTeam: null,
     categoryName: "Regular",

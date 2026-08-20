@@ -396,7 +396,13 @@ export function AuctioneerConsole({
         <section className={`${card} p-3`}>
           <h2 className="text-base font-medium mb-2">On the clock</h2>
           <div className="flex flex-col gap-2 items-center">
-            <OnClockCard player={onClock} photoWidth={140} photoHeight={190} />
+            <OnClockCard
+              player={onClock}
+              template={state.onClockTemplate}
+              visibleFields={state.onClockVisibleFields}
+              photoWidth={140}
+              photoHeight={190}
+            />
             {onClock && (
               <div className="flex flex-col gap-3 w-full max-w-sm">
                 <p className="text-sm text-center">

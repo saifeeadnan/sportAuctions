@@ -12,15 +12,18 @@ import {
   openPreAuction,
   lockPreAuction,
   startBidding,
+  startBiddingDirect,
   resetAuctionToPreBidding,
   deleteAuction,
   updateCategoryBidIncrement,
   addPlayerToAuction,
   updateAuctionPlayerCategory,
   updateAuctionTeamSettings,
+  updateOnClockDisplaySettings,
   type CreateAuctionInput,
 } from "@/lib/services/auction.service";
 import { submitDraft, removeDraftPick } from "@/lib/services/preAuctionDraft.service";
+import type { OnClockTemplate, OnClockFieldKey } from "@/lib/onClockDisplay";
 
 export async function createAuctionAction(
   input: Omit<CreateAuctionInput, "createdById">
@@ -78,6 +81,20 @@ export async function startBiddingAction(
     const session = await requireRole("ADMIN", "AUCTIONEER", "LEAGUE_ADMIN");
     await loadScopedAuction(auctionId, allLeagueIds(session));
     await startBidding(auctionId);
+    revalidatePath(`/admin/auctions/${auctionId}`);
+    revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
+  });
+}
+
+export async function startBiddingDirectAction(
+  auctionId: string,
+  _prevState?: unknown,
+  _formData?: FormData
+): Promise<ActionResult> {
+  return toActionResult(async () => {
+    const session = await requireRole("ADMIN", "AUCTIONEER", "LEAGUE_ADMIN");
+    await loadScopedAuction(auctionId, allLeagueIds(session));
+    await startBiddingDirect(auctionId);
     revalidatePath(`/admin/auctions/${auctionId}`);
     revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
   });
@@ -142,6 +159,19 @@ export async function updateAuctionTeamSettingsAction(
     const { leagueIds } = await requireAdminOrLeagueAdmin();
     await loadScopedAuction(auctionId, leagueIds);
     await updateAuctionTeamSettings(auctionId, input);
+    revalidatePath(`/admin/auctions/${auctionId}`);
+    revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
+  });
+}
+
+export async function updateOnClockDisplaySettingsAction(
+  auctionId: string,
+  input: { onClockTemplate?: OnClockTemplate; onClockVisibleFields?: OnClockFieldKey[] }
+): Promise<ActionResult> {
+  return toActionResult(async () => {
+    const { leagueIds } = await requireAdminOrLeagueAdmin();
+    await loadScopedAuction(auctionId, leagueIds);
+    await updateOnClockDisplaySettings(auctionId, input);
     revalidatePath(`/admin/auctions/${auctionId}`);
     revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
   });

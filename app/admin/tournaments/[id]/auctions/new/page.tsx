@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
 import { isLeagueReadOnly } from "@/lib/services/league.service";
-import { NewAuctionForm } from "@/components/admin/NewAuctionForm";
+import { NewAuctionWizard } from "@/components/admin/NewAuctionWizard";
 
 export default async function NewAuctionPage({
   params,
@@ -55,7 +55,7 @@ export default async function NewAuctionPage({
       <p className="text-sm text-black/60 dark:text-white/60 mb-4">
         {tournament.name} &middot; roster: {tournament.roster.name}
       </p>
-      <NewAuctionForm
+      <NewAuctionWizard
         tournamentId={tournament.id}
         players={tournament.roster.players.map((p) => ({
           id: p.id,

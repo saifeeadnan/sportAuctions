@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
 import { isLeagueReadOnly } from "@/lib/services/league.service";
-import { openPreAuctionAction, startBiddingAction } from "@/lib/actions/auction.actions";
+import { openPreAuctionAction, startBiddingAction, startBiddingDirectAction } from "@/lib/actions/auction.actions";
 import { ActionResultForm } from "@/components/ui/ActionResultForm";
 import { listTournamentSponsors } from "@/lib/services/tournamentSponsor.service";
 import { AssignPlayerForm } from "@/components/admin/AssignPlayerForm";
@@ -12,6 +12,8 @@ import { ChangePlayerCategoryForm } from "@/components/admin/ChangePlayerCategor
 import { EditCategoryBidIncrementForm } from "@/components/admin/EditCategoryBidIncrementForm";
 import { EditAuctionBudgetForm } from "@/components/admin/EditAuctionBudgetForm";
 import { EditAuctionSquadSizeForm } from "@/components/admin/EditAuctionSquadSizeForm";
+import { EditOnClockDisplayForm } from "@/components/admin/EditOnClockDisplayForm";
+import type { OnClockFieldKey } from "@/lib/onClockDisplay";
 import { SponsorRibbon } from "@/components/tournament/SponsorRibbon";
 import { card, cardInteractive, buttonPrimary, buttonSecondary } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
@@ -192,6 +194,24 @@ export default async function AuctionDetailPage({
         <section>
           <h2 className="text-lg font-medium mb-3">Settings</h2>
           <div className={`${card} divide-y divide-black/5 dark:divide-white/5`}>
+            <details>
+              <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
+                On-the-clock display
+              </summary>
+              <div className="px-4 pb-4">
+                <p className="text-sm text-black/60 dark:text-white/60 mb-3">
+                  How the player currently up for bid is shown during live bidding — the
+                  auctioneer console, manager live view, and viewer watch page all use this.
+                  Changes take effect the next time each viewer refreshes.
+                </p>
+                <EditOnClockDisplayForm
+                  auctionId={auction.id}
+                  initialTemplate={auction.onClockTemplate}
+                  initialVisibleFields={auction.onClockVisibleFields as OnClockFieldKey[]}
+                />
+              </div>
+            </details>
+
             {auction.entries.length > 0 && (
               <details>
                 <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
@@ -341,10 +361,18 @@ export default async function AuctionDetailPage({
       )}
 
       <section className="flex gap-3">
-        {auction.status === "CREATED" && (
+        {auction.status === "CREATED" && !auction.skipPreAuctionDraft && (
           <ActionResultForm action={openPreAuctionAction.bind(null, auction.id)}>
             <button type="submit" className={buttonPrimary}>
               Open pre-auction
+            </button>
+          </ActionResultForm>
+        )}
+
+        {auction.status === "CREATED" && auction.skipPreAuctionDraft && (
+          <ActionResultForm action={startBiddingDirectAction.bind(null, auction.id)}>
+            <button type="submit" className={buttonPrimary}>
+              Start bidding (pre-auction draft skipped)
             </button>
           </ActionResultForm>
         )}

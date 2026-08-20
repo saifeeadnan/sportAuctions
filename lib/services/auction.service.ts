@@ -13,6 +13,13 @@ import { findManagerSelfAuctionPlayerId } from "@/lib/services/preAuctionDraft.s
 import { getAuctionState } from "@/lib/services/auctionState.service";
 import { emitAuctionEvent } from "@/server/ws/broadcaster";
 import { type AuctionType, IMPLEMENTED_AUCTION_TYPES, AUCTION_TYPE_LABELS } from "@/lib/auctionTypes";
+import {
+  ON_CLOCK_TEMPLATES,
+  ON_CLOCK_FIELD_KEYS,
+  DEFAULT_ON_CLOCK_VISIBLE_FIELDS,
+  type OnClockTemplate,
+  type OnClockFieldKey,
+} from "@/lib/onClockDisplay";
 
 export type CreateAuctionInput = {
   tournamentId: string;
@@ -20,6 +27,9 @@ export type CreateAuctionInput = {
   teamBudget: number;
   createdById: string;
   auctionType?: AuctionType;
+  skipPreAuctionDraft?: boolean;
+  onClockTemplate?: OnClockTemplate;
+  onClockVisibleFields?: OnClockFieldKey[];
   categories: {
     name: string;
     basePrice: number;
@@ -28,6 +38,26 @@ export type CreateAuctionInput = {
   }[];
   playerAssignments: { playerId: string; categoryName: string }[];
 };
+
+/** Shared between createAuction and updateOnClockDisplaySettings — both take
+ * the same two optional settings and need the same validation against
+ * lib/onClockDisplay.ts's fixed lists. */
+function validateOnClockDisplayInput(input: {
+  onClockTemplate?: string;
+  onClockVisibleFields?: string[];
+}) {
+  if (input.onClockTemplate != null && !ON_CLOCK_TEMPLATES.includes(input.onClockTemplate as OnClockTemplate)) {
+    throw new ValidationError(`Unknown on-the-clock template "${input.onClockTemplate}"`);
+  }
+  if (input.onClockVisibleFields != null) {
+    const invalid = input.onClockVisibleFields.filter(
+      (f) => !ON_CLOCK_FIELD_KEYS.includes(f as OnClockFieldKey)
+    );
+    if (invalid.length > 0) {
+      throw new ValidationError(`Unknown display field(s): ${invalid.join(", ")}`);
+    }
+  }
+}
 
 export async function createAuction(input: CreateAuctionInput) {
   if (!input.name.trim()) throw new ValidationError("Auction name is required");
@@ -40,6 +70,11 @@ export async function createAuction(input: CreateAuctionInput) {
       `${AUCTION_TYPE_LABELS[auctionType]} isn't supported yet — choose Live Auction`
     );
   }
+
+  const skipPreAuctionDraft = input.skipPreAuctionDraft ?? false;
+  const onClockTemplate = input.onClockTemplate ?? "CLASSIC";
+  const onClockVisibleFields = input.onClockVisibleFields ?? DEFAULT_ON_CLOCK_VISIBLE_FIELDS;
+  validateOnClockDisplayInput({ onClockTemplate, onClockVisibleFields });
 
   const categoryNames = new Set(input.categories.map((c) => c.name.trim()));
   if (categoryNames.size !== input.categories.length) {
@@ -93,6 +128,9 @@ export async function createAuction(input: CreateAuctionInput) {
         teamBudget: input.teamBudget,
         auctionType,
         createdById: input.createdById,
+        skipPreAuctionDraft,
+        onClockTemplate,
+        onClockVisibleFields,
       },
     });
 
@@ -233,26 +271,33 @@ export async function updateCategoryBidIncrement(categoryId: string, bidIncremen
   });
 }
 
-export async function openPreAuction(auctionId: string) {
-  const auction = await prisma.auction.findUnique({
-    where: { id: auctionId },
-    include: { tournament: { include: { teams: true } } },
-  });
-  if (!auction) throw new ValidationError("Auction not found");
-  if (auction.status !== "CREATED") {
-    throw new InvalidStateTransitionError(
-      `Cannot open pre-auction from status ${auction.status}`
-    );
-  }
+type AuctionForEntryPlanning = Prisma.AuctionGetPayload<{
+  include: { tournament: { include: { teams: true } } };
+}>;
 
-  // A manager who is matched (by login ID) to a player already in the auction's
-  // pool occupies their squad slot AS that player — no separate manager-fee slot.
+type TeamEntryPlan = {
+  teamId: string;
+  budgetRemaining: Prisma.Decimal;
+  slotsFilled: number;
+  slotsTotal: number;
+};
+
+/**
+ * Computes each team's starting TeamAuctionEntry values — self-pick matching
+ * (a manager whose own loginId matches a roster player occupies their squad
+ * slot AS that player, no separate manager-fee slot), the per-league manager
+ * base price, and the resulting budget/slots — without writing anything.
+ * Shared by openPreAuction (draft path) and startBiddingDirect (skip path),
+ * which differ only in which TeamAuctionEntryStatus the plan gets written
+ * with and whether Auction lands on PRE_AUCTION_OPEN or BIDDING.
+ */
+async function planTeamAuctionEntries(auction: AuctionForEntryPlanning): Promise<TeamEntryPlan[]> {
   const selfPlayerIdByManagerId = new Map<string, string | null>();
   for (const team of auction.tournament.teams) {
     if (team.managerId && !selfPlayerIdByManagerId.has(team.managerId)) {
       selfPlayerIdByManagerId.set(
         team.managerId,
-        await findManagerSelfAuctionPlayerId(auctionId, team.managerId)
+        await findManagerSelfAuctionPlayerId(auction.id, team.managerId)
       );
     }
   }
@@ -271,40 +316,105 @@ export async function openPreAuction(auctionId: string) {
     managerMemberships.map((m) => [m.userId, m.managerBasePrice])
   );
 
-  return prisma.$transaction(async (tx) => {
-    for (const team of auction.tournament.teams) {
-      const selfPlayerId = team.managerId ? selfPlayerIdByManagerId.get(team.managerId) : null;
-      const managerHasOwnPlayerPick = team.managerOccupiesSlot && !!selfPlayerId;
+  return auction.tournament.teams.map((team) => {
+    const selfPlayerId = team.managerId ? selfPlayerIdByManagerId.get(team.managerId) : null;
+    const managerHasOwnPlayerPick = team.managerOccupiesSlot && !!selfPlayerId;
 
-      const managerSlotPrice = managerHasOwnPlayerPick
-        ? new Prisma.Decimal(0)
-        : computeManagerSlotPrice(
-            team.managerOccupiesSlot,
-            team.managerId ? (managerBasePriceByManagerId.get(team.managerId) ?? null) : null,
-            null
-          );
-      const budgetRemaining = new Prisma.Decimal(auction.teamBudget).minus(managerSlotPrice);
-      if (budgetRemaining.lessThan(0)) {
-        throw new InsufficientBudgetError(
-          `Team "${team.name}"'s manager price exceeds the auction's team budget`
+    const managerSlotPrice = managerHasOwnPlayerPick
+      ? new Prisma.Decimal(0)
+      : computeManagerSlotPrice(
+          team.managerOccupiesSlot,
+          team.managerId ? (managerBasePriceByManagerId.get(team.managerId) ?? null) : null,
+          null
         );
-      }
+    const budgetRemaining = new Prisma.Decimal(auction.teamBudget).minus(managerSlotPrice);
+    if (budgetRemaining.lessThan(0)) {
+      throw new InsufficientBudgetError(
+        `Team "${team.name}"'s manager price exceeds the auction's team budget`
+      );
+    }
 
+    return {
+      teamId: team.id,
+      budgetRemaining,
+      slotsFilled: managerHasOwnPlayerPick ? 0 : team.managerOccupiesSlot ? 1 : 0,
+      slotsTotal: auction.tournament.squadSize,
+    };
+  });
+}
+
+export async function openPreAuction(auctionId: string) {
+  const auction = await prisma.auction.findUnique({
+    where: { id: auctionId },
+    include: { tournament: { include: { teams: true } } },
+  });
+  if (!auction) throw new ValidationError("Auction not found");
+  if (auction.status !== "CREATED") {
+    throw new InvalidStateTransitionError(
+      `Cannot open pre-auction from status ${auction.status}`
+    );
+  }
+
+  const plans = await planTeamAuctionEntries(auction);
+
+  return prisma.$transaction(async (tx) => {
+    for (const plan of plans) {
       await tx.teamAuctionEntry.create({
-        data: {
-          teamId: team.id,
-          auctionId: auction.id,
-          status: "PRE_AUCTION_DRAFTING",
-          budgetRemaining,
-          slotsFilled: managerHasOwnPlayerPick ? 0 : team.managerOccupiesSlot ? 1 : 0,
-          slotsTotal: auction.tournament.squadSize,
-        },
+        data: { ...plan, auctionId: auction.id, status: "PRE_AUCTION_DRAFTING" },
       });
     }
 
     return tx.auction.update({
       where: { id: auctionId },
       data: { status: "PRE_AUCTION_OPEN" },
+    });
+  });
+}
+
+/**
+ * The CREATED -> BIDDING direct path for an auction configured to skip the
+ * pre-auction draft (Auction.skipPreAuctionDraft). Reuses the exact same
+ * per-team entry math openPreAuction uses (via planTeamAuctionEntries), just
+ * skips PRE_AUCTION_OPEN/PRE_AUCTION_LOCKED, the draft-submission wait, and
+ * resolveOverlaps (nothing to resolve — no draft submissions exist).
+ *
+ * No changes are needed to resetAuctionToPreBidding for this to work: a
+ * reset already reuses the auction's existing TeamAuctionEntry rows and
+ * lands the auction at PRE_AUCTION_LOCKED regardless of how BIDDING was
+ * first reached, so the plain startBidding (which only requires
+ * PRE_AUCTION_LOCKED) resumes a skip-configured auction correctly with zero
+ * changes there. startBiddingDirect is only ever used for the *first*
+ * CREATED -> BIDDING transition.
+ */
+export async function startBiddingDirect(auctionId: string) {
+  const auction = await prisma.auction.findUnique({
+    where: { id: auctionId },
+    include: { tournament: { include: { teams: true } } },
+  });
+  if (!auction) throw new ValidationError("Auction not found");
+  if (!auction.skipPreAuctionDraft) {
+    throw new InvalidStateTransitionError(
+      "This auction requires the pre-auction draft — open pre-auction instead"
+    );
+  }
+  if (auction.status !== "CREATED") {
+    throw new InvalidStateTransitionError(
+      `Cannot start bidding directly from status ${auction.status}`
+    );
+  }
+
+  const plans = await planTeamAuctionEntries(auction);
+
+  return prisma.$transaction(async (tx) => {
+    for (const plan of plans) {
+      await tx.teamAuctionEntry.create({
+        data: { ...plan, auctionId: auction.id, status: "AUCTION_LIVE" },
+      });
+    }
+
+    return tx.auction.update({
+      where: { id: auctionId },
+      data: { status: "BIDDING", startedAt: new Date() },
     });
   });
 }
@@ -577,6 +687,38 @@ export async function updateAuctionTeamSettings(
       slotsTotal: p.newSlotsTotal,
     });
   }
+}
+
+/**
+ * Changes an auction's "on the clock" template and/or visible-fields
+ * selection. Works at any auction status, including live BIDDING — the
+ * admin Settings accordion is reachable regardless of status, and every
+ * viewer surface (auctioneer console, manager live view, viewer watch page)
+ * picks the new value up on its next getAuctionState refresh (the existing
+ * "Refresh" button, same as how a roster edit is already picked up today) —
+ * no new real-time push needed.
+ */
+export async function updateOnClockDisplaySettings(
+  auctionId: string,
+  input: { onClockTemplate?: OnClockTemplate; onClockVisibleFields?: OnClockFieldKey[] }
+) {
+  await assertAuctionLeagueNotReadOnly(auctionId);
+
+  if (input.onClockTemplate == null && input.onClockVisibleFields == null) {
+    throw new ValidationError("Provide a template and/or visible fields to update");
+  }
+  validateOnClockDisplayInput(input);
+
+  const auction = await prisma.auction.findUnique({ where: { id: auctionId } });
+  if (!auction) throw new ValidationError("Auction not found");
+
+  return prisma.auction.update({
+    where: { id: auctionId },
+    data: {
+      onClockTemplate: input.onClockTemplate ?? undefined,
+      onClockVisibleFields: input.onClockVisibleFields ?? undefined,
+    },
+  });
 }
 
 export async function deleteAuction(auctionId: string) {

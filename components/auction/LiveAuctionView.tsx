@@ -213,7 +213,13 @@ export function LiveAuctionView({
             <section className={`${card} p-3`}>
               <h2 className="text-base font-medium mb-2">On the clock</h2>
               <div className="flex gap-3 items-start">
-                <OnClockCard player={onClock} photoWidth={110} photoHeight={150} />
+                <OnClockCard
+                  player={onClock}
+                  template={state.onClockTemplate}
+                  visibleFields={state.onClockVisibleFields}
+                  photoWidth={110}
+                  photoHeight={150}
+                />
                 {onClock && (
                   <div className="flex flex-col gap-1.5 flex-1 min-w-0">
                     <CurrentBidLine player={onClock} />
@@ -267,19 +273,16 @@ export function LiveAuctionView({
         <>
           <section>
             <h2 className="text-lg font-medium mb-3">On the clock</h2>
-            {!onClock ? (
-              <p className="text-black/60 dark:text-white/60">
-                No player is currently on the clock.
-              </p>
-            ) : (
-              <div className="flex flex-col gap-2">
-                <p className="text-xl font-semibold">{onClock.name}</p>
-                <p className="text-sm text-black/60 dark:text-white/60">
-                  {onClock.categoryName} &middot; base price {onClock.basePrice}
-                </p>
-                <CurrentBidLine player={onClock} />
-              </div>
-            )}
+            <div className="flex flex-col gap-2 items-start">
+              <OnClockCard
+                player={onClock}
+                template={state.onClockTemplate}
+                visibleFields={state.onClockVisibleFields}
+                photoWidth={96}
+                photoHeight={128}
+              />
+              {onClock && <CurrentBidLine player={onClock} />}
+            </div>
           </section>
 
           <section>

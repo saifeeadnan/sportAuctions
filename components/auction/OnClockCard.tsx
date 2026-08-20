@@ -1,12 +1,27 @@
 import type { AuctionStatePlayer } from "@/lib/services/auctionState.service";
 import { card } from "@/lib/ui";
+import { DEFAULT_ON_CLOCK_VISIBLE_FIELDS, type OnClockTemplate, type OnClockFieldKey } from "@/lib/onClockDisplay";
+import { ClassicTemplate } from "@/components/auction/onClockTemplates/ClassicTemplate";
+import { PhotoFocusTemplate } from "@/components/auction/onClockTemplates/PhotoFocusTemplate";
+import { StatsTableTemplate } from "@/components/auction/onClockTemplates/StatsTableTemplate";
+import type { OnClockTemplateProps } from "@/components/auction/onClockTemplates/shared";
+
+const TEMPLATE_COMPONENTS: Record<OnClockTemplate, (props: OnClockTemplateProps) => React.ReactElement> = {
+  CLASSIC: ClassicTemplate,
+  PHOTO_FOCUS: PhotoFocusTemplate,
+  STATS_TABLE: StatsTableTemplate,
+};
 
 export function OnClockCard({
   player,
+  template = "CLASSIC",
+  visibleFields = DEFAULT_ON_CLOCK_VISIBLE_FIELDS,
   photoWidth = 128,
   photoHeight = 128,
 }: {
   player?: AuctionStatePlayer;
+  template?: OnClockTemplate;
+  visibleFields?: OnClockFieldKey[];
   photoWidth?: number;
   photoHeight?: number;
 }) {
@@ -17,38 +32,6 @@ export function OnClockCard({
       </div>
     );
   }
-  return (
-    <div className={`${card} flex flex-col items-center text-center gap-3 p-4`}>
-      {player.photoUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={player.photoUrl}
-          alt={player.name}
-          className="rounded-lg object-cover bg-black/5 dark:bg-white/5"
-          style={{ width: photoWidth, height: photoHeight }}
-        />
-      ) : (
-        <div
-          className="rounded-lg bg-black/5 dark:bg-white/5 flex items-center justify-center text-xs text-black/40 dark:text-white/40"
-          style={{ width: photoWidth, height: photoHeight }}
-        >
-          No photo
-        </div>
-      )}
-      <p className="text-xl font-semibold">{player.name}</p>
-      <p className="text-sm text-black/60 dark:text-white/60">
-        {player.categoryName} &middot; base price {player.basePrice}
-      </p>
-      <p className="text-sm text-black/60 dark:text-white/60">
-        {player.bidCount === 0
-          ? "No bids yet"
-          : `${player.bidCount} bid${player.bidCount === 1 ? "" : "s"} placed`}
-      </p>
-      {player.previousTeam && (
-        <p className="text-sm text-black/60 dark:text-white/60">
-          Previous team: {player.previousTeam}
-        </p>
-      )}
-    </div>
-  );
+  const Template = TEMPLATE_COMPONENTS[template];
+  return <Template player={player} visibleFields={visibleFields} photoWidth={photoWidth} photoHeight={photoHeight} />;
 }

@@ -38,6 +38,12 @@ enum AuctionType {
   FIXED_PRICE
 }
 
+enum OnClockTemplate {
+  CLASSIC
+  PHOTO_FOCUS
+  STATS_TABLE
+}
+
 enum AuctionPlayerStatus {
   AVAILABLE
   IN_PRE_AUCTION_POOL
@@ -296,6 +302,14 @@ model Auction {
   createdAt    DateTime      @default(now())
   startedAt    DateTime?
   completedAt  DateTime?
+  // When true, this auction skips the pre-auction draft phase entirely —
+  // startBiddingDirect takes it straight from CREATED to BIDDING.
+  skipPreAuctionDraft  Boolean         @default(false)
+  onClockTemplate      OnClockTemplate @default(CLASSIC)
+  // Keys into lib/onClockDisplay.ts's ON_CLOCK_FIELD_KEYS — which optional
+  // Player fields show on the "On the clock" card, validated in the service
+  // layer against that same list.
+  onClockVisibleFields String[]        @default(["photoUrl", "previousTeam"])
 
   categories     AuctionCategory[]
   auctionPlayers AuctionPlayer[]

@@ -1,9 +1,11 @@
 import { prisma } from "@/lib/prisma";
+import type { OnClockTemplate, OnClockFieldKey } from "@/lib/onClockDisplay";
 
 export type AuctionStatePlayer = {
   id: string;
   name: string;
   position: string | null;
+  age: number | null;
   photoUrl: string | null;
   previousTeam: string | null;
   categoryName: string;
@@ -42,6 +44,8 @@ export type AuctionState = {
   name: string;
   status: string;
   tournamentName: string;
+  onClockTemplate: OnClockTemplate;
+  onClockVisibleFields: OnClockFieldKey[];
   players: AuctionStatePlayer[];
   teams: AuctionStateTeam[];
 };
@@ -74,10 +78,13 @@ export async function getAuctionState(auctionId: string): Promise<AuctionState |
     name: auction.name,
     status: auction.status,
     tournamentName: auction.tournament.name,
+    onClockTemplate: auction.onClockTemplate,
+    onClockVisibleFields: auction.onClockVisibleFields as OnClockFieldKey[],
     players: auction.auctionPlayers.map((ap) => ({
       id: ap.id,
       name: ap.player.name,
       position: ap.player.position,
+      age: ap.player.age,
       photoUrl: ap.player.photoUrl,
       previousTeam: ap.player.previousTeam,
       categoryName: ap.category.name,
