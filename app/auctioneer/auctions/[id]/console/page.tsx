@@ -31,9 +31,19 @@ export default async function ConsolePage({
 
   return (
     <div>
-      <h1 className="text-lg font-semibold mb-3">
-        {state.name} <span className="text-black/50 dark:text-white/50 font-normal">&middot; {state.tournamentName}</span>
-      </h1>
+      <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
+        <h1 className="text-lg font-semibold">
+          {state.name} <span className="text-black/50 dark:text-white/50 font-normal">&middot; {state.tournamentName}</span>
+        </h1>
+        <a
+          href={`/auctioneer/auctions/${id}/broadcast`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-sm underline underline-offset-2"
+        >
+          Open broadcast view (OBS-friendly) ↗
+        </a>
+      </div>
       {readOnly && (
         <p className="text-sm text-amber-600 dark:text-amber-400 mb-3">
           This league is read-only — no auction actions can be taken. Existing state can still be

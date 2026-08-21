@@ -7,20 +7,18 @@ Each entry: what it is, why it'd be worth doing, and roughly how big a lift it l
 
 ---
 
-## Live broadcast / OBS-friendly view
+## Live broadcast / OBS-friendly view — Done 2026-08-21
 
-A dedicated, stripped-down auction view designed to be captured as an OBS (or similar) browser
-source for streaming an auction to YouTube/Twitch/Facebook Live — big On-the-clock card, no admin
-controls, no login chrome, camera-and-stream-friendly layout. Several competitor cricket-auction
-platforms already offer this as "broadcast overlay" mode.
-
-The app already has real-time, no-video "watch along" via `/viewer/auctions/[id]/watch`
-(Socket.IO-driven, updates live) — this would be a visual variant of that same page, not a new data
-layer. Actual video encoding/streaming (OBS, RTMP, a YouTube/Twitch account) stays outside the app
-entirely; this only builds the thing OBS points its browser source at.
-
-**Rough size:** small-to-medium — mostly a new page/layout reusing existing `getAuctionState` data
-and the On-the-clock template system, styled for legibility on a stream rather than a browser tab.
+~~A dedicated, stripped-down auction view designed to be captured as an OBS (or similar) browser
+source for streaming an auction to YouTube/Twitch/Facebook Live.~~ **Done 2026-08-21.** New route
+`/auctioneer/auctions/[id]/broadcast`, reusing the auctioneer's own login (no new public/token
+auth surface) and the existing real-time data layer (`getAuctionState`/`useAuctionSocket`) — a
+visual variant, not a new data layer, exactly as scoped. Shows the on-clock player in the auction's
+own configured on-clock template (Classic/Photo-focus/Stats table), the live current bid, an
+oversized countdown, and sponsors, with the app's nav chrome hidden (`NavVisibility`) and no admin
+controls. Team rosters (`SoldTicker`) appear automatically only during idle moments — before the
+next player is selected, or once the auction completes — so they never compete with the live card
+for space, with no operator interaction needed.
 
 ---
 
