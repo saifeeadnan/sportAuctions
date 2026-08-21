@@ -107,6 +107,7 @@ export default async function FantasyTeamPage({
           players={await listFantasyPlayerPool(auction.id)}
           lockedPlayerId={eligibility.selfAuctionPlayerId}
           initialSelected={existingTeam?.picks.map((p) => p.auctionPlayerId) ?? []}
+          initialName={existingTeam?.name ?? undefined}
         />
       )}
 

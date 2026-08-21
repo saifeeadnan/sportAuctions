@@ -8,11 +8,12 @@ import { submitFantasyTeam, deleteFantasyTeam } from "@/lib/services/fantasyTeam
 
 export async function submitFantasyTeamAction(
   auctionId: string,
-  auctionPlayerIds: string[]
+  auctionPlayerIds: string[],
+  name?: string
 ): Promise<ActionResult> {
   return toActionResult(async () => {
     const session = await requireRole("VIEWER", "TEAM_MANAGER");
-    await submitFantasyTeam(auctionId, session.user.id, auctionPlayerIds, allLeagueIds(session));
+    await submitFantasyTeam(auctionId, session.user.id, auctionPlayerIds, allLeagueIds(session), name);
     revalidatePath(`/viewer/auctions/${auctionId}/fantasy`);
   });
 }

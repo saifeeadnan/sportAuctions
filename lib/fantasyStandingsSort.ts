@@ -7,7 +7,7 @@ export type FantasySortDir = "asc" | "desc";
 
 export const FANTASY_SORT_LABELS: Record<FantasySortKey, string> = {
   rank: "Rank",
-  user: "User",
+  user: "Team",
   spend: "Spent",
 };
 
@@ -35,7 +35,7 @@ export function sortFantasyStandings<T extends FantasyStanding>(
   return [...standings].sort((a, b) => {
     const cmp =
       sortKey === "user"
-        ? a.team.user.name.localeCompare(b.team.user.name)
+        ? (a.team.name || a.team.user.name).localeCompare(b.team.name || b.team.user.name)
         : sortKey === "spend"
           ? a.totalSpend - b.totalSpend
           : a.rank - b.rank;

@@ -258,7 +258,8 @@ export async function submitFantasyTeam(
   auctionId: string,
   userId: string,
   auctionPlayerIds: string[],
-  leagueIds: string[] | null
+  leagueIds: string[] | null,
+  name?: string
 ) {
   const auction = await prisma.auction.findUnique({
     where: { id: auctionId },
@@ -331,6 +332,11 @@ export async function submitFantasyTeam(
     );
   }
 
+  // Empty/whitespace-only input clears a previously-set name rather than
+  // persisting an empty string — same "optional, trimmed" convention as
+  // every other user-provided display name in this codebase.
+  const trimmedName = name?.trim() || null;
+
   // Re-submittable: upsert the team row (keeping its id/createdAt stable
   // across edits) and replace its picks wholesale, same delete-then-recreate
   // pattern the manager pre-auction draft already uses for its own
@@ -338,8 +344,8 @@ export async function submitFantasyTeam(
   return prisma.$transaction(async (tx) => {
     const fantasyTeam = await tx.fantasyTeam.upsert({
       where: { auctionId_userId: { auctionId, userId } },
-      create: { auctionId, userId },
-      update: {},
+      create: { auctionId, userId, name: trimmedName },
+      update: { name: trimmedName },
     });
     await tx.fantasyTeamPlayer.deleteMany({ where: { fantasyTeamId: fantasyTeam.id } });
     await tx.fantasyTeamPlayer.createMany({

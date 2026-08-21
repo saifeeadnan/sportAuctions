@@ -94,6 +94,66 @@ describe("submitFantasyTeam rejects unsold players", () => {
   });
 });
 
+describe("submitFantasyTeam's optional name", () => {
+  it("defaults to null when no name is given", async () => {
+    const fx = await buildFantasyEligibleFixture();
+
+    const team = await submitFantasyTeam(fx.auction.id, fx.viewer.id, [fx.soldAuctionPlayer.id], null);
+
+    expect(team.name).toBeNull();
+  });
+
+  it("trims and persists a given name", async () => {
+    const fx = await buildFantasyEligibleFixture();
+
+    const team = await submitFantasyTeam(
+      fx.auction.id,
+      fx.viewer.id,
+      [fx.soldAuctionPlayer.id],
+      null,
+      "  The Strikers  "
+    );
+
+    expect(team.name).toBe("The Strikers");
+  });
+
+  it("normalizes an empty/whitespace-only name to null", async () => {
+    const fx = await buildFantasyEligibleFixture();
+
+    const team = await submitFantasyTeam(
+      fx.auction.id,
+      fx.viewer.id,
+      [fx.soldAuctionPlayer.id],
+      null,
+      "   "
+    );
+
+    expect(team.name).toBeNull();
+  });
+
+  it("updates the name on resubmission, keeping the same team row", async () => {
+    const fx = await buildFantasyEligibleFixture();
+
+    const first = await submitFantasyTeam(
+      fx.auction.id,
+      fx.viewer.id,
+      [fx.soldAuctionPlayer.id],
+      null,
+      "Original Name"
+    );
+    const second = await submitFantasyTeam(
+      fx.auction.id,
+      fx.viewer.id,
+      [fx.soldAuctionPlayer.id],
+      null,
+      "Renamed"
+    );
+
+    expect(second.id).toBe(first.id);
+    expect(second.name).toBe("Renamed");
+  });
+});
+
 describe("fantasy team cap follows the actual max roster size, not the configured squad size", () => {
   /**
    * squadSize is 5, but no team gets fully staffed — Team 1 ends up with 2

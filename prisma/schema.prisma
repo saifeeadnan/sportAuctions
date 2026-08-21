@@ -422,6 +422,11 @@ model FantasyTeam {
   auction   Auction  @relation(fields: [auctionId], references: [id], onDelete: Cascade)
   userId    String
   user      User     @relation(fields: [userId], references: [id])
+  // Optional display name, chosen by the user — null falls back to
+  // showing user.name wherever a fantasy team's identity is displayed.
+  // Follows the same edit lifecycle as picks: settable on every
+  // resubmission until isFantasyEditingLocked trips.
+  name      String?
   createdAt DateTime @default(now())
 
   picks FantasyTeamPlayer[]

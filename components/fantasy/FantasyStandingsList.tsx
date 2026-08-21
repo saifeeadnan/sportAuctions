@@ -129,7 +129,12 @@ export function FantasyStandingsList({
                 }`}
               >
                 <span className="flex items-center gap-2">
-                  #{rank} &middot; {team.user.name}
+                  #{rank} &middot; {team.name || team.user.name}
+                  {team.name && (
+                    <span className="text-black/40 dark:text-white/40 font-normal">
+                      ({team.user.name})
+                    </span>
+                  )}
                   {isYou && <Badge variant="info">You</Badge>}
                 </span>
                 <span className="text-black/60 dark:text-white/60 font-normal">

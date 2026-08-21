@@ -6,7 +6,7 @@ import { submitFantasyTeamAction } from "@/lib/actions/fantasyTeam.actions";
 import type { RatedPlayer } from "@/lib/teamStrength";
 import { TeamStrengthSummary } from "@/components/manager/TeamStrengthSummary";
 import { RosterRibbon } from "@/components/roster/RosterRibbon";
-import { card, buttonPrimary, tabsTrack, tabItem } from "@/lib/ui";
+import { card, inputClass, buttonPrimary, tabsTrack, tabItem } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 
 type PlayerOption = RatedPlayer & {
@@ -29,6 +29,7 @@ export function FantasyTeamForm({
   players,
   lockedPlayerId,
   initialSelected,
+  initialName,
 }: {
   auctionId: string;
   cap: number;
@@ -36,11 +37,13 @@ export function FantasyTeamForm({
   players: PlayerOption[];
   lockedPlayerId: string;
   initialSelected?: string[];
+  initialName?: string;
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(
     new Set([lockedPlayerId, ...(initialSelected ?? [])])
   );
+  const [name, setName] = useState(initialName ?? "");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -87,7 +90,7 @@ export function FantasyTeamForm({
     }
     setLoading(true);
     setError(null);
-    const result = await submitFantasyTeamAction(auctionId, Array.from(selected));
+    const result = await submitFantasyTeamAction(auctionId, Array.from(selected), name);
     setLoading(false);
     if (result.error) {
       setError(result.error);
@@ -107,6 +110,17 @@ export function FantasyTeamForm({
 
   return (
     <div className="flex flex-col gap-4">
+      <label className="flex flex-col gap-1 text-sm max-w-xs">
+        Team name (optional)
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. The Strikers"
+          maxLength={60}
+          className={inputClass}
+        />
+      </label>
+
       <p className="text-sm">
         Budget: {budget} &middot; Used: {formatAmount(totalPrice)} &middot; Left:{" "}
         <span className={budgetRemainingAfterSelection < 0 ? "text-red-600 dark:text-red-400" : ""}>
