@@ -3,7 +3,13 @@
 import { useState } from "react";
 import { buttonSecondary } from "@/lib/ui";
 
-export function CopyInviteLinkButton({ path }: { path: string }) {
+export function CopyInviteLinkButton({
+  path,
+  label = "Copy invite link",
+}: {
+  path: string;
+  label?: string;
+}) {
   const [copied, setCopied] = useState(false);
 
   async function handleCopy() {
@@ -20,7 +26,7 @@ export function CopyInviteLinkButton({ path }: { path: string }) {
 
   return (
     <button type="button" onClick={handleCopy} className={`${buttonSecondary} px-2 py-1 text-xs`}>
-      {copied ? "Copied!" : "Copy invite link"}
+      {copied ? "Copied!" : label}
     </button>
   );
 }

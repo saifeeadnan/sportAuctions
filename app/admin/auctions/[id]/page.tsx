@@ -13,6 +13,7 @@ import { EditCategoryBidIncrementForm } from "@/components/admin/EditCategoryBid
 import { EditAuctionBudgetForm } from "@/components/admin/EditAuctionBudgetForm";
 import { EditAuctionSquadSizeForm } from "@/components/admin/EditAuctionSquadSizeForm";
 import { EditOnClockDisplayForm } from "@/components/admin/EditOnClockDisplayForm";
+import { HighlightsLinkPanel } from "@/components/admin/HighlightsLinkPanel";
 import type { OnClockFieldKey } from "@/lib/onClockDisplay";
 import { SponsorRibbon } from "@/components/tournament/SponsorRibbon";
 import { card, cardInteractive, buttonPrimary, buttonSecondary } from "@/lib/ui";
@@ -425,6 +426,12 @@ export default async function AuctionDetailPage({
           </a>
         )}
       </section>
+
+      {auction.status === "COMPLETED" && (
+        <section>
+          <HighlightsLinkPanel auctionId={auction.id} initialToken={auction.highlightsToken} />
+        </section>
+      )}
 
       <SponsorRibbon sponsors={sponsors} />
     </div>

@@ -340,6 +340,11 @@ model Auction {
   // at creation; reAuctionDiscountPercent is only meaningful when this is true.
   reAuctionEnabled         Boolean         @default(false)
   reAuctionDiscountPercent Int?
+  // Set only via getOrCreateHighlightsToken, once an admin explicitly
+  // requests a public recap link for this COMPLETED auction. Nullable —
+  // most auctions never get one; not backfilled for existing rows (same
+  // posture as User.email above).
+  highlightsToken String? @unique
 
   categories     AuctionCategory[]
   auctionPlayers AuctionPlayer[]
