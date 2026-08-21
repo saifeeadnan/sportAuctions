@@ -3,7 +3,7 @@ import { resetDb } from "../helpers/resetDb";
 import { createAuctionReadyFixture } from "../helpers/fixtures";
 import { prisma } from "@/lib/prisma";
 import { createAuction, openPreAuction, lockPreAuction, startBidding } from "@/lib/services/auction.service";
-import { adminAssignPlayer, concludeAuction } from "@/lib/services/bidding.service";
+import { adminAssignPlayer, selectNextPlayer, placeBid, recordSale, concludeAuction } from "@/lib/services/bidding.service";
 import { getOrCreateHighlightsToken, getAuctionHighlights } from "@/lib/services/auctionHighlights.service";
 
 beforeEach(resetDb);
@@ -18,7 +18,11 @@ beforeEach(resetDb);
  * own value is always 0 (it IS the replacement level), so its ratio is 0
  * against Value Player's strictly positive one. "Average Player" (Silver,
  * sold 50, Team 2) and "Unsold Player" (Silver, never assigned) round out
- * the category-spend/unsold assertions.
+ * the category-spend/unsold assertions. Star Player is sold via two real
+ * live bids (selectNextPlayer + placeBid + recordSale) so its bidCount is
+ * 2; Value Player and Average Player are direct adminAssignPlayer sales
+ * with bidCount 0 — covers both cases for the per-category biggest-buy
+ * bid-count assertion.
  */
 async function buildHighlightsFixture(options?: { setValueRatings?: boolean }) {
   const fx = await createAuctionReadyFixture({
@@ -75,7 +79,14 @@ async function buildHighlightsFixture(options?: { setValueRatings?: boolean }) {
     where: { auctionId: auction.id, playerId: averagePlayer.id },
   });
 
-  await adminAssignPlayer(auction.id, starAP.id, team1Entry.id, 500);
+  await selectNextPlayer(auction.id, starAP.id);
+  await placeBid(auction.id, starAP.id, team2Entry.id, 300);
+  // placeBid's 2-second anti-spam cooldown (bidCooldownUntil) would reject an
+  // immediate second bid on the same player — clear it directly rather than
+  // slowing the test down with a real sleep.
+  await prisma.auctionPlayer.update({ where: { id: starAP.id }, data: { bidCooldownUntil: null } });
+  await placeBid(auction.id, starAP.id, team1Entry.id, 500);
+  await recordSale(auction.id, starAP.id, team1Entry.id, 500);
   await adminAssignPlayer(auction.id, valueAP.id, team1Entry.id, 100);
   await adminAssignPlayer(auction.id, averageAP.id, team2Entry.id, 50);
   // "Unsold Player" is deliberately left unassigned — concludeAuction flips it to UNSOLD.
@@ -126,7 +137,7 @@ describe("getAuctionHighlights", () => {
     expect(await getAuctionHighlights("does-not-exist")).toBeNull();
   });
 
-  it("computes the biggest buy, spend by category, and excludes unsold players", async () => {
+  it("computes the biggest buy per category (with bid counts), spend by category, and excludes unsold players", async () => {
     const { auction } = await buildHighlightsFixture();
     const token = await getOrCreateHighlightsToken(auction.id);
 
@@ -135,12 +146,10 @@ describe("getAuctionHighlights", () => {
     expect(highlights!.soldCount).toBe(3);
     expect(highlights!.unsoldCount).toBe(1);
 
-    expect(highlights!.biggestBuy).toEqual({
-      playerName: "Star Player",
-      categoryName: "Gold",
-      teamName: "Team 1",
-      price: "500",
-    });
+    expect(highlights!.biggestBuyByCategory).toEqual([
+      { categoryName: "Gold", playerName: "Star Player", teamName: "Team 1", price: "500", bidCount: 2 },
+      { categoryName: "Silver", playerName: "Average Player", teamName: "Team 2", price: "50", bidCount: 0 },
+    ]);
 
     const gold = highlights!.spendByCategory.find((c) => c.categoryName === "Gold")!;
     expect(gold.playersSold).toBe(2);

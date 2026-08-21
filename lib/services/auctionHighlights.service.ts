@@ -34,7 +34,13 @@ export type AuctionHighlightsData = {
   completedAt: Date;
   soldCount: number;
   unsoldCount: number;
-  biggestBuy: { playerName: string; categoryName: string; teamName: string; price: string } | null;
+  biggestBuyByCategory: {
+    categoryName: string;
+    playerName: string;
+    teamName: string;
+    price: string;
+    bidCount: number;
+  }[];
   bestValuePick: { playerName: string; categoryName: string; teamName: string; price: string } | null;
   spendByCategory: { categoryName: string; totalSpent: string; playersSold: number }[];
 };
@@ -70,6 +76,7 @@ export async function getAuctionHighlights(token: string): Promise<AuctionHighli
             },
           },
           soldToEntry: { select: { team: { select: { name: true } } } },
+          _count: { select: { bids: true } },
         },
       },
     },
@@ -85,10 +92,22 @@ export async function getAuctionHighlights(token: string): Promise<AuctionHighli
     }
   >;
 
-  const biggestBuyRow = sold.reduce<(typeof sold)[number] | null>(
-    (best, ap) => (!best || ap.soldPrice.greaterThan(best.soldPrice) ? ap : best),
-    null
-  );
+  const biggestBuyRowByCategory = new Map<string, (typeof sold)[number]>();
+  for (const ap of sold) {
+    const current = biggestBuyRowByCategory.get(ap.categoryId);
+    if (!current || ap.soldPrice.greaterThan(current.soldPrice)) {
+      biggestBuyRowByCategory.set(ap.categoryId, ap);
+    }
+  }
+  const biggestBuyByCategory = Array.from(biggestBuyRowByCategory.values())
+    .map((ap) => ({
+      categoryName: ap.category.name,
+      playerName: ap.player.name,
+      teamName: ap.soldToEntry.team.name,
+      price: ap.soldPrice.toString(),
+      bidCount: ap._count.bids,
+    }))
+    .sort((a, b) => Number(b.price) - Number(a.price));
 
   const byCategory = new Map<string, { categoryName: string; total: number; count: number }>();
   for (const ap of sold) {
@@ -139,12 +158,7 @@ export async function getAuctionHighlights(token: string): Promise<AuctionHighli
     completedAt: auction.completedAt!,
     soldCount: sold.length,
     unsoldCount: auction.auctionPlayers.length - sold.length,
-    biggestBuy: biggestBuyRow && {
-      playerName: biggestBuyRow.player.name,
-      categoryName: biggestBuyRow.category.name,
-      teamName: biggestBuyRow.soldToEntry.team.name,
-      price: biggestBuyRow.soldPrice.toString(),
-    },
+    biggestBuyByCategory,
     bestValuePick: bestValue && {
       playerName: bestValue.row.player.name,
       categoryName: bestValue.row.category.name,

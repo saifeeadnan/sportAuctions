@@ -32,29 +32,46 @@ export default async function HighlightsPage({
         </p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {highlights.biggestBuy && (
-          <div className={`${card} p-4`}>
-            <p className="text-xs text-black/50 dark:text-white/50 mb-1">Biggest buy</p>
-            <p className="text-lg font-semibold">{highlights.biggestBuy.playerName}</p>
-            <p className="text-sm text-black/60 dark:text-white/60">
-              {highlights.biggestBuy.categoryName} &middot; {highlights.biggestBuy.teamName}
-            </p>
-            <p className="text-2xl font-bold mt-1">{highlights.biggestBuy.price}</p>
-          </div>
-        )}
+      {highlights.bestValuePick && (
+        <div className={`${card} p-4 max-w-sm`}>
+          <p className="text-xs text-black/50 dark:text-white/50 mb-1">Best value pick</p>
+          <p className="text-lg font-semibold">{highlights.bestValuePick.playerName}</p>
+          <p className="text-sm text-black/60 dark:text-white/60">
+            {highlights.bestValuePick.categoryName} &middot; {highlights.bestValuePick.teamName}
+          </p>
+          <p className="text-2xl font-bold mt-1">{highlights.bestValuePick.price}</p>
+        </div>
+      )}
 
-        {highlights.bestValuePick && (
-          <div className={`${card} p-4`}>
-            <p className="text-xs text-black/50 dark:text-white/50 mb-1">Best value pick</p>
-            <p className="text-lg font-semibold">{highlights.bestValuePick.playerName}</p>
-            <p className="text-sm text-black/60 dark:text-white/60">
-              {highlights.bestValuePick.categoryName} &middot; {highlights.bestValuePick.teamName}
-            </p>
-            <p className="text-2xl font-bold mt-1">{highlights.bestValuePick.price}</p>
+      {highlights.biggestBuyByCategory.length > 0 && (
+        <div>
+          <h2 className="text-lg font-medium mb-2">Biggest buy by category</h2>
+          <div className={`${card} overflow-x-auto`}>
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="text-left border-b border-black/10 dark:border-white/10">
+                  <th className="py-2 pl-4 pr-4">Category</th>
+                  <th className="py-2 pr-4">Player</th>
+                  <th className="py-2 pr-4">Team</th>
+                  <th className="py-2 pr-4">Price</th>
+                  <th className="py-2 pr-4">Bids</th>
+                </tr>
+              </thead>
+              <tbody>
+                {highlights.biggestBuyByCategory.map((b) => (
+                  <tr key={b.categoryName} className="border-b border-black/5 dark:border-white/5 last:border-0">
+                    <td className="py-2 pl-4 pr-4">{b.categoryName}</td>
+                    <td className="py-2 pr-4">{b.playerName}</td>
+                    <td className="py-2 pr-4">{b.teamName}</td>
+                    <td className="py-2 pr-4">{b.price}</td>
+                    <td className="py-2 pr-4">{b.bidCount}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {highlights.spendByCategory.length > 0 && (
         <div>
