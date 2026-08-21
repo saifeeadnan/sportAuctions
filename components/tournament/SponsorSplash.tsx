@@ -2,10 +2,24 @@
 
 import { useEffect, useState } from "react";
 import { card, buttonPrimary } from "@/lib/ui";
+import { type SponsorTier } from "@/lib/sponsorTiers";
 
-type Sponsor = { id: string; name: string; websiteUrl: string | null; logoUrl: string | null };
+type Sponsor = {
+  id: string;
+  name: string;
+  websiteUrl: string | null;
+  logoUrl: string | null;
+  tier: SponsorTier;
+};
 
 const AUTO_DISMISS_MS = 6000;
+
+// Literal lookup — see the same note in SponsorRibbon.tsx.
+const TIER_LOGO_SIZE: Record<SponsorTier, string> = {
+  TITLE: "h-24 w-24",
+  MARQUEE: "h-20 w-20",
+  COMMUNITY: "h-16 w-16", // unchanged — today's size
+};
 
 /** A one-time "thank you" greeting for a tournament's sponsors, shown the
  * first time a Viewer or Team Manager lands on an auction/fantasy page each
@@ -82,7 +96,7 @@ export function SponsorSplash({
               <img
                 src={sponsor.logoUrl ?? `/api/tournament-sponsors/${sponsor.id}`}
                 alt={sponsor.name}
-                className="h-16 w-16 rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-1"
+                className={`${TIER_LOGO_SIZE[sponsor.tier]} rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-1`}
               />
               <span className="text-xs text-center max-w-full truncate" title={sponsor.name}>
                 {sponsor.name}

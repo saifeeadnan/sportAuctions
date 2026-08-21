@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import {
   addTournamentSponsor,
   addExistingTournamentSponsor,
+  listTournamentSponsors,
 } from "@/lib/services/tournamentSponsor.service";
 
 beforeEach(resetDb);
@@ -106,5 +107,89 @@ describe("addExistingTournamentSponsor copying a URL-backed sponsor", () => {
 
     const fromDb = await prisma.tournamentSponsor.findUniqueOrThrow({ where: { id: copy.id } });
     expect(fromDb.logoUrl).toBe("https://example.com/logo.png");
+  });
+});
+
+describe("sponsor tier", () => {
+  it("defaults to COMMUNITY when no tier is given", async () => {
+    const { tournament } = await buildTournamentFixture();
+    const sponsor = await addTournamentSponsor({
+      tournamentId: tournament.id,
+      name: "Acme Corp",
+      logoUrl: "https://example.com/logo.png",
+    });
+    expect(sponsor.tier).toBe("COMMUNITY");
+  });
+
+  it("accepts each valid tier explicitly", async () => {
+    const { tournament } = await buildTournamentFixture();
+    for (const tier of ["TITLE", "MARQUEE", "COMMUNITY"] as const) {
+      const sponsor = await addTournamentSponsor({
+        tournamentId: tournament.id,
+        name: `Sponsor ${tier}`,
+        logoUrl: "https://example.com/logo.png",
+        tier,
+      });
+      expect(sponsor.tier).toBe(tier);
+    }
+  });
+
+  it("rejects an unknown tier value", async () => {
+    const { tournament } = await buildTournamentFixture();
+    await expect(
+      addTournamentSponsor({
+        tournamentId: tournament.id,
+        name: "Acme Corp",
+        logoUrl: "https://example.com/logo.png",
+        tier: "PLATINUM",
+      })
+    ).rejects.toThrow(/Unknown sponsor tier/);
+  });
+
+  it("addExistingTournamentSponsor does not inherit the source sponsor's tier", async () => {
+    const { tournament, league, admin } = await buildTournamentFixture();
+    const source = await addTournamentSponsor({
+      tournamentId: tournament.id,
+      name: "Acme Corp",
+      logoUrl: "https://example.com/logo.png",
+      tier: "TITLE",
+    });
+
+    const { roster: roster2 } = await createFixtureRoster(league.id, admin.id, ["Player B"]);
+    const tournament2 = await createFixtureTournament({
+      leagueId: league.id,
+      rosterId: roster2.id,
+      createdById: admin.id,
+      numTeams: 2,
+      squadSize: 5,
+    });
+
+    const copyDefault = await addExistingTournamentSponsor(tournament2.id, source.id);
+    expect(copyDefault.tier).toBe("COMMUNITY");
+
+    const copyExplicit = await addExistingTournamentSponsor(tournament2.id, source.id, "MARQUEE");
+    expect(copyExplicit.tier).toBe("MARQUEE");
+  });
+
+  it("listTournamentSponsors sorts TITLE, then MARQUEE, then COMMUNITY, preserving creation order within a tier", async () => {
+    const { tournament } = await buildTournamentFixture();
+    const order = ["COMMUNITY", "TITLE", "MARQUEE", "COMMUNITY"] as const;
+    for (const [i, tier] of order.entries()) {
+      await addTournamentSponsor({
+        tournamentId: tournament.id,
+        name: `Sponsor ${i}`,
+        logoUrl: "https://example.com/logo.png",
+        tier,
+      });
+    }
+
+    const sponsors = await listTournamentSponsors(tournament.id);
+    expect(sponsors.map((s) => s.tier)).toEqual(["TITLE", "MARQUEE", "COMMUNITY", "COMMUNITY"]);
+    expect(sponsors.map((s) => s.name)).toEqual([
+      "Sponsor 1",
+      "Sponsor 2",
+      "Sponsor 0",
+      "Sponsor 3",
+    ]);
   });
 });

@@ -14,6 +14,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     const name = String(formData.get("name") ?? "");
     const websiteUrl = String(formData.get("websiteUrl") ?? "");
     const logoUrl = String(formData.get("logoUrl") ?? "");
+    const tier = String(formData.get("tier") ?? "");
     const file = formData.get("logo") as File | null;
     if (!file && !logoUrl) {
       return NextResponse.json({ error: "Provide a logo file or a logo URL" }, { status: 400 });
@@ -25,6 +26,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
       websiteUrl: websiteUrl || undefined,
       file: file ? { type: file.type, data: Buffer.from(await file.arrayBuffer()) } : undefined,
       logoUrl: logoUrl || undefined,
+      tier: tier || undefined,
     });
 
     return NextResponse.json({ sponsorId: sponsor.id });

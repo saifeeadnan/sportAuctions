@@ -73,6 +73,20 @@ enum StrategyPreferenceType {
   AVOID
 }
 
+// Prestige ladder for a per-tournament sponsor placement — a fixed,
+// predefined set (not user-defined names), independent of the sponsor
+// company itself (the same sponsor can be TITLE for one tournament and
+// COMMUNITY for another — addExistingTournamentSponsor never copies this).
+// Declaration order here IS the prestige sort order — Postgres enums sort
+// by CREATE TYPE declaration order, not alphabetically — listTournamentSponsors
+// relies on this via `orderBy: [{ tier: "asc" }, ...]`. Keep in sync with
+// lib/sponsorTiers.ts's SPONSOR_TIERS array if this is ever reordered.
+enum SponsorTier {
+  TITLE
+  MARQUEE
+  COMMUNITY
+}
+
 model User {
   id           String   @id @default(cuid())
   loginId      String   @unique
@@ -233,15 +247,16 @@ model TournamentDocument {
 }
 
 model TournamentSponsor {
-  id           String     @id @default(cuid())
+  id           String      @id @default(cuid())
   tournamentId String
-  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  tournament   Tournament  @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
   name         String
+  tier         SponsorTier @default(COMMUNITY)
   websiteUrl   String?
   logoUrl      String?
   mimeType     String?
   data         Bytes?
-  createdAt    DateTime   @default(now())
+  createdAt    DateTime    @default(now())
 
   clicks SponsorClickEvent[]
 

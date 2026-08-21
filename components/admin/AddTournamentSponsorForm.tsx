@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { inputClass, selectClass, buttonPrimary, tabsTrack, tabItem } from "@/lib/ui";
+import { SPONSOR_TIERS, SPONSOR_TIER_LABELS, DEFAULT_SPONSOR_TIER, type SponsorTier } from "@/lib/sponsorTiers";
 
 type KnownSponsor = { id: string; name: string; websiteUrl: string | null };
 
@@ -28,6 +29,7 @@ export function AddTournamentSponsorForm({
   );
   const [logoSource, setLogoSource] = useState<"file" | "url">("file");
   const [selectedSponsorId, setSelectedSponsorId] = useState(knownSponsors[0]?.id ?? "");
+  const [tier, setTier] = useState<SponsorTier>(DEFAULT_SPONSOR_TIER);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,7 +64,7 @@ export function AddTournamentSponsorForm({
       const res = await fetch(`/api/tournaments/${tournamentId}/sponsors/existing`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sourceSponsorId: selectedSponsorId }),
+        body: JSON.stringify({ sourceSponsorId: selectedSponsorId, tier }),
       });
       if (!res.ok) throw new Error(await readErrorMessage(res, "Failed to add sponsor"));
       router.refresh();
@@ -110,6 +112,20 @@ export function AddTournamentSponsorForm({
               ))}
             </select>
           </label>
+          <label className="flex flex-col gap-1 text-sm">
+            Tier
+            <select
+              value={tier}
+              onChange={(e) => setTier(e.target.value as SponsorTier)}
+              className={selectClass}
+            >
+              {SPONSOR_TIERS.map((t) => (
+                <option key={t} value={t}>
+                  {SPONSOR_TIER_LABELS[t]}
+                </option>
+              ))}
+            </select>
+          </label>
           {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
           <button type="submit" disabled={loading} className={`${buttonPrimary} mt-2 self-start`}>
             {loading ? "Adding…" : "Add sponsor"}
@@ -124,6 +140,21 @@ export function AddTournamentSponsorForm({
           <label className="flex flex-col gap-1 text-sm">
             Website (optional)
             <input name="websiteUrl" type="text" placeholder="example.com" className={inputClass} />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            Tier
+            <select
+              name="tier"
+              value={tier}
+              onChange={(e) => setTier(e.target.value as SponsorTier)}
+              className={selectClass}
+            >
+              {SPONSOR_TIERS.map((t) => (
+                <option key={t} value={t}>
+                  {SPONSOR_TIER_LABELS[t]}
+                </option>
+              ))}
+            </select>
           </label>
           <div className={tabsTrack}>
             <button

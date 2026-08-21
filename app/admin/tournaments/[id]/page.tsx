@@ -18,12 +18,19 @@ import { SponsorLink } from "@/components/tournament/SponsorLink";
 import { toDateInputValue, formatCalendarDate } from "@/lib/dates";
 import { card, cardInteractive } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
+import { SPONSOR_TIER_LABELS, type SponsorTier } from "@/lib/sponsorTiers";
 
 const AUCTION_STATUS_VARIANT: Record<string, "neutral" | "info" | "success" | "warning"> = {
   BIDDING: "info",
   COMPLETED: "success",
   PRE_AUCTION_OPEN: "warning",
   PRE_AUCTION_LOCKED: "warning",
+};
+
+const SPONSOR_TIER_BADGE_VARIANT: Record<SponsorTier, "success" | "info" | "neutral"> = {
+  TITLE: "success",
+  MARQUEE: "info",
+  COMMUNITY: "neutral",
 };
 
 export default async function TournamentDetailPage({
@@ -200,6 +207,9 @@ export default async function TournamentDetailPage({
                     alt={sponsor.name}
                     className="h-20 w-20 rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-2"
                   />
+                  <Badge variant={SPONSOR_TIER_BADGE_VARIANT[sponsor.tier]}>
+                    {SPONSOR_TIER_LABELS[sponsor.tier]}
+                  </Badge>
                   {sponsor.websiteUrl ? (
                     <SponsorLink
                       sponsorId={sponsor.id}

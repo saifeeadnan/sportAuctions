@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { ValidationError } from "@/lib/errors";
 import { assertLeagueNotReadOnly } from "@/lib/services/league.service";
+import { SPONSOR_TIERS, DEFAULT_SPONSOR_TIER, type SponsorTier } from "@/lib/sponsorTiers";
 
 const MAX_SIZE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/jpg", "image/png"]);
@@ -38,6 +39,7 @@ export type AddTournamentSponsorInput = {
    * is either uploaded bytes or an external URL, never both. */
   file?: SponsorLogoFile;
   logoUrl?: string;
+  tier?: string;
 };
 
 function normalizeWebsiteUrl(url?: string): string | undefined {
@@ -57,6 +59,14 @@ function validateLogoUrl(url: string): string {
     throw new ValidationError("Logo URL must be a valid URL");
   }
   return trimmed;
+}
+
+function validateTier(tier: string | undefined): SponsorTier {
+  if (!tier) return DEFAULT_SPONSOR_TIER;
+  if (!SPONSOR_TIERS.includes(tier as SponsorTier)) {
+    throw new ValidationError(`Unknown sponsor tier "${tier}"`);
+  }
+  return tier as SponsorTier;
 }
 
 export async function addTournamentSponsor(input: AddTournamentSponsorInput) {
@@ -88,12 +98,14 @@ export async function addTournamentSponsor(input: AddTournamentSponsorInput) {
     logoUrl = validateLogoUrl(input.logoUrl!);
   }
 
+  const tier = validateTier(input.tier);
   await loadTournamentForSponsorCreate(input.tournamentId);
 
   return prisma.tournamentSponsor.create({
     data: {
       tournamentId: input.tournamentId,
       name: input.name.trim(),
+      tier,
       websiteUrl: normalizeWebsiteUrl(input.websiteUrl),
       logoUrl,
       mimeType,
@@ -110,8 +122,8 @@ export async function deleteTournamentSponsor(sponsorId: string) {
 export async function listTournamentSponsors(tournamentId: string) {
   return prisma.tournamentSponsor.findMany({
     where: { tournamentId },
-    select: { id: true, name: true, websiteUrl: true, logoUrl: true, createdAt: true },
-    orderBy: { createdAt: "asc" },
+    select: { id: true, name: true, tier: true, websiteUrl: true, logoUrl: true, createdAt: true },
+    orderBy: [{ tier: "asc" }, { createdAt: "asc" }],
   });
 }
 
@@ -163,7 +175,11 @@ export async function listKnownSponsors(
   return distinct;
 }
 
-export async function addExistingTournamentSponsor(tournamentId: string, sourceSponsorId: string) {
+export async function addExistingTournamentSponsor(
+  tournamentId: string,
+  sourceSponsorId: string,
+  tier?: string
+) {
   await loadTournamentForSponsorCreate(tournamentId);
 
   const source = await prisma.tournamentSponsor.findUnique({ where: { id: sourceSponsorId } });
@@ -173,6 +189,11 @@ export async function addExistingTournamentSponsor(tournamentId: string, sourceS
     data: {
       tournamentId,
       name: source.name,
+      // Tier is a per-placement/deal concept, not inherited from the source
+      // sponsor — the same real company can be TITLE for one tournament and
+      // COMMUNITY for another, so this is deliberately validateTier(tier),
+      // never source.tier.
+      tier: validateTier(tier),
       websiteUrl: source.websiteUrl,
       logoUrl: source.logoUrl,
       mimeType: source.mimeType,

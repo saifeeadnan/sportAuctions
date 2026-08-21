@@ -12,6 +12,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
     const body = await req.json();
     const sourceSponsorId = typeof body?.sourceSponsorId === "string" ? body.sourceSponsorId : "";
+    const tier = typeof body?.tier === "string" ? body.tier : undefined;
     if (!sourceSponsorId) {
       return NextResponse.json({ error: "sourceSponsorId is required" }, { status: 400 });
     }
@@ -20,7 +21,7 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     // copy a sponsor whose logo lives in a different league's tournament.
     await loadScopedTournamentSponsor(sourceSponsorId, leagueIds);
 
-    const sponsor = await addExistingTournamentSponsor(tournamentId, sourceSponsorId);
+    const sponsor = await addExistingTournamentSponsor(tournamentId, sourceSponsorId, tier);
     return NextResponse.json({ sponsorId: sponsor.id });
   } catch (error) {
     return toErrorResponse(error);
