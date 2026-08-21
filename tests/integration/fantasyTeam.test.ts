@@ -5,7 +5,11 @@ import { createAuctionReadyFixture } from "../helpers/fixtures";
 import { prisma } from "@/lib/prisma";
 import { createAuction, openPreAuction, lockPreAuction, startBidding } from "@/lib/services/auction.service";
 import { adminAssignPlayer, concludeAuction } from "@/lib/services/bidding.service";
-import { submitFantasyTeam, getMaxRosterSize } from "@/lib/services/fantasyTeam.service";
+import {
+  submitFantasyTeam,
+  getMaxRosterSize,
+  updateFantasyLockDate,
+} from "@/lib/services/fantasyTeam.service";
 
 beforeEach(resetDb);
 
@@ -151,6 +155,54 @@ describe("submitFantasyTeam's optional name", () => {
 
     expect(second.id).toBe(first.id);
     expect(second.name).toBe("Renamed");
+  });
+});
+
+describe("Auction.fantasyLockDate override", () => {
+  it("an override earlier than the tournament's startDate locks submission early", async () => {
+    const fx = await buildFantasyEligibleFixture();
+    // buildFantasyEligibleFixture already pushed tournament.startDate into
+    // FUTURE — without an override, submission would still succeed here.
+    const PAST = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    await updateFantasyLockDate(fx.auction.id, PAST);
+
+    await expect(
+      submitFantasyTeam(fx.auction.id, fx.viewer.id, [fx.soldAuctionPlayer.id], null)
+    ).rejects.toThrow(/locked and can no longer be changed/);
+  });
+
+  it("an override later than the tournament's startDate keeps submission open", async () => {
+    const fx = await buildFantasyEligibleFixture();
+    const PAST = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    // Flip the tournament's own startDate into the past — without an
+    // override this alone would already lock submission.
+    await prisma.tournament.update({ where: { id: fx.auction.tournamentId }, data: { startDate: PAST } });
+    await updateFantasyLockDate(fx.auction.id, FUTURE);
+
+    const team = await submitFantasyTeam(fx.auction.id, fx.viewer.id, [fx.soldAuctionPlayer.id], null);
+    expect(team.id).toBeTruthy();
+  });
+
+  it("clearing the override (null) reverts to the tournament's startDate", async () => {
+    const fx = await buildFantasyEligibleFixture();
+    const PAST = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    await updateFantasyLockDate(fx.auction.id, PAST);
+    await updateFantasyLockDate(fx.auction.id, null);
+
+    // tournament.startDate is still FUTURE (set by the fixture), so clearing
+    // the override should un-lock submission again.
+    const team = await submitFantasyTeam(fx.auction.id, fx.viewer.id, [fx.soldAuctionPlayer.id], null);
+    expect(team.id).toBeTruthy();
+
+    const fromDb = await prisma.auction.findUniqueOrThrow({ where: { id: fx.auction.id } });
+    expect(fromDb.fantasyLockDate).toBeNull();
+  });
+
+  it("rejects an invalid date", async () => {
+    const fx = await buildFantasyEligibleFixture();
+    await expect(
+      updateFantasyLockDate(fx.auction.id, new Date("not-a-date"))
+    ).rejects.toThrow(/Invalid date/);
   });
 });
 

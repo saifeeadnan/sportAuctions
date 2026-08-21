@@ -8,7 +8,9 @@ import { listTournamentSponsors } from "@/lib/services/tournamentSponsor.service
 import { FantasyStandingsList } from "@/components/fantasy/FantasyStandingsList";
 import { MostPickedPlayersTable } from "@/components/fantasy/MostPickedPlayersTable";
 import { UploadPointsForm } from "@/components/admin/UploadPointsForm";
+import { EditFantasyLockDateForm } from "@/components/admin/EditFantasyLockDateForm";
 import { SponsorRibbon } from "@/components/tournament/SponsorRibbon";
+import { formatCalendarDate, toDateInputValue } from "@/lib/dates";
 import { card } from "@/lib/ui";
 
 export default async function FantasyTeamsPage({
@@ -35,12 +37,27 @@ export default async function FantasyTeamsPage({
   const page = resolveFantasyPage(rawPage);
   const standings = sortFantasyStandings(rankedStandings, sortKey, sortDir);
   const sponsors = await listTournamentSponsors(auction.tournament.id);
+  const effectiveLockDate = auction.fantasyLockDate ?? auction.tournament.startDate;
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 flex flex-col gap-6">
       <p className="text-sm text-black/60 dark:text-white/60">
         {auction.tournament.name} / {auction.name} / Fantasy teams &middot; {standings.length} submitted
       </p>
+
+      <div className="flex items-center gap-2 text-sm">
+        <span className="text-black/60 dark:text-white/60">
+          Picks lock{" "}
+          <span className="font-bold text-amber-600 dark:text-amber-400">
+            {formatCalendarDate(effectiveLockDate)}
+          </span>
+          {auction.fantasyLockDate == null && " (tournament start date)"}
+        </span>
+        <EditFantasyLockDateForm
+          auctionId={auction.id}
+          effectiveLockDate={toDateInputValue(effectiveLockDate)}
+        />
+      </div>
 
       <details className={card}>
         <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">

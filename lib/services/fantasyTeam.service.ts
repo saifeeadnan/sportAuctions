@@ -7,6 +7,7 @@ import {
   InvalidStateTransitionError,
 } from "@/lib/errors";
 import { computeTeamStrength, type RatedPlayer } from "@/lib/teamStrength";
+import { assertAuctionLeagueNotReadOnly } from "@/lib/services/league.service";
 
 /** The price a fantasy pick costs: what it actually sold for, or its category
  * base price if it went unsold — the real auction's outcome either way. */
@@ -246,12 +247,32 @@ export async function listFantasyPlayerPool(auctionId: string) {
   }));
 }
 
-/** A fantasy team is freely editable up until its tournament's start date —
- * past that point, whatever was last saved becomes final automatically (no
- * explicit "lock" action needed, and nothing needs to run at the deadline
- * itself: `submitFantasyTeam` just starts rejecting further edits). */
-export function isFantasyEditingLocked(tournament: { startDate: Date }): boolean {
-  return new Date() >= tournament.startDate;
+/** A fantasy team is freely editable up until its lock date — past that
+ * point, whatever was last saved becomes final automatically (no explicit
+ * "lock" action needed, and nothing needs to run at the deadline itself:
+ * `submitFantasyTeam` just starts rejecting further edits). `fantasyLockDate`
+ * is an Admin/League-Admin-editable override; when unset, this falls back
+ * to the tournament's own startDate — the original, always-on behavior. */
+export function isFantasyEditingLocked(auction: {
+  fantasyLockDate: Date | null;
+  tournament: { startDate: Date };
+}): boolean {
+  return new Date() >= (auction.fantasyLockDate ?? auction.tournament.startDate);
+}
+
+/** Admin/League-Admin-only: set (or clear, via `null`) the override that
+ * decides when this auction's fantasy picks finalize. Editable any time,
+ * not write-once — unlike auction settings locked in at creation, there's
+ * no cross-cutting cascade to worry about here, just a date comparison. */
+export async function updateFantasyLockDate(auctionId: string, fantasyLockDate: Date | null) {
+  if (fantasyLockDate != null && Number.isNaN(fantasyLockDate.getTime())) {
+    throw new ValidationError("Invalid date");
+  }
+  await assertAuctionLeagueNotReadOnly(auctionId);
+  const auction = await prisma.auction.findUnique({ where: { id: auctionId } });
+  if (!auction) throw new ValidationError("Auction not found");
+
+  return prisma.auction.update({ where: { id: auctionId }, data: { fantasyLockDate } });
 }
 
 export async function submitFantasyTeam(
@@ -274,9 +295,9 @@ export async function submitFantasyTeam(
       "Fantasy teams can only be built once the auction is completed"
     );
   }
-  if (isFantasyEditingLocked(auction.tournament)) {
+  if (isFantasyEditingLocked(auction)) {
     throw new InvalidStateTransitionError(
-      "The tournament has started — fantasy team picks are locked and can no longer be changed"
+      "Fantasy team picks are locked and can no longer be changed"
     );
   }
 

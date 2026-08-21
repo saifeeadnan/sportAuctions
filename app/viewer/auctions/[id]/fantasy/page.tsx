@@ -39,7 +39,8 @@ export default async function FantasyTeamPage({
   }
 
   const { auction } = eligibility;
-  const locked = isFantasyEditingLocked(auction.tournament);
+  const locked = isFantasyEditingLocked(auction);
+  const effectiveLockDate = auction.fantasyLockDate ?? auction.tournament.startDate;
   const existingTeam = await getFantasyTeam(id, session.user.id);
   const sponsors = await listTournamentSponsors(auction.tournament.id);
 
@@ -87,7 +88,16 @@ export default async function FantasyTeamPage({
       />
       <p className="text-sm text-black/60 dark:text-white/60">
         {auction.tournament.league.name} / {auction.tournament.name} / {auction.name}
-        {!locked && <> &middot; Editable until {formatCalendarDate(auction.tournament.startDate)}.</>}
+        {!locked && (
+          <>
+            {" "}
+            &middot; Editable until{" "}
+            <span className="font-bold text-amber-600 dark:text-amber-400">
+              {formatCalendarDate(effectiveLockDate)}
+            </span>
+            .
+          </>
+        )}
         {locked && <> &middot; budget: {String(auction.teamBudget)}</>}
       </p>
 

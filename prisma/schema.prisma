@@ -345,6 +345,11 @@ model Auction {
   // most auctions never get one; not backfilled for existing rows (same
   // posture as User.email above).
   highlightsToken String? @unique
+  // Admin/League-Admin-editable override for when fantasy team picks
+  // finalize — null falls back to the tournament's startDate (the original,
+  // always-on behavior), preserving every existing auction unchanged.
+  // Editable any time via updateFantasyLockDate, not write-once.
+  fantasyLockDate DateTime?
 
   categories     AuctionCategory[]
   auctionPlayers AuctionPlayer[]

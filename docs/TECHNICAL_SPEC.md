@@ -258,9 +258,10 @@ Built entirely from real auction outcomes, not synthetic data: a pick's price is
 actually sold for (or its category's base price, if it went unsold). A viewer is only
 eligible for a given auction's fantasy game if they were themselves in that auction's player
 pool (matched by `loginId`), and is always auto-included on their own fantasy team the same
-way a manager is on their own draft. Editing is unlocked until the parent tournament's
-`startDate` (`isFantasyEditingLocked`) and freezes automatically at that point — no explicit
-lock action or scheduled job required. Standings rank by uploaded `points` once an admin has
+way a manager is on their own draft. Editing is unlocked until `Auction.fantasyLockDate` — an
+Admin/League-Admin-editable override, falling back to the parent tournament's `startDate` when
+unset (`isFantasyEditingLocked`) — and freezes automatically at that point; no explicit lock
+action or scheduled job required. Standings rank by uploaded `points` once an admin has
 uploaded any (`AuctionPlayer.points`), falling back to a computed `teamStrength` (position
 balance × average skill rating, `lib/teamStrength.ts`) beforehand.
 
