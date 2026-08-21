@@ -405,6 +405,9 @@ export default async function AuctionDetailPage({
             <Link href={`/admin/auctions/${auction.id}/fantasy-teams`} className={buttonSecondary}>
               Fantasy teams
             </Link>
+            <Link href={`/admin/auctions/${auction.id}/correct-results`} className={buttonSecondary}>
+              Correct results
+            </Link>
           </>
         )}
 
