@@ -30,6 +30,9 @@ export type CreateAuctionInput = {
   skipPreAuctionDraft?: boolean;
   onClockTemplate?: OnClockTemplate;
   onClockVisibleFields?: OnClockFieldKey[];
+  lotTimerSeconds?: number;
+  reAuctionEnabled?: boolean;
+  reAuctionDiscountPercent?: number;
   categories: {
     name: string;
     basePrice: number;
@@ -59,6 +62,32 @@ function validateOnClockDisplayInput(input: {
   }
 }
 
+/** Both settings are write-once at auction creation — no settings-page
+ * editor exists for either, unlike the on-clock display settings. */
+function validateBiddingMechanicsInput(input: {
+  lotTimerSeconds?: number | null;
+  reAuctionEnabled: boolean;
+  reAuctionDiscountPercent?: number | null;
+}) {
+  if (input.lotTimerSeconds != null) {
+    if (!Number.isInteger(input.lotTimerSeconds) || input.lotTimerSeconds < 3 || input.lotTimerSeconds > 600) {
+      throw new ValidationError("Lot timer must be a whole number of seconds between 3 and 600");
+    }
+  }
+  if (input.reAuctionEnabled) {
+    if (
+      input.reAuctionDiscountPercent == null ||
+      !Number.isInteger(input.reAuctionDiscountPercent) ||
+      input.reAuctionDiscountPercent < 1 ||
+      input.reAuctionDiscountPercent > 99
+    ) {
+      throw new ValidationError(
+        "Re-auction discount percent must be a whole number between 1 and 99 when re-auction is enabled"
+      );
+    }
+  }
+}
+
 export async function createAuction(input: CreateAuctionInput) {
   if (!input.name.trim()) throw new ValidationError("Auction name is required");
   if (input.teamBudget <= 0) throw new ValidationError("Team budget must be greater than 0");
@@ -75,6 +104,11 @@ export async function createAuction(input: CreateAuctionInput) {
   const onClockTemplate = input.onClockTemplate ?? "CLASSIC";
   const onClockVisibleFields = input.onClockVisibleFields ?? DEFAULT_ON_CLOCK_VISIBLE_FIELDS;
   validateOnClockDisplayInput({ onClockTemplate, onClockVisibleFields });
+
+  const lotTimerSeconds = input.lotTimerSeconds ?? null;
+  const reAuctionEnabled = input.reAuctionEnabled ?? false;
+  const reAuctionDiscountPercent = reAuctionEnabled ? (input.reAuctionDiscountPercent ?? null) : null;
+  validateBiddingMechanicsInput({ lotTimerSeconds, reAuctionEnabled, reAuctionDiscountPercent });
 
   const categoryNames = new Set(input.categories.map((c) => c.name.trim()));
   if (categoryNames.size !== input.categories.length) {
@@ -131,6 +165,9 @@ export async function createAuction(input: CreateAuctionInput) {
         skipPreAuctionDraft,
         onClockTemplate,
         onClockVisibleFields,
+        lotTimerSeconds,
+        reAuctionEnabled,
+        reAuctionDiscountPercent,
       },
     });
 
@@ -530,6 +567,9 @@ export async function resetAuctionToPreBidding(auctionId: string) {
             currentBidAmount: null,
             currentBidderEntryId: null,
             bidCooldownUntil: null,
+            lotTimerDeadline: null,
+            discountedBasePrice: null,
+            reAuctionDiscountUsed: false,
           },
         });
       } else if (ap.status === "UNSOLD" || ap.status === "IN_BIDDING") {
@@ -543,6 +583,9 @@ export async function resetAuctionToPreBidding(auctionId: string) {
             currentBidAmount: null,
             currentBidderEntryId: null,
             bidCooldownUntil: null,
+            lotTimerDeadline: null,
+            discountedBasePrice: null,
+            reAuctionDiscountUsed: false,
           },
         });
       }

@@ -310,6 +310,14 @@ model Auction {
   // Player fields show on the "On the clock" card, validated in the service
   // layer against that same list.
   onClockVisibleFields String[]        @default(["photoUrl", "previousTeam"])
+  // Visual-only lot countdown shown during live bidding — resets on every
+  // bid, never auto-resolves anything. Null = no timer for this auction.
+  // Write-once at creation, same posture as skipPreAuctionDraft.
+  lotTimerSeconds          Int?
+  // Lets an UNSOLD player be re-offered later at a reduced price. Write-once
+  // at creation; reAuctionDiscountPercent is only meaningful when this is true.
+  reAuctionEnabled         Boolean         @default(false)
+  reAuctionDiscountPercent Int?
 
   categories     AuctionCategory[]
   auctionPlayers AuctionPlayer[]
@@ -357,6 +365,17 @@ model AuctionPlayer {
   currentBidderEntryId String?
   currentBidderEntry   TeamAuctionEntry?   @relation("CurrentBidder", fields: [currentBidderEntryId], references: [id])
   bidCooldownUntil     DateTime?
+  // Mirrors bidCooldownUntil's shape: set in selectNextPlayer and on every
+  // placeBid, cleared on sale/unsold/reset. Purely cosmetic — nothing reads
+  // this to auto-resolve the lot.
+  lotTimerDeadline      DateTime?
+  // First-unsold-transition discount snapshot: once set, this is the
+  // player's new effective base price for every future re-offer and never
+  // changes again. A per-row snapshot, not a live formula — same reasoning
+  // as updateAuctionPlayerCategory's categoryId snapshot.
+  discountedBasePrice   Decimal?  @db.Decimal(12, 2)
+  // Authoritative "already used its one reduced-price attempt" flag.
+  reAuctionDiscountUsed Boolean   @default(false)
 
   draftPicks   PreAuctionSubmission[]
   fantasyPicks FantasyTeamPlayer[]

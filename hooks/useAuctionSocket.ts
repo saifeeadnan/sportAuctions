@@ -40,7 +40,7 @@ export function useAuctionSocket(auctionId: string, initialState: AuctionState) 
 
     socket.on(
       "player:on-clock",
-      (payload: { auctionPlayerId: string }) => {
+      (payload: { auctionPlayerId: string; basePrice: string; lotTimerDeadline: string | null }) => {
         setState((prev) => ({
           ...prev,
           players: prev.players.map((p) =>
@@ -54,6 +54,8 @@ export function useAuctionSocket(auctionId: string, initialState: AuctionState) 
                   currentBidderEntryId: null,
                   currentBidderTeamName: null,
                   bidCooldownUntil: null,
+                  basePrice: payload.basePrice,
+                  lotTimerDeadline: payload.lotTimerDeadline,
                 }
               : p
           ),
@@ -69,6 +71,7 @@ export function useAuctionSocket(auctionId: string, initialState: AuctionState) 
         teamName: string;
         amount: string;
         cooldownUntil: string;
+        lotTimerDeadline: string | null;
       }) => {
         setState((prev) => ({
           ...prev,
@@ -80,6 +83,7 @@ export function useAuctionSocket(auctionId: string, initialState: AuctionState) 
                   currentBidderEntryId: payload.teamAuctionEntryId,
                   currentBidderTeamName: payload.teamName,
                   bidCooldownUntil: payload.cooldownUntil,
+                  lotTimerDeadline: payload.lotTimerDeadline,
                 }
               : p
           ),
@@ -112,6 +116,7 @@ export function useAuctionSocket(auctionId: string, initialState: AuctionState) 
                   currentBidderEntryId: null,
                   currentBidderTeamName: null,
                   bidCooldownUntil: null,
+                  lotTimerDeadline: null,
                 }
               : p
           ),
@@ -125,11 +130,13 @@ export function useAuctionSocket(auctionId: string, initialState: AuctionState) 
       }
     );
 
-    socket.on("player:unsold", (payload: { auctionPlayerId: string }) => {
+    socket.on("player:unsold", (payload: { auctionPlayerId: string; basePrice: string }) => {
       setState((prev) => ({
         ...prev,
         players: prev.players.map((p) =>
-          p.id === payload.auctionPlayerId ? { ...p, status: "UNSOLD" } : p
+          p.id === payload.auctionPlayerId
+            ? { ...p, status: "UNSOLD", basePrice: payload.basePrice, lotTimerDeadline: null }
+            : p
         ),
       }));
     });

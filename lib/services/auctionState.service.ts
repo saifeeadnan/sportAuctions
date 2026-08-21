@@ -22,6 +22,7 @@ export type AuctionStatePlayer = {
   currentBidderTeamName: string | null;
   bidCount: number;
   bidCooldownUntil: string | null;
+  lotTimerDeadline: string | null;
   rating: string | null;
   battingRating: string | null;
   bowlingRating: string | null;
@@ -46,6 +47,7 @@ export type AuctionState = {
   tournamentName: string;
   onClockTemplate: OnClockTemplate;
   onClockVisibleFields: OnClockFieldKey[];
+  lotTimerSeconds: number | null;
   players: AuctionStatePlayer[];
   teams: AuctionStateTeam[];
 };
@@ -80,6 +82,7 @@ export async function getAuctionState(auctionId: string): Promise<AuctionState |
     tournamentName: auction.tournament.name,
     onClockTemplate: auction.onClockTemplate,
     onClockVisibleFields: auction.onClockVisibleFields as OnClockFieldKey[],
+    lotTimerSeconds: auction.lotTimerSeconds,
     players: auction.auctionPlayers.map((ap) => ({
       id: ap.id,
       name: ap.player.name,
@@ -88,7 +91,7 @@ export async function getAuctionState(auctionId: string): Promise<AuctionState |
       photoUrl: ap.player.photoUrl,
       previousTeam: ap.player.previousTeam,
       categoryName: ap.category.name,
-      basePrice: String(ap.category.basePrice),
+      basePrice: String(ap.discountedBasePrice ?? ap.category.basePrice),
       bidIncrement: ap.category.bidIncrement != null ? String(ap.category.bidIncrement) : null,
       status: ap.status,
       soldPrice: ap.soldPrice != null ? String(ap.soldPrice) : null,
@@ -101,6 +104,7 @@ export async function getAuctionState(auctionId: string): Promise<AuctionState |
       currentBidderTeamName: ap.currentBidderEntry?.team.name ?? null,
       bidCount: ap._count.bids,
       bidCooldownUntil: ap.bidCooldownUntil != null ? ap.bidCooldownUntil.toISOString() : null,
+      lotTimerDeadline: ap.lotTimerDeadline != null ? ap.lotTimerDeadline.toISOString() : null,
       rating: ap.player.rating != null ? String(ap.player.rating) : null,
       battingRating: ap.player.battingRating != null ? String(ap.player.battingRating) : null,
       bowlingRating: ap.player.bowlingRating != null ? String(ap.player.bowlingRating) : null,

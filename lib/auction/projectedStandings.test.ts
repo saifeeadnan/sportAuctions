@@ -29,6 +29,7 @@ function player(overrides: Partial<AuctionStatePlayer>): AuctionStatePlayer {
     currentBidderTeamName: null,
     bidCount: 0,
     bidCooldownUntil: null,
+    lotTimerDeadline: null,
     rating: null,
     battingRating: null,
     bowlingRating: null,

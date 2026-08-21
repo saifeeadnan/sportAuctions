@@ -38,6 +38,9 @@ export async function selectNextPlayer(auctionId: string, auctionPlayerId: strin
     );
   }
 
+  const lotTimerDeadline =
+    auction.lotTimerSeconds != null ? new Date(Date.now() + auction.lotTimerSeconds * 1000) : null;
+
   const updated = await prisma.auctionPlayer.update({
     where: { id: auctionPlayerId },
     data: {
@@ -45,6 +48,7 @@ export async function selectNextPlayer(auctionId: string, auctionPlayerId: strin
       currentBidAmount: null,
       currentBidderEntryId: null,
       bidCooldownUntil: null,
+      lotTimerDeadline,
     },
     include: { player: true, category: true },
   });
@@ -53,7 +57,8 @@ export async function selectNextPlayer(auctionId: string, auctionPlayerId: strin
     auctionPlayerId: updated.id,
     playerName: updated.player.name,
     categoryName: updated.category.name,
-    basePrice: String(updated.category.basePrice),
+    basePrice: String(updated.discountedBasePrice ?? updated.category.basePrice),
+    lotTimerDeadline: lotTimerDeadline ? lotTimerDeadline.toISOString() : null,
   });
 
   return updated;
@@ -105,9 +110,10 @@ async function allocatePlayerToTeam(
   }
 
   const priceDecimal = new Prisma.Decimal(price);
-  if (!options.force && priceDecimal.lessThan(auctionPlayer.category.basePrice)) {
+  const effectiveBasePrice = auctionPlayer.discountedBasePrice ?? auctionPlayer.category.basePrice;
+  if (!options.force && priceDecimal.lessThan(effectiveBasePrice)) {
     throw new ValidationError(
-      `Price must be at least the base price (${String(auctionPlayer.category.basePrice)}) for category "${auctionPlayer.category.name}"`
+      `Price must be at least the base price (${String(effectiveBasePrice)}) for category "${auctionPlayer.category.name}"`
     );
   }
   if (priceDecimal.greaterThan(entry.budgetRemaining)) {
@@ -139,6 +145,7 @@ async function allocatePlayerToTeam(
         currentBidAmount: null,
         currentBidderEntryId: null,
         bidCooldownUntil: null,
+        lotTimerDeadline: null,
       },
       include: { player: true },
     }),
@@ -250,7 +257,7 @@ export async function placeBid(
   const [auctionPlayer, entry] = await Promise.all([
     prisma.auctionPlayer.findUnique({
       where: { id: auctionPlayerId },
-      include: { category: true },
+      include: { category: true, auction: true },
     }),
     prisma.teamAuctionEntry.findUnique({
       where: { id: teamAuctionEntryId },
@@ -278,12 +285,11 @@ export async function placeBid(
   }
 
   const amountDecimal = new Prisma.Decimal(amount);
+  const effectiveBasePrice = auctionPlayer.discountedBasePrice ?? auctionPlayer.category.basePrice;
   const currentBid = auctionPlayer.currentBidAmount;
   if (currentBid == null) {
-    if (amountDecimal.lessThan(auctionPlayer.category.basePrice)) {
-      throw new ValidationError(
-        `Bid must be at least the base price (${String(auctionPlayer.category.basePrice)})`
-      );
+    if (amountDecimal.lessThan(effectiveBasePrice)) {
+      throw new ValidationError(`Bid must be at least the base price (${String(effectiveBasePrice)})`);
     }
   } else {
     const minRequired = auctionPlayer.category.bidIncrement
@@ -317,6 +323,10 @@ export async function placeBid(
   }
 
   const cooldownUntil = new Date(Date.now() + 2_000);
+  const lotTimerDeadline =
+    auctionPlayer.auction.lotTimerSeconds != null
+      ? new Date(Date.now() + auctionPlayer.auction.lotTimerSeconds * 1000)
+      : null;
   const bid = await prisma.$transaction(async (tx) => {
     const updateResult = await tx.auctionPlayer.updateMany({
       where: { id: auctionPlayerId, status: "IN_BIDDING", currentBidAmount: currentBid },
@@ -324,6 +334,7 @@ export async function placeBid(
         currentBidAmount: amountDecimal,
         currentBidderEntryId: teamAuctionEntryId,
         bidCooldownUntil: cooldownUntil,
+        lotTimerDeadline,
       },
     });
     if (updateResult.count === 0) {
@@ -338,6 +349,7 @@ export async function placeBid(
     teamName: entry.team.name,
     amount: amountDecimal.toString(),
     cooldownUntil: cooldownUntil.toISOString(),
+    lotTimerDeadline: lotTimerDeadline ? lotTimerDeadline.toISOString() : null,
   });
 
   return bid;
@@ -346,10 +358,14 @@ export async function placeBid(
 export async function markUnsold(auctionId: string, auctionPlayerId: string) {
   await assertAuctionLeagueNotReadOnly(auctionId);
 
-  const auctionPlayer = await prisma.auctionPlayer.findUnique({
-    where: { id: auctionPlayerId },
-    include: { player: true },
-  });
+  const [auction, auctionPlayer] = await Promise.all([
+    prisma.auction.findUnique({ where: { id: auctionId } }),
+    prisma.auctionPlayer.findUnique({
+      where: { id: auctionPlayerId },
+      include: { player: true, category: true },
+    }),
+  ]);
+  if (!auction) throw new ValidationError("Auction not found");
   if (!auctionPlayer || auctionPlayer.auctionId !== auctionId) {
     throw new ValidationError("Player not found in this auction");
   }
@@ -359,15 +375,32 @@ export async function markUnsold(auctionId: string, auctionPlayerId: string) {
     );
   }
 
+  // The first time a player goes unsold under a re-auction-enabled auction,
+  // its price drops once and permanently — reAuctionDiscountUsed guards
+  // against ever discounting it again on a later unsold round.
+  let discountFields: { discountedBasePrice?: Prisma.Decimal; reAuctionDiscountUsed?: boolean } = {};
+  if (
+    auction.reAuctionEnabled &&
+    !auctionPlayer.reAuctionDiscountUsed &&
+    auction.reAuctionDiscountPercent != null
+  ) {
+    const discounted = new Prisma.Decimal(auctionPlayer.category.basePrice)
+      .times(new Prisma.Decimal(100).minus(auction.reAuctionDiscountPercent))
+      .dividedBy(100)
+      .toDecimalPlaces(2);
+    discountFields = { discountedBasePrice: discounted, reAuctionDiscountUsed: true };
+  }
+
   const updated = await prisma.auctionPlayer.update({
     where: { id: auctionPlayerId },
-    data: { status: "UNSOLD" },
-    include: { player: true },
+    data: { status: "UNSOLD", lotTimerDeadline: null, ...discountFields },
+    include: { player: true, category: true },
   });
 
   emitAuctionEvent(auctionId, "player:unsold", {
     auctionPlayerId: updated.id,
     playerName: updated.player.name,
+    basePrice: String(updated.discountedBasePrice ?? updated.category.basePrice),
   });
 
   return updated;

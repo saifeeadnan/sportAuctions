@@ -8,6 +8,7 @@ import { useAuctionSocket } from "@/hooks/useAuctionSocket";
 import { TeamBudgetBoard } from "@/components/auction/TeamBudgetBoard";
 import { SoldTicker } from "@/components/auction/SoldTicker";
 import { OnClockCard } from "@/components/auction/OnClockCard";
+import { OnClockTimer } from "@/components/auction/OnClockTimer";
 import { SaleAnnouncement } from "@/components/auction/SaleAnnouncement";
 import {
   selectNextPlayerAction,
@@ -405,6 +406,7 @@ export function AuctioneerConsole({
             />
             {onClock && (
               <div className="flex flex-col gap-3 w-full max-w-sm">
+                <OnClockTimer player={onClock} totalSeconds={state.lotTimerSeconds} />
                 <p className="text-sm text-center">
                   {onClock.currentBid ? (
                     <>

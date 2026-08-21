@@ -9,12 +9,17 @@ export type WizardCategory = {
 
 export function CategoriesStep({
   categories,
+  skipPreAuctionDraft,
   onUpdateCategory,
   onToggleCategoryPreAuctionEligible,
   onAddCategory,
   onRemoveCategory,
 }: {
   categories: WizardCategory[];
+  /** When the whole auction skips pre-auction, no category can be
+   * pre-auction-eligible either — there's no draft phase for it to matter
+   * in, so the checkbox is shown grayed out and unchecked. */
+  skipPreAuctionDraft: boolean;
   onUpdateCategory: (index: number, field: "name" | "basePrice" | "bidIncrement", value: string) => void;
   onToggleCategoryPreAuctionEligible: (index: number) => void;
   onAddCategory: () => void;
@@ -62,12 +67,21 @@ export function CategoriesStep({
               )}
             </div>
             <label
-              className="flex items-center gap-1.5 text-xs text-black/60 dark:text-white/60"
-              title="If unchecked, players in this category can only be won through live bidding, not the pre-auction draft"
+              className={`flex items-center gap-1.5 text-xs ${
+                skipPreAuctionDraft
+                  ? "text-black/30 dark:text-white/30"
+                  : "text-black/60 dark:text-white/60"
+              }`}
+              title={
+                skipPreAuctionDraft
+                  ? "This auction skips the pre-auction draft entirely, so no category can be eligible for it"
+                  : "If unchecked, players in this category can only be won through live bidding, not the pre-auction draft"
+              }
             >
               <input
                 type="checkbox"
-                checked={cat.preAuctionEligible}
+                checked={!skipPreAuctionDraft && cat.preAuctionEligible}
+                disabled={skipPreAuctionDraft}
                 onChange={() => onToggleCategoryPreAuctionEligible(i)}
               />
               Allow pre-auction draft picks

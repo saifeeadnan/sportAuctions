@@ -7,6 +7,7 @@ import { useAuctionSocket } from "@/hooks/useAuctionSocket";
 import { TeamBudgetBoard } from "@/components/auction/TeamBudgetBoard";
 import { SoldTicker } from "@/components/auction/SoldTicker";
 import { OnClockCard } from "@/components/auction/OnClockCard";
+import { OnClockTimer } from "@/components/auction/OnClockTimer";
 import { SaleAnnouncement } from "@/components/auction/SaleAnnouncement";
 import { TeamStrengthSummary } from "@/components/manager/TeamStrengthSummary";
 import { RosterRibbon } from "@/components/roster/RosterRibbon";
@@ -222,6 +223,7 @@ export function LiveAuctionView({
                 />
                 {onClock && (
                   <div className="flex flex-col gap-1.5 flex-1 min-w-0">
+                    <OnClockTimer player={onClock} totalSeconds={state.lotTimerSeconds} />
                     <CurrentBidLine player={onClock} />
                     {myMaxBid != null && (
                       <p className="text-sm text-black/60 dark:text-white/60">
@@ -281,6 +283,7 @@ export function LiveAuctionView({
                 photoWidth={96}
                 photoHeight={128}
               />
+              {onClock && <OnClockTimer player={onClock} totalSeconds={state.lotTimerSeconds} />}
               {onClock && <CurrentBidLine player={onClock} />}
             </div>
           </section>

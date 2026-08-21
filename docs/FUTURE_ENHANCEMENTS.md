@@ -72,28 +72,33 @@ and app-store submission/review for both platforms.
 
 ## Auction enhancements
 
-A batch of ideas gathered from competitor cricket/IPL-style auction platforms, none built yet.
-Grouped together since they're all auction-mechanic tweaks rather than new subsystems — each is
-independently small enough to build on its own.
+A batch of ideas gathered from competitor cricket/IPL-style auction platforms. Grouped together
+since they're all auction-mechanic tweaks rather than new subsystems — each is independently small
+enough to build on its own.
 
-- **Retention + Right-to-Match (RTM) cards** — the single most iconic missing IPL-style mechanic.
-  Teams pre-retain a player before the auction, or hold a card letting them match the winning bid
-  on a player they previously owned rather than losing them outright. Would extend the existing
-  pre-auction draft flow (`openPreAuction`/`preAuctionDraft.service.ts`) rather than replace it.
-- **Unsold-player re-auction at a reduced base price** — instead of a player just sitting
-  "unsold," automatically re-offer them in a later round at a lower price. Several competitor
-  platforms specifically call this out as a feature.
-- **Live countdown/bidding timer** — a visible "going once, going twice" clock that resets on
-  each new bid, creating real urgency for the room. Distinct from the existing
-  `AuctionPlayer.bidCooldownUntil` (that's anti-spam, not a public clock).
-- **Real-time "you've been outbid" push notifications** — a lighter-weight version of the native
+- [ ] **Retention + Right-to-Match (RTM) cards** — the single most iconic missing IPL-style
+  mechanic. Teams pre-retain a player before the auction, or hold a card letting them match the
+  winning bid on a player they previously owned rather than losing them outright. Would extend the
+  existing pre-auction draft flow (`openPreAuction`/`preAuctionDraft.service.ts`) rather than
+  replace it.
+- [x] **Unsold-player re-auction at a reduced base price** — ~~instead of a player just sitting
+  "unsold," automatically re-offer them in a later round at a lower price.~~ **Done 2026-08-20.**
+  An opt-in switch plus discount percentage, set once at auction creation in the wizard; an unsold
+  player's price is discounted on its first re-offer only and never drops further on subsequent
+  unsold passes.
+- [x] **Live countdown/bidding timer** — ~~a visible "going once, going twice" clock that resets
+  on each new bid, creating real urgency for the room.~~ **Done 2026-08-20.** Visual-only —
+  resets on every bid, never auto-resolves the sale — configurable per auction (on/off + seconds)
+  in the creation wizard. Distinct from the existing `AuctionPlayer.bidCooldownUntil` (that's
+  anti-spam, not a public clock).
+- [ ] **Real-time "you've been outbid" push notifications** — a lighter-weight version of the native
   mobile app idea above; deliverable via browser web push alone, no app store needed.
-- **Post-auction highlights/recap page** — a shareable summary once the auction ends (biggest
+- [ ] **Post-auction highlights/recap page** — a shareable summary once the auction ends (biggest
   buy, best-value pick, spend by category) — reuses data already being collected, good for social
   sharing/engagement.
-- **Player comparison tool** — side-by-side stats for a manager's shortlisted players, for
+- [ ] **Player comparison tool** — side-by-side stats for a manager's shortlisted players, for
   pre-auction planning or live in-the-moment decisions.
-- **Multi-day auction scheduling** — pause/resume an auction across multiple sessions for larger
+- [ ] **Multi-day auction scheduling** — pause/resume an auction across multiple sessions for larger
   tournaments (e.g. marquee players on day 1, the rest on day 2).
 
 ---

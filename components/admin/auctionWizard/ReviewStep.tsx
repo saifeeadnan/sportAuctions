@@ -13,6 +13,10 @@ export function ReviewStep({
   skipPreAuctionDraft,
   onClockTemplate,
   onClockVisibleFields,
+  lotTimerEnabled,
+  lotTimerSeconds,
+  reAuctionEnabled,
+  reAuctionDiscountPercent,
   error,
   loading,
   onSubmit,
@@ -26,6 +30,10 @@ export function ReviewStep({
   skipPreAuctionDraft: boolean;
   onClockTemplate: OnClockTemplate;
   onClockVisibleFields: OnClockFieldKey[];
+  lotTimerEnabled: boolean;
+  lotTimerSeconds: string;
+  reAuctionEnabled: boolean;
+  reAuctionDiscountPercent: string;
   error: string | null;
   loading: boolean;
   onSubmit: () => void;
@@ -74,6 +82,20 @@ export function ReviewStep({
             {onClockVisibleFields.length > 0
               ? ` · ${onClockVisibleFields.map((f) => ON_CLOCK_FIELD_LABELS[f]).join(", ")}`
               : " · no optional fields shown"}
+          </p>
+        </div>
+        <div>
+          <p className="text-black/50 dark:text-white/50">Bidding timer</p>
+          <p className="font-medium">
+            {lotTimerEnabled ? `${lotTimerSeconds || "—"}s per bid` : "No timer"}
+          </p>
+        </div>
+        <div>
+          <p className="text-black/50 dark:text-white/50">Re-auction of unsold players</p>
+          <p className="font-medium">
+            {reAuctionEnabled
+              ? `Enabled — ${reAuctionDiscountPercent || "—"}% off on first re-offer`
+              : "Full price (default)"}
           </p>
         </div>
       </div>

@@ -34,6 +34,7 @@ const SAMPLE_PLAYER: AuctionStatePlayer = {
   currentBidderTeamName: "Sample FC",
   bidCount: 3,
   bidCooldownUntil: null,
+  lotTimerDeadline: null,
   rating: "8.2",
   battingRating: "8.5",
   bowlingRating: "6.0",
