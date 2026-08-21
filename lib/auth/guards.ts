@@ -1,4 +1,6 @@
 import { auth } from "@/auth";
+import { headers } from "next/headers";
+import { decodeMobileToken } from "@/lib/auth/mobileToken";
 
 export type Role = "ADMIN" | "LEAGUE_ADMIN" | "TEAM_MANAGER" | "AUCTIONEER" | "VIEWER";
 
@@ -9,8 +11,34 @@ export class AuthError extends Error {
   }
 }
 
+// auth()'s zero-arg form only ever forwards the incoming `cookie` header to
+// Auth.js's session logic — any Authorization header is silently dropped
+// before it gets there. Browsers never send an Authorization header on a
+// same-origin page/action request, so checking the cookie session first,
+// then falling back to a mobile bearer token, is transparent to every
+// existing web call site: nothing here changes for the cookie path.
+async function resolveSession() {
+  const cookieSession = await auth();
+  if (cookieSession?.user) return cookieSession;
+
+  const authHeader = (await headers()).get("authorization");
+  if (!authHeader?.startsWith("Bearer ")) return null;
+  const token = await decodeMobileToken(authHeader.slice(7));
+  if (!token) return null;
+
+  return {
+    user: {
+      id: token.id,
+      name: token.name,
+      isSiteAdmin: token.isSiteAdmin ?? false,
+      memberships: token.memberships ?? [],
+      analyticsSessionId: token.analyticsSessionId,
+    },
+  };
+}
+
 export async function requireSession() {
-  const session = await auth();
+  const session = await resolveSession();
   if (!session?.user) {
     throw new AuthError("Not authenticated");
   }

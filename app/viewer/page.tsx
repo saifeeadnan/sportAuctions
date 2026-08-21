@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { auth } from "@/auth";
-import { prisma } from "@/lib/prisma";
 import { allLeagueIds } from "@/lib/auth/guards";
+import { listViewableAuctions } from "@/lib/services/auction.service";
 import { cardInteractive } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 import { getRulesDocumentIfViewable } from "@/lib/services/tournamentDocument.service";
@@ -10,14 +10,7 @@ export default async function ViewerHomePage() {
   const session = await auth();
   const leagueIds = session?.user ? allLeagueIds(session) : null;
 
-  const auctions = await prisma.auction.findMany({
-    where: {
-      status: { in: ["BIDDING", "COMPLETED"] },
-      tournament: leagueIds ? { leagueId: { in: leagueIds } } : undefined,
-    },
-    include: { tournament: true },
-    orderBy: { createdAt: "desc" },
-  });
+  const auctions = await listViewableAuctions(leagueIds);
 
   // Checked once per distinct tournament (several auctions can share one) so a
   // "Rules" link only shows where this viewer is actually on the roster.

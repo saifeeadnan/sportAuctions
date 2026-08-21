@@ -5,6 +5,7 @@ import { Server } from "socket.io";
 import { getToken } from "next-auth/jwt";
 import { setIO } from "./server/ws/broadcaster";
 import { prisma } from "./lib/prisma";
+import { decodeMobileToken } from "./lib/auth/mobileToken";
 
 const dev = process.env.NODE_ENV !== "production";
 const port = Number(process.env.PORT) || 3000;
@@ -30,14 +31,24 @@ app.prepare().then(() => {
       // though NODE_ENV still says "development". Reading it off the actual
       // cookie header (rather than guessing from NODE_ENV) works in every
       // setup: plain localhost dev, tunneled dev, and a real prod deploy.
-      const rawCookies = (socket.request.headers as Record<string, string | undefined>).cookie ?? "";
-      const secureCookie = rawCookies.includes("__Secure-authjs.session-token=");
+      // Mobile clients can't attach a browser-style cookie, so they pass
+      // their bearer token via socket.io's own `auth` payload
+      // (`io(url, { auth: { token } })`) instead of a header — checked
+      // first since it's cheap and unambiguous when present.
+      const bearerToken = (socket.handshake.auth as { token?: unknown }).token;
+      let token: Record<string, unknown> | null =
+        typeof bearerToken === "string" ? await decodeMobileToken(bearerToken) : null;
 
-      const token = await getToken({
-        req: socket.request as unknown as { headers: Record<string, string> },
-        secret: process.env.NEXTAUTH_SECRET,
-        secureCookie,
-      }).catch(() => null);
+      if (!token) {
+        const rawCookies = (socket.request.headers as Record<string, string | undefined>).cookie ?? "";
+        const secureCookie = rawCookies.includes("__Secure-authjs.session-token=");
+
+        token = await getToken({
+          req: socket.request as unknown as { headers: Record<string, string> },
+          secret: process.env.NEXTAUTH_SECRET,
+          secureCookie,
+        }).catch(() => null);
+      }
       if (!token) return;
 
       const auction = await prisma.auction.findUnique({

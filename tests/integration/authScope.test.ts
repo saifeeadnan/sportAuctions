@@ -8,6 +8,11 @@ import { createAuctionReadyFixture } from "../helpers/fixtures";
 // (it expects Next's own bundler). Nothing under test here ever calls the
 // real auth() function, so it's stubbed out rather than actually loaded.
 vi.mock("@/auth", () => ({ auth: vi.fn() }));
+// guards.ts's requireSession() also calls next/headers() as its bearer-token
+// fallback path — not exercised by anything in this suite either, but the
+// import itself must resolve under Vitest the same way @/auth's mock above
+// exists to satisfy import resolution, not behavior under test.
+vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
 
 const { loadScopedAuction } = await import("@/lib/auth/scope");
 const { AuthError } = await import("@/lib/auth/guards");

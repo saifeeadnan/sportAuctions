@@ -775,3 +775,18 @@ export async function deleteAuction(auctionId: string) {
 
   await prisma.auction.delete({ where: { id: auctionId } });
 }
+
+/** Auctions a viewer/manager can watch — live or already finished.
+ * `leagueIds === null` means unrestricted (site Admin). Shared by
+ * app/viewer/page.tsx and the mobile auctions-list route, so both stay in
+ * sync automatically. */
+export async function listViewableAuctions(leagueIds: string[] | null) {
+  return prisma.auction.findMany({
+    where: {
+      status: { in: ["BIDDING", "COMPLETED"] },
+      tournament: leagueIds ? { leagueId: { in: leagueIds } } : undefined,
+    },
+    include: { tournament: true },
+    orderBy: { createdAt: "desc" },
+  });
+}
