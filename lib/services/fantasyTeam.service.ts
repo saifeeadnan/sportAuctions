@@ -69,6 +69,38 @@ export async function listEligibleCompletedAuctionsForViewer(userId: string, lea
   });
 }
 
+export type FantasyEligibilityOverviewItem = {
+  auctionId: string;
+  auctionName: string;
+  tournamentName: string;
+  submitted: boolean;
+};
+
+/** Mobile-only overview list: every completed auction this viewer is
+ * eligible to build a fantasy team for, plus whether they already have.
+ * Mirrors app/viewer/fantasy/page.tsx's own data fetch (eligible auctions +
+ * a submitted-check), just moved into the service layer for reuse. */
+export async function listFantasyEligibilityOverview(
+  userId: string,
+  leagueIds: string[] | null
+): Promise<FantasyEligibilityOverviewItem[]> {
+  const auctions = await listEligibleCompletedAuctionsForViewer(userId, leagueIds);
+  if (auctions.length === 0) return [];
+
+  const submitted = await prisma.fantasyTeam.findMany({
+    where: { userId, auctionId: { in: auctions.map((a) => a.id) } },
+    select: { auctionId: true },
+  });
+  const submittedIds = new Set(submitted.map((s) => s.auctionId));
+
+  return auctions.map((a) => ({
+    auctionId: a.id,
+    auctionName: a.name,
+    tournamentName: a.tournament.name,
+    submitted: submittedIds.has(a.id),
+  }));
+}
+
 export async function getFantasyEligibility(auctionId: string, userId: string, leagueIds: string[] | null) {
   const auction = await prisma.auction.findUnique({
     where: { id: auctionId },

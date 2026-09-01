@@ -1,7 +1,14 @@
 import { NextResponse } from "next/server";
 import { requireRole, allLeagueIds } from "@/lib/auth/guards";
 import { toErrorResponse } from "@/lib/api/errors";
-import { getFantasyEligibility, getFantasyTeam, submitFantasyTeam } from "@/lib/services/fantasyTeam.service";
+import {
+  getFantasyEligibility,
+  getFantasyTeam,
+  getMaxRosterSize,
+  isFantasyEditingLocked,
+  listFantasyPlayerPool,
+  submitFantasyTeam,
+} from "@/lib/services/fantasyTeam.service";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -13,11 +20,23 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       return NextResponse.json({ eligible: false, reason: eligibility.reason });
     }
 
-    const team = await getFantasyTeam(auctionId, session.user.id);
+    const [team, pool, cap] = await Promise.all([
+      getFantasyTeam(auctionId, session.user.id),
+      listFantasyPlayerPool(auctionId),
+      getMaxRosterSize(auctionId),
+    ]);
     return NextResponse.json({
       eligible: true,
       selfAuctionPlayerId: eligibility.selfAuctionPlayerId,
+      locked: isFantasyEditingLocked(eligibility.auction),
+      lockDate: (eligibility.auction.fantasyLockDate ?? eligibility.auction.tournament.startDate).toISOString(),
+      budget: String(eligibility.auction.teamBudget),
+      cap,
+      pool,
       team,
+      auctionName: eligibility.auction.name,
+      tournamentName: eligibility.auction.tournament.name,
+      leagueName: eligibility.auction.tournament.league.name,
     });
   } catch (error) {
     return toErrorResponse(error);
