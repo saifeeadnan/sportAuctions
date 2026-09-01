@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireSession, requireAdminOrLeagueAdmin } from "@/lib/auth/guards";
+import { requireAdminOrLeagueAdmin } from "@/lib/auth/guards";
 import { loadScopedTournamentSponsor } from "@/lib/auth/scope";
 import { toErrorResponse } from "@/lib/api/errors";
 import {
@@ -9,9 +9,11 @@ import {
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    // Cosmetic branding, not sensitive — any authenticated user may view it,
-    // matching the same precedent as team sponsor logos and player photos.
-    await requireSession();
+    // Cosmetic branding, not sensitive — deliberately no auth check at all.
+    // The public, unauthenticated highlights page (app/highlights/[token])
+    // embeds these via SponsorRibbon for anyone with the share link, logged
+    // in or not; gating this behind requireSession() (the original posture)
+    // silently 403'd every sponsor logo <img> for an anonymous visitor.
     const { id: sponsorId } = await params;
 
     const logo = await getTournamentSponsorLogoContent(sponsorId);
@@ -25,7 +27,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     return new NextResponse(new Uint8Array(logo.data), {
       headers: {
         "Content-Type": logo.mimeType,
-        "Cache-Control": "private, max-age=300",
+        "Cache-Control": "public, max-age=300",
       },
     });
   } catch (error) {
