@@ -147,8 +147,8 @@ describe("getAuctionHighlights", () => {
     expect(highlights!.unsoldCount).toBe(1);
 
     expect(highlights!.biggestBuyByCategory).toEqual([
-      { categoryName: "Gold", playerName: "Star Player", teamName: "Team 1", price: "500", bidCount: 2 },
-      { categoryName: "Silver", playerName: "Average Player", teamName: "Team 2", price: "50", bidCount: 0 },
+      { categoryName: "Gold", playerName: "Star Player", photoUrl: null, teamName: "Team 1", price: "500", bidCount: 2 },
+      { categoryName: "Silver", playerName: "Average Player", photoUrl: null, teamName: "Team 2", price: "50", bidCount: 0 },
     ]);
 
     const gold = highlights!.spendByCategory.find((c) => c.categoryName === "Gold")!;
@@ -168,6 +168,7 @@ describe("getAuctionHighlights", () => {
     const highlights = await getAuctionHighlights(token);
     expect(highlights!.bestValuePick).toEqual({
       playerName: "Value Player",
+      photoUrl: null,
       categoryName: "Gold",
       teamName: "Team 1",
       price: "100",

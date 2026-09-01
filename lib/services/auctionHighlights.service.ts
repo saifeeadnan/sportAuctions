@@ -37,11 +37,18 @@ export type AuctionHighlightsData = {
   biggestBuyByCategory: {
     categoryName: string;
     playerName: string;
+    photoUrl: string | null;
     teamName: string;
     price: string;
     bidCount: number;
   }[];
-  bestValuePick: { playerName: string; categoryName: string; teamName: string; price: string } | null;
+  bestValuePick: {
+    playerName: string;
+    photoUrl: string | null;
+    categoryName: string;
+    teamName: string;
+    price: string;
+  } | null;
   spendByCategory: { categoryName: string; totalSpent: string; playersSold: number }[];
 };
 
@@ -69,6 +76,7 @@ export async function getAuctionHighlights(token: string): Promise<AuctionHighli
             select: {
               name: true,
               position: true,
+              photoUrl: true,
               rating: true,
               battingRating: true,
               bowlingRating: true,
@@ -103,6 +111,7 @@ export async function getAuctionHighlights(token: string): Promise<AuctionHighli
     .map((ap) => ({
       categoryName: ap.category.name,
       playerName: ap.player.name,
+      photoUrl: ap.player.photoUrl,
       teamName: ap.soldToEntry.team.name,
       price: ap.soldPrice.toString(),
       bidCount: ap._count.bids,
@@ -161,6 +170,7 @@ export async function getAuctionHighlights(token: string): Promise<AuctionHighli
     biggestBuyByCategory,
     bestValuePick: bestValue && {
       playerName: bestValue.row.player.name,
+      photoUrl: bestValue.row.player.photoUrl,
       categoryName: bestValue.row.category.name,
       teamName: bestValue.row.soldToEntry.team.name,
       price: bestValue.row.soldPrice.toString(),
