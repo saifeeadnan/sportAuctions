@@ -3,9 +3,7 @@ import { Bebas_Neue } from "next/font/google";
 import { getAuctionHighlights } from "@/lib/services/auctionHighlights.service";
 import { listTournamentSponsors } from "@/lib/services/tournamentSponsor.service";
 import { SponsorRibbon } from "@/components/tournament/SponsorRibbon";
-import { InitialsAvatar } from "@/components/auction/onClockTemplates/shared";
 import { categoryAccent } from "@/lib/categoryAccent";
-import { formatCalendarDate } from "@/lib/dates";
 
 const displayFont = Bebas_Neue({ weight: "400", subsets: ["latin"] });
 
@@ -20,8 +18,8 @@ const displayFont = Bebas_Neue({ weight: "400", subsets: ["latin"] });
  * rest of the app uses. Wrapping in `dark` (rather than forking every
  * shared component into a light/dark pair) piggybacks on globals.css's own
  * `@custom-variant dark (&:where(.dark, .dark *))`, so already dark-mode-
- * aware shared pieces (SponsorRibbon, InitialsAvatar) render correctly here
- * without any changes of their own.
+ * aware shared pieces (SponsorRibbon) render correctly here without any
+ * changes of their own.
  */
 export default async function HighlightsPage({
   params,
@@ -52,17 +50,12 @@ export default async function HighlightsPage({
         <div className="relative mx-auto max-w-4xl px-4 py-12 flex flex-col gap-12">
           {/* Header */}
           <div className="flex flex-col items-center text-center gap-3">
-            <span className="text-xs font-semibold uppercase tracking-[0.3em] text-indigo-300/80">
-              Auction recap
-            </span>
             <h1
               className={`${displayFont.className} text-5xl sm:text-6xl leading-none tracking-wide text-white drop-shadow-[0_2px_20px_rgba(99,102,241,0.35)]`}
             >
-              {highlights.auctionName}
+              Auction Legends
             </h1>
-            <p className="text-sm text-white/50">
-              {highlights.tournamentName} &middot; completed {formatCalendarDate(highlights.completedAt)}
-            </p>
+            <p className="text-sm text-white/50">{highlights.tournamentName}</p>
 
             <div className="flex items-center gap-3 mt-2">
               <div className="rounded-xl border border-white/10 bg-white/[0.04] px-5 py-2.5 text-center">
@@ -79,23 +72,6 @@ export default async function HighlightsPage({
               </div>
             </div>
           </div>
-
-          {/* Best value pick — one featured spotlight card */}
-          {highlights.bestValuePick && (
-            <section className="flex flex-col items-center gap-3">
-              <h2 className="text-xs font-semibold uppercase tracking-[0.25em] text-amber-300/90">
-                Best value pick
-              </h2>
-              <PlayerCard
-                playerName={highlights.bestValuePick.playerName}
-                photoUrl={highlights.bestValuePick.photoUrl}
-                categoryName={highlights.bestValuePick.categoryName}
-                teamName={highlights.bestValuePick.teamName}
-                price={highlights.bestValuePick.price}
-                featured
-              />
-            </section>
-          )}
 
           {/* Biggest buy per category */}
           {highlights.biggestBuyByCategory.length > 0 && (
@@ -117,6 +93,23 @@ export default async function HighlightsPage({
                   />
                 ))}
               </div>
+            </section>
+          )}
+
+          {/* Best value pick — one featured spotlight card */}
+          {highlights.bestValuePick && (
+            <section className="flex flex-col items-center gap-3">
+              <h2 className="text-xs font-semibold uppercase tracking-[0.25em] text-amber-300/90">
+                Best value pick
+              </h2>
+              <PlayerCard
+                playerName={highlights.bestValuePick.playerName}
+                photoUrl={highlights.bestValuePick.photoUrl}
+                categoryName={highlights.bestValuePick.categoryName}
+                teamName={highlights.bestValuePick.teamName}
+                price={highlights.bestValuePick.price}
+                featured
+              />
             </section>
           )}
 
@@ -193,56 +186,65 @@ function PlayerCard({
   featured?: boolean;
 }) {
   const accent = categoryAccent(categoryName);
-  const size = featured ? 128 : 96;
 
   return (
     <div
       className={`relative rounded-2xl border border-white/10 bg-white/[0.04] overflow-hidden ${
-        featured ? "w-full max-w-xs p-5 flex flex-col items-center gap-3" : "p-3 flex flex-col items-center gap-2"
+        featured ? "w-full max-w-sm" : ""
       }`}
     >
-      <div className={`absolute inset-x-0 top-0 h-1 ${accent.bar}`} />
-      {rank && (
-        <span
-          className={`absolute top-2.5 left-2.5 h-5 w-5 rounded-full ${accent.chipSolid} text-[11px] font-bold flex items-center justify-center`}
-        >
-          {rank}
-        </span>
-      )}
-      <span className="absolute top-2.5 right-2.5 rounded-full bg-emerald-500/15 text-emerald-400 text-[9px] font-bold uppercase tracking-wide px-2 py-0.5">
-        Sold
-      </span>
-
-      {photoUrl ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={photoUrl}
-          alt={playerName}
-          className="rounded-xl object-cover mt-2"
-          style={{ width: size, height: size }}
-        />
-      ) : (
-        <div className="mt-2">
-          <InitialsAvatar name={playerName} categoryName={categoryName} width={size} height={size} rounded="lg" />
-        </div>
-      )}
-
-      <div className="flex flex-col items-center gap-1 text-center">
-        <p className={`font-semibold leading-tight ${featured ? "text-base" : "text-sm"}`}>{playerName}</p>
-        <p className="text-xs text-white/50">{teamName}</p>
-        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${accent.chipSoft}`}>
-          {categoryName}
-        </span>
+      {/* Full-bleed photo — the dominant element, not a small centered
+          thumbnail floating in a mostly-empty card. */}
+      <div className="relative w-full aspect-[4/5]">
+        {photoUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={photoUrl} alt={playerName} className="absolute inset-0 h-full w-full object-cover" />
+        ) : (
+          <div className={`absolute inset-0 flex items-center justify-center ${accent.avatarGradient}`}>
+            <span className={`font-bold text-white/90 ${featured ? "text-5xl" : "text-4xl"}`}>
+              {initials(playerName)}
+            </span>
+          </div>
+        )}
+        <div className={`absolute inset-x-0 top-0 h-1 ${accent.bar}`} />
+        {rank && (
+          <span
+            className={`absolute top-2 left-2 h-5 w-5 rounded-full ${accent.chipSolid} text-[11px] font-bold flex items-center justify-center shadow`}
+          >
+            {rank}
+          </span>
+        )}
+        <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/40 to-transparent" />
       </div>
 
-      <p className={`${displayFont.className} tracking-wide text-amber-300 leading-none ${featured ? "text-3xl" : "text-2xl"}`}>
-        {price}
-      </p>
-      {bidCount != null && (
-        <p className="text-[10px] text-white/40">
-          {bidCount === 0 ? "No bidding war" : `${bidCount} bid${bidCount === 1 ? "" : "s"}`}
-        </p>
-      )}
+      {/* Compact stat block — three tight rows, no separately-spaced blocks. */}
+      <div className={`flex flex-col gap-1 ${featured ? "p-3" : "p-2"}`}>
+        <p className={`font-semibold leading-tight truncate ${featured ? "text-base" : "text-sm"}`}>{playerName}</p>
+        <div className="flex items-center justify-between gap-2">
+          <span
+            className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide shrink-0 ${accent.chipSoft}`}
+          >
+            {categoryName}
+          </span>
+          <span className="text-[11px] text-white/50 truncate">{teamName}</span>
+        </div>
+        <div className="flex items-baseline justify-between gap-2">
+          <p className={`${displayFont.className} tracking-wide text-amber-300 leading-none ${featured ? "text-2xl" : "text-xl"}`}>
+            {price}
+          </p>
+          {bidCount != null && (
+            <span className="text-[10px] text-white/40 shrink-0">
+              {bidCount === 0 ? "No bids" : `${bidCount} bid${bidCount === 1 ? "" : "s"}`}
+            </span>
+          )}
+        </div>
+      </div>
     </div>
   );
+}
+
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return (parts[0]?.[0] ?? "?").toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
