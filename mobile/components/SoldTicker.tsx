@@ -44,7 +44,10 @@ export function SoldTicker({ players, teams }: { players: AuctionStatePlayer[]; 
             <ThemedText type="smallBold">{t.teamName}</ThemedText>
             {sold.map((p) => (
               <View key={p.id} style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                <ThemedText type="small">{p.name}</ThemedText>
+                <ThemedText type="small">
+                  {p.name}
+                  {p.isCaptain ? " (C)" : ""}
+                </ThemedText>
                 <ThemedText type="small" themeColor="textSecondary">
                   {p.soldPrice}
                 </ThemedText>

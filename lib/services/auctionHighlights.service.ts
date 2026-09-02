@@ -49,6 +49,16 @@ export type AuctionHighlightsData = {
     teamName: string;
     price: string;
   } | null;
+  /** One entry per team that has an assigned captain — empty when no admin
+   * has assigned any captain for this auction yet. The page shows this
+   * instead of bestValuePick whenever it's non-empty. */
+  teamCaptains: {
+    playerName: string;
+    photoUrl: string | null;
+    categoryName: string;
+    teamName: string;
+    price: string;
+  }[];
   spendByCategory: { categoryName: string; totalSpent: string; playersSold: number }[];
 };
 
@@ -83,7 +93,9 @@ export async function getAuctionHighlights(token: string): Promise<AuctionHighli
               fieldingRating: true,
             },
           },
-          soldToEntry: { select: { team: { select: { name: true } } } },
+          soldToEntry: {
+            select: { captainAuctionPlayerId: true, team: { select: { name: true } } },
+          },
           _count: { select: { bids: true } },
         },
       },
@@ -117,6 +129,17 @@ export async function getAuctionHighlights(token: string): Promise<AuctionHighli
       bidCount: ap._count.bids,
     }))
     .sort((a, b) => Number(b.price) - Number(a.price));
+
+  const teamCaptains = sold
+    .filter((ap) => ap.soldToEntry.captainAuctionPlayerId === ap.id)
+    .map((ap) => ({
+      playerName: ap.player.name,
+      photoUrl: ap.player.photoUrl,
+      categoryName: ap.category.name,
+      teamName: ap.soldToEntry.team.name,
+      price: ap.soldPrice.toString(),
+    }))
+    .sort((a, b) => a.teamName.localeCompare(b.teamName));
 
   const byCategory = new Map<string, { categoryName: string; total: number; count: number }>();
   for (const ap of sold) {
@@ -175,6 +198,7 @@ export async function getAuctionHighlights(token: string): Promise<AuctionHighli
       teamName: bestValue.row.soldToEntry.team.name,
       price: bestValue.row.soldPrice.toString(),
     },
+    teamCaptains,
     spendByCategory,
   };
 }

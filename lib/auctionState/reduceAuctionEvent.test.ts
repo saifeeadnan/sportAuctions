@@ -26,6 +26,7 @@ function baseState(): AuctionState {
         soldPrice: null,
         soldToEntryId: null,
         soldToTeamName: null,
+        isCaptain: false,
         soldVia: null,
         soldAt: null,
         currentBid: null,

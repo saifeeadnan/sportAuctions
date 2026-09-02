@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { createAuction, openPreAuction, lockPreAuction, startBidding } from "@/lib/services/auction.service";
 import { adminAssignPlayer, selectNextPlayer, placeBid, recordSale, concludeAuction } from "@/lib/services/bidding.service";
 import { getOrCreateHighlightsToken, getAuctionHighlights } from "@/lib/services/auctionHighlights.service";
+import { assignTeamCaptain } from "@/lib/services/teamCaptain.service";
 
 beforeEach(resetDb);
 
@@ -93,7 +94,7 @@ async function buildHighlightsFixture(options?: { setValueRatings?: boolean }) {
 
   await concludeAuction(auction.id);
 
-  return { auction, adminId: fx.admin.id };
+  return { auction, adminId: fx.admin.id, team1Entry, team2Entry, starAP, valueAP, averageAP };
 }
 
 describe("getOrCreateHighlightsToken", () => {
@@ -181,5 +182,26 @@ describe("getAuctionHighlights", () => {
 
     const highlights = await getAuctionHighlights(token);
     expect(highlights!.bestValuePick).not.toBeNull();
+  });
+
+  it("returns an empty teamCaptains list when no captain has been assigned", async () => {
+    const { auction } = await buildHighlightsFixture();
+    const token = await getOrCreateHighlightsToken(auction.id);
+
+    const highlights = await getAuctionHighlights(token);
+    expect(highlights!.teamCaptains).toEqual([]);
+  });
+
+  it("lists every assigned captain, one per team, sorted by team name", async () => {
+    const { auction, team1Entry, team2Entry, starAP, averageAP } = await buildHighlightsFixture();
+    await assignTeamCaptain(auction.id, team1Entry.id, starAP.id);
+    await assignTeamCaptain(auction.id, team2Entry.id, averageAP.id);
+    const token = await getOrCreateHighlightsToken(auction.id);
+
+    const highlights = await getAuctionHighlights(token);
+    expect(highlights!.teamCaptains).toEqual([
+      { playerName: "Star Player", photoUrl: null, categoryName: "Gold", teamName: "Team 1", price: "500" },
+      { playerName: "Average Player", photoUrl: null, categoryName: "Silver", teamName: "Team 2", price: "50" },
+    ]);
   });
 });

@@ -83,6 +83,7 @@ export default async function ManagerTeamDetailPage({
                 categoryName: ap.category.name,
                 soldPrice: ap.soldPrice != null ? String(ap.soldPrice) : null,
                 soldVia: ap.soldVia,
+                isCaptain: ap.id === entry.captainAuctionPlayerId,
               }))}
             />
             <div className="flex items-center gap-4 mt-2">

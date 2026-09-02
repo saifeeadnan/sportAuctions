@@ -27,6 +27,7 @@ const SAMPLE_PLAYER: AuctionStatePlayer = {
   soldPrice: null,
   soldToEntryId: null,
   soldToTeamName: null,
+  isCaptain: false,
   soldVia: null,
   soldAt: null,
   currentBid: "6,500",

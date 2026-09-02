@@ -191,7 +191,14 @@ function LiveAuctionBody({
             <RosterRibbon
               players={myPlayers
                 .filter((p) => p.status === "SOLD")
-                .map((p) => ({ id: p.id, playerName: p.name, photoUrl: p.photoUrl, position: p.position, soldPrice: p.soldPrice }))}
+                .map((p) => ({
+                  id: p.id,
+                  playerName: p.name,
+                  photoUrl: p.photoUrl,
+                  position: p.position,
+                  soldPrice: p.soldPrice,
+                  isCaptain: p.isCaptain,
+                }))}
             />
           </View>
         </>

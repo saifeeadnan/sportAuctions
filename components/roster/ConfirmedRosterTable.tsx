@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { formatSoldVia } from "@/lib/format";
 import { card } from "@/lib/ui";
+import { Badge } from "@/components/ui/Badge";
 
 export type ConfirmedRosterPlayer = {
   id: string;
@@ -11,6 +12,7 @@ export type ConfirmedRosterPlayer = {
   categoryName: string;
   soldPrice: string | null;
   soldVia: string | null;
+  isCaptain?: boolean;
 };
 
 type SortField = "playerName" | "categoryName" | "soldPrice" | "soldVia";
@@ -107,6 +109,7 @@ export function ConfirmedRosterTable({
                     />
                   )}
                   {p.playerName}
+                  {p.isCaptain && <Badge variant="warning">Captain</Badge>}
                 </div>
               </td>
               <td className="py-2 pr-4">{p.categoryName}</td>

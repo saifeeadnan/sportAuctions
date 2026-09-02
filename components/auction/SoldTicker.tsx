@@ -68,7 +68,8 @@ export function SoldTicker({
                         <span className="text-black/60 dark:text-white/60">{player.name}</span>
                       ) : (
                         <span>
-                          {player.name}{" "}
+                          {player.name}
+                          {player.isCaptain && " (C)"}{" "}
                           <span className="text-black/50 dark:text-white/50">
                             ({player.soldPrice})
                           </span>

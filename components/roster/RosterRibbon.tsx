@@ -8,6 +8,7 @@ export type RosterRibbonPlayer = {
   position: string | null;
   soldPrice: string | null;
   points?: string | null;
+  isCaptain?: boolean;
 };
 
 export function RosterRibbon({
@@ -55,6 +56,7 @@ export function RosterRibbon({
               <div className="flex items-center gap-1 flex-wrap">
                 {p.position && <Badge variant="neutral">{p.position}</Badge>}
                 {isHighlighted && <Badge variant="info">You</Badge>}
+                {p.isCaptain && <Badge variant="warning">Captain</Badge>}
               </div>
               <p className="text-sm text-black/70 dark:text-white/70">{p.soldPrice ?? "—"}</p>
               {p.points != null && (

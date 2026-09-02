@@ -267,6 +267,7 @@ export function LiveAuctionView({
                   photoUrl: p.photoUrl,
                   position: p.position,
                   soldPrice: p.soldPrice,
+                  isCaptain: p.isCaptain,
                 }))}
             />
           </section>

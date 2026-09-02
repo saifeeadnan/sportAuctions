@@ -80,10 +80,9 @@ export default async function HighlightsPage({
                 Biggest buy by category
               </h2>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
-                {highlights.biggestBuyByCategory.map((b, i) => (
+                {highlights.biggestBuyByCategory.map((b) => (
                   <PlayerCard
                     key={b.categoryName}
-                    rank={i + 1}
                     playerName={b.playerName}
                     photoUrl={b.photoUrl}
                     categoryName={b.categoryName}
@@ -96,21 +95,44 @@ export default async function HighlightsPage({
             </section>
           )}
 
-          {/* Best value pick — one featured spotlight card */}
-          {highlights.bestValuePick && (
-            <section className="flex flex-col items-center gap-3">
-              <h2 className="text-xs font-semibold uppercase tracking-[0.25em] text-amber-300/90">
-                Best value pick
+          {/* Team captains, when any have been assigned — replaces the best
+              value pick spotlight below rather than adding a third section. */}
+          {highlights.teamCaptains.length > 0 ? (
+            <section className="flex flex-col gap-4">
+              <h2 className="text-xs font-semibold uppercase tracking-[0.25em] text-indigo-300/80 text-center">
+                Team captains
               </h2>
-              <PlayerCard
-                playerName={highlights.bestValuePick.playerName}
-                photoUrl={highlights.bestValuePick.photoUrl}
-                categoryName={highlights.bestValuePick.categoryName}
-                teamName={highlights.bestValuePick.teamName}
-                price={highlights.bestValuePick.price}
-                featured
-              />
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
+                {highlights.teamCaptains.map((c) => (
+                  <PlayerCard
+                    key={c.teamName}
+                    playerName={c.playerName}
+                    photoUrl={c.photoUrl}
+                    categoryName={c.categoryName}
+                    teamName={c.teamName}
+                    price={c.price}
+                    emphasizeTeamName
+                    showPrice={false}
+                  />
+                ))}
+              </div>
             </section>
+          ) : (
+            highlights.bestValuePick && (
+              <section className="flex flex-col items-center gap-3">
+                <h2 className="text-xs font-semibold uppercase tracking-[0.25em] text-amber-300/90">
+                  Best value pick
+                </h2>
+                <PlayerCard
+                  playerName={highlights.bestValuePick.playerName}
+                  photoUrl={highlights.bestValuePick.photoUrl}
+                  categoryName={highlights.bestValuePick.categoryName}
+                  teamName={highlights.bestValuePick.teamName}
+                  price={highlights.bestValuePick.price}
+                  featured
+                />
+              </section>
+            )
           )}
 
           {/* Spend by category — horizontal bar chart */}
@@ -167,7 +189,6 @@ export default async function HighlightsPage({
 }
 
 function PlayerCard({
-  rank,
   playerName,
   photoUrl,
   categoryName,
@@ -175,8 +196,9 @@ function PlayerCard({
   price,
   bidCount,
   featured = false,
+  emphasizeTeamName = false,
+  showPrice = true,
 }: {
-  rank?: number;
   playerName: string;
   photoUrl: string | null;
   categoryName: string;
@@ -184,6 +206,13 @@ function PlayerCard({
   price: string;
   bidCount?: number;
   featured?: boolean;
+  /** Team captains spotlight the team, not just the player — bumps the team
+   * name up to the same visual weight as the player name instead of its
+   * usual small, muted treatment. */
+  emphasizeTeamName?: boolean;
+  /** Team captains are a designation, not a purchase — hide the price/bid
+   * row entirely rather than showing a captain-selection price. */
+  showPrice?: boolean;
 }) {
   const accent = categoryAccent(categoryName);
 
@@ -207,13 +236,6 @@ function PlayerCard({
           </div>
         )}
         <div className={`absolute inset-x-0 top-0 h-1 ${accent.bar}`} />
-        {rank && (
-          <span
-            className={`absolute top-2 left-2 h-5 w-5 rounded-full ${accent.chipSolid} text-[11px] font-bold flex items-center justify-center shadow`}
-          >
-            {rank}
-          </span>
-        )}
         <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-black/40 to-transparent" />
       </div>
 
@@ -226,18 +248,28 @@ function PlayerCard({
           >
             {categoryName}
           </span>
-          <span className="text-[11px] text-white/50 truncate">{teamName}</span>
+          <span
+            className={
+              emphasizeTeamName
+                ? "text-sm font-bold text-indigo-200 truncate"
+                : "text-[11px] text-white/50 truncate"
+            }
+          >
+            {teamName}
+          </span>
         </div>
-        <div className="flex items-baseline justify-between gap-2">
-          <p className={`${displayFont.className} tracking-wide text-amber-300 leading-none ${featured ? "text-2xl" : "text-xl"}`}>
-            {price}
-          </p>
-          {bidCount != null && (
-            <span className="text-[10px] text-white/40 shrink-0">
-              {bidCount === 0 ? "No bids" : `${bidCount} bid${bidCount === 1 ? "" : "s"}`}
-            </span>
-          )}
-        </div>
+        {showPrice && (
+          <div className="flex items-baseline justify-between gap-2">
+            <p className={`${displayFont.className} tracking-wide text-amber-300 leading-none ${featured ? "text-2xl" : "text-xl"}`}>
+              {price}
+            </p>
+            {bidCount != null && (
+              <span className="text-[10px] text-white/40 shrink-0">
+                {bidCount === 0 ? "No bids" : `${bidCount} bid${bidCount === 1 ? "" : "s"}`}
+              </span>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

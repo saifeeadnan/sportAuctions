@@ -14,6 +14,7 @@ export type RosterRibbonPlayer = {
   photoUrl: string | null;
   position: string | null;
   soldPrice: string | null;
+  isCaptain?: boolean;
 };
 
 /** Mirrors components/roster/RosterRibbon.tsx — a horizontally-scrolling
@@ -63,6 +64,7 @@ export function RosterRibbon({
         <View style={styles.badgeRow}>
           {p.position && <Badge tone="neutral">{p.position}</Badge>}
           {isHighlighted && <Badge tone="accent">You</Badge>}
+          {p.isCaptain && <Badge tone="success">Captain</Badge>}
         </View>
         <ThemedText type="smallBold">{p.soldPrice ?? "—"}</ThemedText>
       </Card>

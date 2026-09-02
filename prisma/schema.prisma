@@ -447,6 +447,13 @@ model AuctionPlayer {
   // Authoritative "already used its one reduced-price attempt" flag.
   reAuctionDiscountUsed Boolean   @default(false)
 
+  // Mandatory back-reference for TeamAuctionEntry.captainAuctionPlayerId's
+  // "TeamCaptain" relation (distinct from "SoldPlayers" below, which already
+  // names the soldToEntryId relation between these same two models). A real
+  // 1:1: a player can only ever be won by one entry, hence captain of at
+  // most one.
+  captainOfEntry TeamAuctionEntry? @relation("TeamCaptain")
+
   draftPicks   PreAuctionSubmission[]
   fantasyPicks FantasyTeamPlayer[]
   bids         Bid[]
@@ -515,6 +522,13 @@ model TeamAuctionEntry {
   slotsFilled          Int                    @default(0)
   slotsTotal           Int
   analyticsEnabled     Boolean                @default(false)
+  // Settable only once the auction is COMPLETED, and only to a player this
+  // entry actually won (soldToEntryId === this entry's id) — enforced in
+  // teamCaptain.service.ts, not at the DB level. Nullable = no captain
+  // designated. No vice-captain concept. Freely re-assignable/clearable at
+  // any time post-completion, not a one-shot action.
+  captainAuctionPlayerId String?              @unique
+  captainAuctionPlayer   AuctionPlayer?       @relation("TeamCaptain", fields: [captainAuctionPlayerId], references: [id])
 
   draftSubmissions       PreAuctionSubmission[]
   playersWon             AuctionPlayer[]               @relation("SoldPlayers")

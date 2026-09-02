@@ -2,7 +2,9 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
+import { isLeagueReadOnly } from "@/lib/services/league.service";
 import { TeamStrengthSummary } from "@/components/manager/TeamStrengthSummary";
+import { AssignTeamCaptainForm } from "@/components/admin/AssignTeamCaptainForm";
 import { card, buttonSecondary } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 
@@ -31,6 +33,12 @@ export default async function AuctionResultsPage({
   if (!auction) notFound();
   assertInScope(leagueIds, auction.tournament.leagueId);
 
+  const league = await prisma.league.findUniqueOrThrow({
+    where: { id: auction.tournament.leagueId },
+    select: { endDate: true },
+  });
+  const readOnly = isLeagueReadOnly(league);
+
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 flex flex-col gap-8">
       <div className="flex items-center justify-between">
@@ -50,6 +58,12 @@ export default async function AuctionResultsPage({
         </div>
       </div>
 
+      {auction.status === "COMPLETED" && readOnly && (
+        <p className="text-sm text-black/40 dark:text-white/40">
+          This league is read-only — team captains can no longer be changed.
+        </p>
+      )}
+
       {auction.entries.map((entry) => {
         const totalSpent = entry.playersWon.reduce((sum, p) => sum + Number(p.soldPrice ?? 0), 0);
         return (
@@ -60,6 +74,16 @@ export default async function AuctionResultsPage({
               {entry.playersWon.length} player(s): {totalSpent} &middot; Slots {entry.slotsFilled}/
               {entry.slotsTotal}
             </p>
+            {auction.status === "COMPLETED" && !readOnly && (
+              <div className="mb-1">
+                <AssignTeamCaptainForm
+                  auctionId={auction.id}
+                  teamAuctionEntryId={entry.id}
+                  currentCaptainAuctionPlayerId={entry.captainAuctionPlayerId}
+                  players={entry.playersWon.map((ap) => ({ id: ap.id, name: ap.player.name }))}
+                />
+              </div>
+            )}
             <div className="mb-3">
               <TeamStrengthSummary
                 players={entry.playersWon.map((ap) => ({
@@ -91,7 +115,14 @@ export default async function AuctionResultsPage({
                   <tbody>
                     {entry.playersWon.map((ap) => (
                       <tr key={ap.id} className="border-b border-black/5 dark:border-white/5 last:border-0">
-                        <td className="py-2 pl-4 pr-4">{ap.player.name}</td>
+                        <td className="py-2 pl-4 pr-4">
+                          <div className="flex items-center gap-2">
+                            {ap.player.name}
+                            {ap.id === entry.captainAuctionPlayerId && (
+                              <Badge variant="warning">Captain</Badge>
+                            )}
+                          </div>
+                        </td>
                         <td className="py-2 pr-4">{ap.category.name}</td>
                         <td className="py-2 pr-4">{String(ap.soldPrice)}</td>
                         <td className="py-2 pr-4">

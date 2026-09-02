@@ -35,6 +35,7 @@ export type AuctionStatePlayer = {
   soldPrice: string | null;
   soldToEntryId: string | null;
   soldToTeamName: string | null;
+  isCaptain: boolean;
   soldVia: string | null;
   soldAt: string | null;
   currentBid: string | null;

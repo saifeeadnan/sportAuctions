@@ -18,6 +18,7 @@ import {
   addPlayerPostAuction,
   replacePlayerPostAuction,
 } from "@/lib/services/bidding.service";
+import { assignTeamCaptain } from "@/lib/services/teamCaptain.service";
 
 beforeEach(resetDb);
 
@@ -191,6 +192,34 @@ describe("replacePlayerPostAuction", () => {
       replacePlayerPostAuction(fx.auction.id, fx.aAuctionPlayer.id, fx.playerB.id, fx.category.id, 100)
     ).rejects.toThrow(/read-only/);
   });
+
+  it("clears the team's captain when the outgoing player was captain", async () => {
+    const fx = await buildCompletedAuctionFixture();
+    await concludeFixture(fx);
+    await assignTeamCaptain(fx.auction.id, fx.team1Entry.id, fx.aAuctionPlayer.id);
+
+    await replacePlayerPostAuction(fx.auction.id, fx.aAuctionPlayer.id, fx.playerB.id, fx.category.id, 250);
+
+    const entry = await prisma.teamAuctionEntry.findUniqueOrThrow({ where: { id: fx.team1Entry.id } });
+    expect(entry.captainAuctionPlayerId).toBeNull();
+  });
+
+  it("leaves the team's captain untouched when a different player is replaced", async () => {
+    const fx = await buildCompletedAuctionFixture();
+    await concludeFixture(fx);
+    // Fill team 1's open slot with a second player, make it captain, then
+    // replace the ORIGINAL (non-captain) player — the captain must survive.
+    await addPlayerPostAuction(fx.auction.id, fx.team1Entry.id, fx.playerB.id, fx.category.id, 90);
+    const secondPlayer = await prisma.auctionPlayer.findFirstOrThrow({
+      where: { auctionId: fx.auction.id, playerId: fx.playerB.id },
+    });
+    await assignTeamCaptain(fx.auction.id, fx.team1Entry.id, secondPlayer.id);
+
+    await replacePlayerPostAuction(fx.auction.id, fx.aAuctionPlayer.id, fx.playerC.id, fx.category.id, 50);
+
+    const entry = await prisma.teamAuctionEntry.findUniqueOrThrow({ where: { id: fx.team1Entry.id } });
+    expect(entry.captainAuctionPlayerId).toBe(secondPlayer.id);
+  });
 });
 
 describe("removePlayerPostAuction", () => {
@@ -207,6 +236,32 @@ describe("removePlayerPostAuction", () => {
     const entry = await prisma.teamAuctionEntry.findUniqueOrThrow({ where: { id: fx.team1Entry.id } });
     expect(String(entry.budgetRemaining)).toBe("950"); // (1000 - 50 manager - 200 A) + 200
     expect(entry.slotsFilled).toBe(1);
+  });
+
+  it("clears the team's captain when the removed player was captain", async () => {
+    const fx = await buildCompletedAuctionFixture();
+    await concludeFixture(fx);
+    await assignTeamCaptain(fx.auction.id, fx.team1Entry.id, fx.aAuctionPlayer.id);
+
+    await removePlayerPostAuction(fx.auction.id, fx.aAuctionPlayer.id);
+
+    const entry = await prisma.teamAuctionEntry.findUniqueOrThrow({ where: { id: fx.team1Entry.id } });
+    expect(entry.captainAuctionPlayerId).toBeNull();
+  });
+
+  it("leaves the team's captain untouched when a different player is removed", async () => {
+    const fx = await buildCompletedAuctionFixture();
+    await concludeFixture(fx);
+    await addPlayerPostAuction(fx.auction.id, fx.team1Entry.id, fx.playerB.id, fx.category.id, 90);
+    const secondPlayer = await prisma.auctionPlayer.findFirstOrThrow({
+      where: { auctionId: fx.auction.id, playerId: fx.playerB.id },
+    });
+    await assignTeamCaptain(fx.auction.id, fx.team1Entry.id, secondPlayer.id);
+
+    await removePlayerPostAuction(fx.auction.id, fx.aAuctionPlayer.id);
+
+    const entry = await prisma.teamAuctionEntry.findUniqueOrThrow({ where: { id: fx.team1Entry.id } });
+    expect(entry.captainAuctionPlayerId).toBe(secondPlayer.id);
   });
 });
 

@@ -22,6 +22,7 @@ function player(overrides: Partial<AuctionStatePlayer>): AuctionStatePlayer {
     soldPrice: null,
     soldToEntryId: null,
     soldToTeamName: null,
+    isCaptain: false,
     soldVia: null,
     soldAt: null,
     currentBid: null,

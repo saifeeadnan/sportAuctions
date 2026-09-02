@@ -573,6 +573,10 @@ export async function removePlayerPostAuction(auctionId: string, auctionPlayerId
       data: {
         budgetRemaining: new Prisma.Decimal(entry.budgetRemaining).plus(refund),
         slotsFilled: { decrement: 1 },
+        // A removed player can't stay captain of a roster they're no longer
+        // on — leaving this pointing at them would silently orphan the
+        // designation with no visible sign anything changed.
+        ...(entry.captainAuctionPlayerId === auctionPlayerId ? { captainAuctionPlayerId: null } : {}),
       },
       include: { team: true },
     }),
@@ -736,7 +740,14 @@ export async function replacePlayerPostAuction(
     });
     const updatedEntry = await tx.teamAuctionEntry.update({
       where: { id: entryId },
-      data: { budgetRemaining: newBudgetRemaining },
+      data: {
+        budgetRemaining: newBudgetRemaining,
+        // Same reasoning as removePlayerPostAuction: the outgoing player
+        // can't stay captain of a roster they've just left.
+        ...(entry.captainAuctionPlayerId === outgoingAuctionPlayerId
+          ? { captainAuctionPlayerId: null }
+          : {}),
+      },
       include: { team: true },
     });
 

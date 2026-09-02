@@ -129,6 +129,7 @@ export default async function TeamRosterPage({
             categoryName: ap.category.name,
             soldPrice: ap.soldPrice != null ? String(ap.soldPrice) : null,
             soldVia: ap.soldVia,
+            isCaptain: ap.id === entry.captainAuctionPlayerId,
           }))}
         />
       </section>
