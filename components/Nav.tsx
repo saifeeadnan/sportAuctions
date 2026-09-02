@@ -2,7 +2,6 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { logoutAction } from "@/lib/actions/auth.actions";
 import { buttonSecondary } from "@/lib/ui";
-import { Badge } from "@/components/ui/Badge";
 import { LogoMark } from "@/components/ui/LogoMark";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { NavVisibility } from "@/components/NavVisibility";
@@ -27,11 +26,6 @@ export async function Nav() {
                   className="flex items-center gap-2 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white transition-colors"
                 >
                   <span className="hidden sm:inline truncate max-w-[10rem]">{session.user.name}</span>
-                  <Badge variant="info">
-                    {session.user.isSiteAdmin
-                      ? "ADMIN"
-                      : (session.user.memberships[0]?.role ?? "VIEWER")}
-                  </Badge>
                 </Link>
                 <form action={logoutAction}>
                   <button type="submit" className={`${buttonSecondary} px-3 py-1.5 text-xs`}>
