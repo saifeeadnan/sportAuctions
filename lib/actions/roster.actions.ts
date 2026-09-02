@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { requireAdminOrLeagueAdmin } from "@/lib/auth/guards";
+import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
 import { loadScopedRoster } from "@/lib/auth/scope";
 import { toActionResult, type ActionResult } from "@/lib/actions/result";
 import {
@@ -13,6 +13,7 @@ import {
   deletePlayer,
   type PlayerInput,
 } from "@/lib/services/roster.service";
+import { updateLeagueRosterFieldConfig } from "@/lib/services/league.service";
 
 export async function deleteRosterAction(rosterId: string): Promise<ActionResult> {
   return toActionResult(async () => {
@@ -34,6 +35,18 @@ export async function renameRosterAction(rosterId: string, name: string): Promis
   });
 }
 
+export async function updateLeagueRosterFieldConfigAction(
+  leagueId: string,
+  mandatoryFields: string[]
+): Promise<ActionResult> {
+  return toActionResult(async () => {
+    const { leagueIds } = await requireAdminOrLeagueAdmin();
+    assertInScope(leagueIds, leagueId);
+    await updateLeagueRosterFieldConfig(leagueId, mandatoryFields);
+    revalidatePath("/admin/rosters");
+  });
+}
+
 function parsePlayerInput(formData: FormData): PlayerInput {
   const str = (key: string) => {
     const value = formData.get(key);
@@ -51,6 +64,8 @@ function parsePlayerInput(formData: FormData): PlayerInput {
     position: str("position"),
     age: num("age"),
     loginId: str("loginId"),
+    email: str("email"),
+    phone: str("phone"),
     defaultCategory: str("defaultCategory"),
     previousTeam: str("previousTeam"),
     photoUrl: str("photoUrl"),

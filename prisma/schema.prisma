@@ -163,6 +163,17 @@ model League {
   maxTournaments           Int?
   maxTeamsPerTournament    Int?
   maxSponsorsPerTournament Int?
+  // Array of Player field-key strings (lib/rosterTemplates.ts's
+  // ROSTER_FIELD_KEYS) this league currently requires on every roster
+  // upload — enforced in roster.service.ts alongside the permanently-
+  // required `name`. Defaults to `["email","phone"]` — every league (new or
+  // pre-existing, backfilled via migration) requires email and phone unless
+  // an admin explicitly customizes them away.
+  // Which named preset (Cricket/Generic) this "is" is derived by comparing
+  // this array against each preset's fixed list (rosterTemplates.ts's
+  // matchingRosterTemplateKey) — not stored, so it can never drift out of
+  // sync, same reasoning as isLeagueReadOnly below.
+  mandatoryRosterFields    Json      @default("[\"email\",\"phone\"]")
   createdAt                DateTime  @default(now())
 
   memberships LeagueMembership[]
@@ -197,6 +208,8 @@ model Player {
   position        String?
   age             Int?
   loginId         String?
+  email           String?
+  phone           String?
   defaultCategory String?
   previousTeam    String?
   photoUrl        String?

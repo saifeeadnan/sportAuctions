@@ -5,6 +5,8 @@ export type PlayerFormDefaults = {
   position?: string | null;
   age?: number | null;
   loginId?: string | null;
+  email?: string | null;
+  phone?: string | null;
   defaultCategory?: string | null;
   previousTeam?: string | null;
   photoUrl?: string | null;
@@ -40,6 +42,21 @@ export function PlayerFormFields({ defaultValues = {} }: { defaultValues?: Playe
         <label className="flex flex-col gap-1 text-sm">
           Login ID
           <input name="loginId" defaultValue={defaultValues.loginId ?? ""} className={inputClass} />
+        </label>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <label className="flex flex-col gap-1 text-sm">
+          Email
+          <input
+            name="email"
+            type="email"
+            defaultValue={defaultValues.email ?? ""}
+            className={inputClass}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          Phone
+          <input name="phone" type="tel" defaultValue={defaultValues.phone ?? ""} className={inputClass} />
         </label>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

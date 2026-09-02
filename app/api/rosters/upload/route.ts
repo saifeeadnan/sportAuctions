@@ -3,6 +3,7 @@ import { requireAdminOrLeagueAdmin } from "@/lib/auth/guards";
 import { toErrorResponse } from "@/lib/api/errors";
 import { ValidationError } from "@/lib/errors";
 import { parseRosterFile, createRosterFromUpload } from "@/lib/services/roster.service";
+import { getLeagueRosterFieldConfig } from "@/lib/services/league.service";
 
 export async function POST(req: Request) {
   try {
@@ -17,15 +18,18 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 });
     }
 
+    // A single-league League Admin's roster always belongs to their own
+    // league; a site Admin (unrestricted) or a multi-league League Admin
+    // picks a league via the form — resolved for Preview too (not just
+    // Confirm) so league-mandatory-field errors surface before commit.
+    const targetLeagueId =
+      leagueIds?.length === 1 ? leagueIds[0] : String(formData.get("leagueId") ?? "");
+    const mandatoryFields = targetLeagueId ? await getLeagueRosterFieldConfig(targetLeagueId) : [];
+
     const buffer = Buffer.from(await file.arrayBuffer());
-    const { validRows, errors } = parseRosterFile(buffer, file.name);
+    const { validRows, errors } = parseRosterFile(buffer, file.name, mandatoryFields);
 
     if (mode === "commit") {
-      // A single-league League Admin's roster always belongs to their own
-      // league; a site Admin (unrestricted) or a multi-league League Admin
-      // picks a league via the form.
-      const targetLeagueId =
-        leagueIds?.length === 1 ? leagueIds[0] : String(formData.get("leagueId") ?? "");
       if (!targetLeagueId) {
         throw new ValidationError("A league must be selected for this roster");
       }

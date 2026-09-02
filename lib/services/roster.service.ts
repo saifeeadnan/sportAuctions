@@ -2,6 +2,7 @@ import Papa from "papaparse";
 import { prisma } from "@/lib/prisma";
 import { ValidationError } from "@/lib/errors";
 import { assertLeagueNotReadOnly } from "@/lib/services/league.service";
+import { ROSTER_FIELD_LABELS, type RosterFieldKey } from "@/lib/rosterTemplates";
 import type { Player } from "@/app/generated/prisma/client";
 
 export type ParsedPlayerRow = {
@@ -9,6 +10,8 @@ export type ParsedPlayerRow = {
   position?: string;
   age?: number;
   loginId?: string;
+  email?: string;
+  phone?: string;
   defaultCategory?: string;
   previousTeam?: string;
   photoUrl?: string;
@@ -37,9 +40,13 @@ const HEADER_ALIASES: Record<string, keyof ParsedPlayerRow> = {
   age: "age",
   loginid: "loginId",
   login: "loginId",
-  contact: "loginId",
-  phone: "loginId",
-  email: "loginId",
+  email: "email",
+  emailid: "email",
+  emailaddress: "email",
+  phone: "phone",
+  phonenumber: "phone",
+  mobile: "phone",
+  contact: "phone",
   defaultcategory: "defaultCategory",
   category: "defaultCategory",
   previousteam: "previousTeam",
@@ -73,11 +80,17 @@ function isNumericField(field: keyof ParsedPlayerRow): field is NumericField {
 }
 
 function normalizeHeader(header: string): keyof ParsedPlayerRow | null {
-  const key = header.trim().toLowerCase().replace(/[\s_-]/g, "");
+  // A trailing " *" (or "*") marks a mandatory column on a downloaded
+  // template (see rosterTemplateHeaderRow) — stripped before alias lookup
+  // so a filled-in template re-imports without the admin renaming anything.
+  const key = header.trim().toLowerCase().replace(/[\s_-]/g, "").replace(/\*+$/, "");
   return HEADER_ALIASES[key] ?? null;
 }
 
-function rowsFromRecords(records: Record<string, unknown>[]): ParseResult {
+function rowsFromRecords(
+  records: Record<string, unknown>[],
+  mandatoryFields: RosterFieldKey[] = []
+): ParseResult {
   const validRows: ParsedPlayerRow[] = [];
   const errors: RowError[] = [];
 
@@ -109,13 +122,28 @@ function rowsFromRecords(records: Record<string, unknown>[]): ParseResult {
       return;
     }
 
+    // A field that's both league-mandatory and numerically invalid (caught
+    // above) produces two errors for the same row — harmless, both are
+    // legitimate and the row is correctly skipped either way.
+    const missing = mandatoryFields.filter((field) => mapped[field] == null);
+    if (missing.length > 0) {
+      for (const field of missing) {
+        errors.push({ rowNumber, message: `Missing required field: ${ROSTER_FIELD_LABELS[field]}` });
+      }
+      return;
+    }
+
     validRows.push(mapped as ParsedPlayerRow);
   });
 
   return { validRows, errors };
 }
 
-export function parseRosterFile(buffer: Buffer, filename: string): ParseResult {
+export function parseRosterFile(
+  buffer: Buffer,
+  filename: string,
+  mandatoryFields: RosterFieldKey[] = []
+): ParseResult {
   // Excel import intentionally isn't supported: the `xlsx` (SheetJS) parser
   // has unpatched prototype-pollution and ReDoS advisories with no fix
   // available on npm, and this function runs it directly against
@@ -128,7 +156,7 @@ export function parseRosterFile(buffer: Buffer, filename: string): ParseResult {
     header: true,
     skipEmptyLines: true,
   });
-  return rowsFromRecords(parsed.data);
+  return rowsFromRecords(parsed.data, mandatoryFields);
 }
 
 export async function createRosterFromUpload(
@@ -160,6 +188,8 @@ export async function createRosterFromUpload(
         position: row.position,
         age: row.age,
         loginId: row.loginId,
+        email: row.email,
+        phone: row.phone,
         defaultCategory: row.defaultCategory,
         previousTeam: row.previousTeam,
         photoUrl: row.photoUrl,
@@ -179,6 +209,8 @@ export type PlayerInput = {
   position?: string;
   age?: number;
   loginId?: string;
+  email?: string;
+  phone?: string;
   defaultCategory?: string;
   previousTeam?: string;
   photoUrl?: string;
@@ -240,23 +272,51 @@ export async function deletePlayer(playerId: string) {
 
 // Header names deliberately match `HEADER_ALIASES` above (once spaces are
 // stripped/lowercased), so a file exported here re-imports cleanly through
-// `parseRosterFile`.
-export const ROSTER_EXPORT_COLUMNS: { header: string; get: (p: Player) => string | number }[] = [
-  { header: "Name", get: (p) => p.name },
-  { header: "Position", get: (p) => p.position ?? "" },
-  { header: "Age", get: (p) => p.age ?? "" },
-  { header: "Login ID", get: (p) => p.loginId ?? "" },
-  { header: "Default Category", get: (p) => p.defaultCategory ?? "" },
-  { header: "Previous Team", get: (p) => p.previousTeam ?? "" },
-  { header: "Photo URL", get: (p) => p.photoUrl ?? "" },
-  { header: "Rating", get: (p) => (p.rating != null ? Number(p.rating) : "") },
-  { header: "Batting Rating", get: (p) => (p.battingRating != null ? Number(p.battingRating) : "") },
-  { header: "Bowling Rating", get: (p) => (p.bowlingRating != null ? Number(p.bowlingRating) : "") },
-  { header: "Fielding Rating", get: (p) => (p.fieldingRating != null ? Number(p.fieldingRating) : "") },
+// `parseRosterFile`. `field` is `null` for the always-required Name column
+// (never eligible to be marked mandatory — it already always is).
+export const ROSTER_EXPORT_COLUMNS: {
+  header: string;
+  field: RosterFieldKey | null;
+  get: (p: Player) => string | number;
+}[] = [
+  { header: "Name", field: null, get: (p) => p.name },
+  { header: "Position", field: "position", get: (p) => p.position ?? "" },
+  { header: "Age", field: "age", get: (p) => p.age ?? "" },
+  { header: "Login ID", field: "loginId", get: (p) => p.loginId ?? "" },
+  { header: "Email", field: "email", get: (p) => p.email ?? "" },
+  { header: "Phone", field: "phone", get: (p) => p.phone ?? "" },
+  { header: "Default Category", field: "defaultCategory", get: (p) => p.defaultCategory ?? "" },
+  { header: "Previous Team", field: "previousTeam", get: (p) => p.previousTeam ?? "" },
+  { header: "Photo URL", field: "photoUrl", get: (p) => p.photoUrl ?? "" },
+  { header: "Rating", field: "rating", get: (p) => (p.rating != null ? Number(p.rating) : "") },
+  {
+    header: "Batting Rating",
+    field: "battingRating",
+    get: (p) => (p.battingRating != null ? Number(p.battingRating) : ""),
+  },
+  {
+    header: "Bowling Rating",
+    field: "bowlingRating",
+    get: (p) => (p.bowlingRating != null ? Number(p.bowlingRating) : ""),
+  },
+  {
+    header: "Fielding Rating",
+    field: "fieldingRating",
+    get: (p) => (p.fieldingRating != null ? Number(p.fieldingRating) : ""),
+  },
 ];
 
 export function rosterExportRows(players: Player[]): (string | number)[][] {
   return players.map((p) => ROSTER_EXPORT_COLUMNS.map((col) => col.get(p)));
+}
+
+// A blank starting file for a league's roster upload — same headers as
+// export (so it round-trips through parseRosterFile unchanged) with " *"
+// appended to any header the league currently requires.
+export function rosterTemplateHeaderRow(mandatoryFields: RosterFieldKey[]): string[] {
+  return ROSTER_EXPORT_COLUMNS.map((col) =>
+    col.field && mandatoryFields.includes(col.field) ? `${col.header} *` : col.header
+  );
 }
 
 export async function renameRoster(rosterId: string, name: string) {

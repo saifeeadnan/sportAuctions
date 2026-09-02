@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { ValidationError, InvalidStateTransitionError } from "@/lib/errors";
+import { ROSTER_FIELD_KEYS, type RosterFieldKey } from "@/lib/rosterTemplates";
 
 export type LeagueSettingsInput = {
   startDate?: Date | null;
@@ -124,6 +125,55 @@ export async function updateLeagueSettings(leagueId: string, input: LeagueSettin
           : input.maxSponsorsPerTournament,
     },
   });
+}
+
+/** Defensively filters out any value no longer in ROSTER_FIELD_KEYS — guards
+ * against a stale field key surviving a future rename of the fixed list. */
+export async function getLeagueRosterFieldConfig(leagueId: string): Promise<RosterFieldKey[]> {
+  const league = await prisma.league.findUnique({
+    where: { id: leagueId },
+    select: { mandatoryRosterFields: true },
+  });
+  if (!league) throw new ValidationError("League not found");
+
+  const stored = Array.isArray(league.mandatoryRosterFields) ? league.mandatoryRosterFields : [];
+  return ROSTER_FIELD_KEYS.filter((key) => stored.includes(key));
+}
+
+/** No assertLeagueNotReadOnly guard — read-only blocks *creating* new
+ * records (rosters, players, tournaments), not editing league config, same
+ * posture as updateLeagueSettings above. Stored filtered+deduped in
+ * ROSTER_FIELD_KEYS's canonical order so matchingRosterTemplateKey
+ * comparisons stay stable regardless of the order the UI submits them in. */
+export async function updateLeagueRosterFieldConfig(leagueId: string, mandatoryFields: string[]) {
+  const league = await prisma.league.findUnique({ where: { id: leagueId } });
+  if (!league) throw new ValidationError("League not found");
+
+  const unknown = mandatoryFields.filter((f) => !ROSTER_FIELD_KEYS.includes(f as RosterFieldKey));
+  if (unknown.length > 0) {
+    throw new ValidationError(`Unknown roster field(s): ${unknown.join(", ")}`);
+  }
+
+  const canonical = ROSTER_FIELD_KEYS.filter((key) => mandatoryFields.includes(key));
+
+  return prisma.league.update({
+    where: { id: leagueId },
+    data: { mandatoryRosterFields: canonical },
+  });
+}
+
+/** Looked up fresh at read time (never cached into a session/JWT) so a
+ * league rename shows up immediately everywhere it's displayed — same
+ * "derive, don't cache" posture as isLeagueReadOnly above. Used by the
+ * mobile API to turn a session's bare {leagueId, role} memberships into
+ * something a screen can actually show a person. */
+export async function leagueNamesByIds(leagueIds: string[]): Promise<Record<string, string>> {
+  if (leagueIds.length === 0) return {};
+  const leagues = await prisma.league.findMany({
+    where: { id: { in: leagueIds } },
+    select: { id: true, name: true },
+  });
+  return Object.fromEntries(leagues.map((l) => [l.id, l.name]));
 }
 
 export async function listLeagues() {

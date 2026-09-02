@@ -37,6 +37,8 @@ export default async function EditPlayerPage({
               position: player.position,
               age: player.age,
               loginId: player.loginId,
+              email: player.email,
+              phone: player.phone,
               defaultCategory: player.defaultCategory,
               previousTeam: player.previousTeam,
               photoUrl: player.photoUrl,

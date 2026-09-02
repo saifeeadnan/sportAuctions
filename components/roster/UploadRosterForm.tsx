@@ -22,14 +22,23 @@ async function readErrorMessage(res: Response, fallback: string): Promise<string
 
 export function UploadRosterForm({
   leagues,
+  leagueId: fixedLeagueId,
 }: {
-  /** Non-null only for a site ADMIN (unrestricted) — shows a league picker.
-   * A League Admin's roster is always scoped to their own league server-side. */
+  /** Non-null only for a site ADMIN with no single league resolved yet —
+   * shows a league picker. */
   leagues?: { id: string; name: string; readOnly: boolean }[] | null;
+  /** A single already-resolved league — either a League Admin's own (real
+   * auth-scoped) league, or a site Admin who's narrowed to one league via
+   * the sidebar switcher. That sidebar narrowing is display-only, not part
+   * of `requireAdminOrLeagueAdmin`'s actual auth scope (a site Admin's
+   * scope is always unrestricted), so the server can't infer it — this
+   * must be sent explicitly on every request, same as a real `<select>`. */
+  leagueId?: string;
 }) {
   const router = useRouter();
   const [rosterName, setRosterName] = useState("");
-  const [leagueId, setLeagueId] = useState(leagues?.[0]?.id ?? "");
+  const [selectedLeagueId, setSelectedLeagueId] = useState(leagues?.[0]?.id ?? "");
+  const effectiveLeagueId = leagues ? selectedLeagueId : fixedLeagueId;
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<PreviewResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -45,6 +54,7 @@ export function UploadRosterForm({
       formData.set("file", file);
       formData.set("rosterName", rosterName);
       formData.set("mode", "preview");
+      if (effectiveLeagueId) formData.set("leagueId", effectiveLeagueId);
       const res = await fetch("/api/rosters/upload", {
         method: "POST",
         body: formData,
@@ -67,7 +77,7 @@ export function UploadRosterForm({
       formData.set("file", file);
       formData.set("rosterName", rosterName);
       formData.set("mode", "commit");
-      if (leagues) formData.set("leagueId", leagueId);
+      if (effectiveLeagueId) formData.set("leagueId", effectiveLeagueId);
       const res = await fetch("/api/rosters/upload", {
         method: "POST",
         body: formData,
@@ -99,8 +109,8 @@ export function UploadRosterForm({
             League
             <select
               required
-              value={leagueId}
-              onChange={(e) => setLeagueId(e.target.value)}
+              value={selectedLeagueId}
+              onChange={(e) => setSelectedLeagueId(e.target.value)}
               className={selectClass}
             >
               {leagues.length === 0 && <option value="">— No leagues yet —</option>}
@@ -113,6 +123,19 @@ export function UploadRosterForm({
             </select>
           </label>
         )}
+        <p className="text-xs">
+          {effectiveLeagueId ? (
+            <a href={`/api/rosters/template.csv?leagueId=${effectiveLeagueId}`} className="underline">
+              Download template
+            </a>
+          ) : (
+            <span className="text-black/40 dark:text-white/40">Download template</span>
+          )}
+          <span className="text-black/50 dark:text-white/50">
+            {" "}
+            — fields marked * are required for this league.
+          </span>
+        </p>
         <label className="flex flex-col gap-1 text-sm">
           CSV file
           <input
@@ -161,6 +184,8 @@ export function UploadRosterForm({
                     <th className="py-2 pr-4 whitespace-nowrap">Position</th>
                     <th className="py-2 pr-4 whitespace-nowrap">Age</th>
                     <th className="py-2 pr-4 whitespace-nowrap">Login ID</th>
+                    <th className="py-2 pr-4 whitespace-nowrap">Email</th>
+                    <th className="py-2 pr-4 whitespace-nowrap">Phone</th>
                     <th className="py-2 pr-4 whitespace-nowrap">Default category</th>
                     <th className="py-2 pr-4 whitespace-nowrap">Previous team</th>
                     <th className="py-2 pr-4 whitespace-nowrap">Batting</th>
@@ -175,6 +200,8 @@ export function UploadRosterForm({
                       <td className="py-2 pr-4 whitespace-nowrap">{String(row.position ?? "—")}</td>
                       <td className="py-2 pr-4 whitespace-nowrap">{String(row.age ?? "—")}</td>
                       <td className="py-2 pr-4 whitespace-nowrap">{String(row.loginId ?? "—")}</td>
+                      <td className="py-2 pr-4 whitespace-nowrap">{String(row.email ?? "—")}</td>
+                      <td className="py-2 pr-4 whitespace-nowrap">{String(row.phone ?? "—")}</td>
                       <td className="py-2 pr-4 whitespace-nowrap">{String(row.defaultCategory ?? "—")}</td>
                       <td className="py-2 pr-4 whitespace-nowrap">{String(row.previousTeam ?? "—")}</td>
                       <td className="py-2 pr-4 whitespace-nowrap">{String(row.battingRating ?? "—")}</td>

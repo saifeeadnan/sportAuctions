@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import { resolveAdminScope } from "@/lib/auth/scope";
-import { listLeagues, isLeagueReadOnly } from "@/lib/services/league.service";
+import { listLeagues, isLeagueReadOnly, getLeagueRosterFieldConfig } from "@/lib/services/league.service";
 import { DeleteRosterButton } from "@/components/admin/DeleteRosterButton";
 import { UploadRosterForm } from "@/components/roster/UploadRosterForm";
+import { RosterFieldConfigForm } from "@/components/admin/RosterFieldConfigForm";
 import { card, cardInteractive } from "@/lib/ui";
 
 export async function RostersPanel({ selectedLeagueId }: { selectedLeagueId?: string }) {
@@ -12,7 +13,7 @@ export async function RostersPanel({ selectedLeagueId }: { selectedLeagueId?: st
   // only meaningful once scope has narrowed to exactly one league.
   const leagueId = leagueIds?.length === 1 ? leagueIds[0] : undefined;
 
-  const [rosters, leagues, myLeague] = await Promise.all([
+  const [rosters, leagues, myLeague, rosterFieldConfig] = await Promise.all([
     prisma.playerRoster.findMany({
       where: leagueIds ? { leagueId: { in: leagueIds } } : {},
       orderBy: { createdAt: "desc" },
@@ -20,6 +21,7 @@ export async function RostersPanel({ selectedLeagueId }: { selectedLeagueId?: st
     }),
     leagueIds ? Promise.resolve(null) : listLeagues(),
     leagueId ? prisma.league.findUnique({ where: { id: leagueId }, select: { endDate: true } }) : Promise.resolve(null),
+    leagueId ? getLeagueRosterFieldConfig(leagueId) : Promise.resolve(null),
   ]);
 
   // A League Admin has no league picker (always their own fixed league), so
@@ -41,7 +43,13 @@ export async function RostersPanel({ selectedLeagueId }: { selectedLeagueId?: st
           </summary>
           <UploadRosterForm
             leagues={leagues?.map((l) => ({ id: l.id, name: l.name, readOnly: isLeagueReadOnly(l) }))}
+            leagueId={leagueId}
           />
+          {leagueId && rosterFieldConfig && (
+            <div className="px-4 pb-4">
+              <RosterFieldConfigForm leagueId={leagueId} mandatoryFields={rosterFieldConfig} />
+            </div>
+          )}
         </details>
       )}
 
