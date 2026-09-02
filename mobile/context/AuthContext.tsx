@@ -4,10 +4,17 @@ import { apiFetch, ApiError, configureAuthHandlers } from "@/services/apiClient"
 
 const TOKEN_KEY = "mobile_auth_token";
 
-export type Membership = { leagueId: string; role: string };
-export type MobileUser = { id: string; name: string; isSiteAdmin: boolean; memberships: Membership[] };
+export type Membership = { leagueId: string; role: string; leagueName: string };
+export type MobileUser = {
+  id: string;
+  name: string;
+  isSiteAdmin: boolean;
+  email: string | null;
+  phone: string | null;
+  memberships: Membership[];
+};
 
-type LoginResponse = { token: string; user: MobileUser };
+type LoginResponse = { token: string };
 
 type AuthState = {
   token: string | null;
@@ -15,6 +22,7 @@ type AuthState = {
   isLoading: boolean;
   login: (loginId: string, password: string) => Promise<{ error?: string }>;
   logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthState | null>(null);
@@ -74,9 +82,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ loginId, password }),
         skipAuth: true,
       });
+      // Explicit header override (not just skipAuth) since `token` state
+      // hasn't re-rendered yet at this point in the function — handlers
+      // .getToken() would still return the old (null) value.
+      const me = await apiFetch<MobileUser>("/api/mobile/me", {
+        headers: { Authorization: `Bearer ${res.token}` },
+      });
       await SecureStore.setItemAsync(TOKEN_KEY, res.token);
       setToken(res.token);
-      setUser(res.user);
+      setUser(me);
       return {};
     } catch (e) {
       if (e instanceof ApiError) return { error: e.message };
@@ -85,9 +99,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const refreshUser = useCallback(async () => {
+    try {
+      setUser(await apiFetch<MobileUser>("/api/mobile/me"));
+    } catch {
+      // Best-effort — the screen that triggered this already knows whether
+      // its own save request succeeded; a refresh hiccup shouldn't surface
+      // as a separate error.
+    }
+  }, []);
+
   const value = useMemo(
-    () => ({ token, user, isLoading, login, logout }),
-    [token, user, isLoading, login, logout]
+    () => ({ token, user, isLoading, login, logout, refreshUser }),
+    [token, user, isLoading, login, logout, refreshUser]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
