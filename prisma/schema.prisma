@@ -65,6 +65,11 @@ enum AuctionCorrectionType {
   TEAM_BUDGET
 }
 
+enum FantasyPricingModel {
+  SOLD_PRICE       // default — every pick costs what it actually sold for (or category basePrice if unsold)
+  CATEGORY_AVERAGE // every pick costs the average soldPrice across every SOLD player in its category, this auction
+}
+
 enum TeamAuctionEntryStatus {
   CREATED
   PRE_AUCTION_DRAFTING
@@ -363,6 +368,14 @@ model Auction {
   // always-on behavior), preserving every existing auction unchanged.
   // Editable any time via updateFantasyLockDate, not write-once.
   fantasyLockDate DateTime?
+  // Editable any time via updateFantasySettings, not write-once — same
+  // posture as fantasyLockDate. Defaults preserve every existing auction's
+  // current behavior unchanged: real sold price, self-pick forced in, one
+  // team per user. See lib/services/fantasyTeam.service.ts's fantasyPrice()
+  // for exactly how these three combine.
+  fantasyPricingModel     FantasyPricingModel @default(SOLD_PRICE)
+  fantasySelfPickRequired Boolean             @default(true)
+  fantasyMaxTeamsPerUser  Int                 @default(1)
 
   categories     AuctionCategory[]
   auctionPlayers AuctionPlayer[]
@@ -493,7 +506,11 @@ model FantasyTeam {
 
   picks FantasyTeamPlayer[]
 
-  @@unique([auctionId, userId])
+  // Was @@unique([auctionId, userId]) — relaxed to a plain index once
+  // Auction.fantasyMaxTeamsPerUser could be >1, allowing multiple rows per
+  // user per auction. Kept as an index since submitFantasyTeam/
+  // listMyFantasyTeams still always filter by both together.
+  @@index([auctionId, userId])
   @@map("fantasy_teams")
 }
 

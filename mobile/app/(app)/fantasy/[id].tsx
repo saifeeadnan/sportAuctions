@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, TextInput, View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -27,21 +27,27 @@ type PoolPlayer = RatedPlayer & {
   price: string;
 };
 
-type FantasyTeamResponse =
+type MyTeam = { id: string; name: string | null; picks: string[] };
+
+type FantasyTeamsResponse =
   | { eligible: false; reason: string }
   | {
       eligible: true;
-      selfAuctionPlayerId: string;
+      selfAuctionPlayerId: string | null;
+      selfPickRequired: boolean;
       locked: boolean;
       lockDate: string;
       budget: string;
       cap: number;
+      maxTeams: number;
       pool: PoolPlayer[];
-      team: { picks: { auctionPlayer: { id: string } }[]; name: string | null } | null;
+      teams: MyTeam[];
       auctionName: string;
       tournamentName: string;
       leagueName: string;
     };
+
+type Eligible = Extract<FantasyTeamsResponse, { eligible: true }>;
 
 function formatAmount(n: number) {
   return Number.isInteger(n) ? String(n) : n.toFixed(2);
@@ -49,37 +55,15 @@ function formatAmount(n: number) {
 
 export default function FantasyBuilderScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const queryClient = useQueryClient();
   const theme = useTheme();
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["fantasy-team", id],
-    queryFn: () => apiFetch<FantasyTeamResponse>(`/api/mobile/auctions/${id}/fantasy-team`),
+    queryKey: ["fantasy-teams", id],
+    queryFn: () => apiFetch<FantasyTeamsResponse>(`/api/mobile/auctions/${id}/fantasy-teams`),
   });
 
-  const [selected, setSelected] = useState<Set<string> | null>(null);
-  const [name, setName] = useState<string | null>(null);
-  const [activeCategory, setActiveCategory] = useState("");
-
-  const initialized = useMemo(() => {
-    if (!data?.eligible || selected != null) return selected;
-    const fromTeam = data.team?.picks.map((p) => p.auctionPlayer.id) ?? [];
-    return new Set([data.selfAuctionPlayerId, ...fromTeam]);
-  }, [data, selected]);
-
-  const mutation = useMutation({
-    mutationFn: (auctionPlayerIds: string[]) =>
-      apiFetch(`/api/mobile/auctions/${id}/fantasy-team`, {
-        method: "POST",
-        body: JSON.stringify({ auctionPlayerIds, name: (name ?? "").trim() || undefined }),
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["fantasy-team", id] });
-      queryClient.invalidateQueries({ queryKey: ["fantasy-teams"] });
-      Alert.alert("Saved", "Your fantasy team has been saved.");
-    },
-    onError: (e) => Alert.alert("Couldn't save", e instanceof Error ? e.message : "Something went wrong"),
-  });
+  const [selectedTeamId, setSelectedTeamId] = useState<string | null>(null);
+  const [creatingNew, setCreatingNew] = useState(false);
 
   if (isLoading) {
     return (
@@ -110,14 +94,136 @@ export default function FantasyBuilderScreen() {
     );
   }
 
-  // A plain `const` capture so the nested functions below close over a type
-  // already narrowed to the `eligible: true` variant — TS doesn't carry
-  // control-flow narrowing of `data` itself into nested function
-  // declarations, only into code in the same scope as the narrowing check.
-  const eligible = data;
-  const selectedIds = initialized ?? new Set([eligible.selfAuctionPlayerId]);
+  const effectiveCreatingNew = creatingNew || (data.teams.length === 0 && selectedTeamId === null);
+  const activeTeam = effectiveCreatingNew
+    ? null
+    : (data.teams.find((t) => t.id === selectedTeamId) ?? data.teams[0] ?? null);
+  const canAddAnother = data.teams.length < data.maxTeams;
+
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <ThemedText type="small" themeColor="textSecondary">
+        {data.leagueName} / {data.tournamentName} / {data.auctionName}
+      </ThemedText>
+      <ThemedText type="small" themeColor="textSecondary">
+        Editable until <ThemedText type="smallBold" themeColor="accent">{formatCalendarDate(data.lockDate)}</ThemedText>
+      </ThemedText>
+
+      {data.teams.length > 0 && (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabRow}>
+          {data.teams.map((t, i) => {
+            const isActive = !effectiveCreatingNew && activeTeam?.id === t.id;
+            return (
+              <Pressable
+                key={t.id}
+                onPress={() => {
+                  setSelectedTeamId(t.id);
+                  setCreatingNew(false);
+                }}
+                style={[
+                  styles.tab,
+                  { borderColor: theme.border },
+                  isActive && { backgroundColor: theme.accent, borderColor: theme.accent },
+                ]}
+              >
+                <ThemedText type="small" style={isActive ? { color: theme.accentText, fontWeight: "700" } : undefined}>
+                  {t.name || `Team ${i + 1}`}
+                </ThemedText>
+              </Pressable>
+            );
+          })}
+          {canAddAnother && (
+            <Pressable
+              onPress={() => setCreatingNew(true)}
+              style={[
+                styles.tab,
+                { borderColor: theme.border },
+                effectiveCreatingNew && { backgroundColor: theme.accent, borderColor: theme.accent },
+              ]}
+            >
+              <ThemedText
+                type="small"
+                style={effectiveCreatingNew ? { color: theme.accentText, fontWeight: "700" } : undefined}
+              >
+                + Add another team
+              </ThemedText>
+            </Pressable>
+          )}
+        </ScrollView>
+      )}
+
+      <TeamEditor
+        key={activeTeam?.id ?? "new"}
+        auctionId={id}
+        eligible={data}
+        activeTeam={activeTeam}
+        onSaved={(teamId) => {
+          setSelectedTeamId(teamId);
+          setCreatingNew(false);
+        }}
+      />
+
+      <SponsorRibbon auctionId={id} />
+    </ScrollView>
+  );
+}
+
+/** One team's picker/editor — remounted (via the parent's `key`) on every
+ * team switch so its local selection/name state never leaks between teams. */
+function TeamEditor({
+  auctionId,
+  eligible,
+  activeTeam,
+  onSaved,
+}: {
+  auctionId: string;
+  eligible: Eligible;
+  activeTeam: MyTeam | null;
+  onSaved: (teamId: string) => void;
+}) {
+  const queryClient = useQueryClient();
+  const theme = useTheme();
+
+  const lockedPlayerId = eligible.selfPickRequired ? eligible.selfAuctionPlayerId : null;
+  const [selected, setSelected] = useState<Set<string>>(
+    new Set([...(lockedPlayerId ? [lockedPlayerId] : []), ...(activeTeam?.picks ?? [])])
+  );
+  const [name, setName] = useState(activeTeam?.name ?? "");
+  const [activeCategory, setActiveCategory] = useState("");
+
+  const mutation = useMutation({
+    mutationFn: (auctionPlayerIds: string[]) =>
+      apiFetch<{ team: { id: string } }>(`/api/mobile/auctions/${auctionId}/fantasy-teams`, {
+        method: "POST",
+        body: JSON.stringify({
+          auctionPlayerIds,
+          name: name.trim() || undefined,
+          fantasyTeamId: activeTeam?.id,
+        }),
+      }),
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ["fantasy-teams", auctionId] });
+      queryClient.invalidateQueries({ queryKey: ["fantasy-teams"] });
+      onSaved(result.team.id);
+      Alert.alert("Saved", "Your fantasy team has been saved.");
+    },
+    onError: (e) => Alert.alert("Couldn't save", e instanceof Error ? e.message : "Something went wrong"),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () =>
+      apiFetch(`/api/mobile/auctions/${auctionId}/fantasy-teams/${activeTeam!.id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["fantasy-teams", auctionId] });
+      queryClient.invalidateQueries({ queryKey: ["fantasy-teams"] });
+    },
+    onError: (e) => Alert.alert("Couldn't delete", e instanceof Error ? e.message : "Something went wrong"),
+  });
+
   const budgetTotal = Number(eligible.budget);
-  const totalPrice = eligible.pool.filter((p) => selectedIds.has(p.id)).reduce((sum, p) => sum + Number(p.price), 0);
+  const totalPrice = eligible.pool
+    .filter((p) => selected.has(p.id))
+    .reduce((sum, p) => sum + Number(p.price), 0);
   const budgetLeft = budgetTotal - totalPrice;
 
   const priceByCategory = new Map<string, number>();
@@ -129,27 +235,27 @@ export default function FantasyBuilderScreen() {
   );
   const effectiveCategory = activeCategory && categories.includes(activeCategory) ? activeCategory : (categories[0] ?? "");
   const visiblePlayers = eligible.pool.filter((p) => p.categoryName === effectiveCategory);
-  const teamSoFar: RatedPlayer[] = eligible.pool.filter((p) => selectedIds.has(p.id));
+  const teamSoFar: RatedPlayer[] = eligible.pool.filter((p) => selected.has(p.id));
 
   function toggle(player: PoolPlayer) {
-    if (player.id === eligible.selfAuctionPlayerId) return; // always force-included
+    if (player.id === lockedPlayerId) return; // always force-included
     setSelected((prev) => {
-      const next = new Set(prev ?? selectedIds);
+      const next = new Set(prev);
       if (next.has(player.id)) {
         next.delete(player.id);
         return next;
       }
-      if (next.size >= eligible.cap) return prev ?? selectedIds;
-      if (player.status !== "SOLD") return prev ?? selectedIds;
+      if (next.size >= eligible.cap) return prev;
+      if (player.status !== "SOLD") return prev;
       const currentTotal = eligible.pool.filter((p) => next.has(p.id)).reduce((sum, p) => sum + Number(p.price), 0);
-      if (currentTotal + Number(player.price) > budgetTotal) return prev ?? selectedIds;
+      if (currentTotal + Number(player.price) > budgetTotal) return prev;
       next.add(player.id);
       return next;
     });
   }
 
   function handleSubmit() {
-    const ids = Array.from(selectedIds);
+    const ids = Array.from(selected);
     if (ids.length < eligible.cap) {
       Alert.alert("Save with fewer picks?", `Your fantasy team has ${ids.length} of ${eligible.cap} players. Save it anyway?`, [
         { text: "Cancel", style: "cancel" },
@@ -160,23 +266,34 @@ export default function FantasyBuilderScreen() {
     }
   }
 
-  return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <ThemedText type="small" themeColor="textSecondary">
-        {eligible.leagueName} / {eligible.tournamentName} / {eligible.auctionName}
-      </ThemedText>
-      <ThemedText type="small" themeColor="textSecondary">
-        Editable until <ThemedText type="smallBold" themeColor="accent">{formatCalendarDate(eligible.lockDate)}</ThemedText>
-      </ThemedText>
+  function handleDelete() {
+    if (!activeTeam) return;
+    Alert.alert(
+      "Delete this team?",
+      `Delete "${activeTeam.name || "this team"}"? This can't be undone.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Delete", style: "destructive", onPress: () => deleteMutation.mutate() },
+      ]
+    );
+  }
 
+  return (
+    <>
       <TextInput
         placeholder="Team name (optional)"
         placeholderTextColor={theme.textSecondary}
-        defaultValue={eligible.team?.name ?? ""}
+        defaultValue={name}
         onChangeText={setName}
         maxLength={60}
         style={[styles.input, { color: theme.text, borderColor: theme.border, backgroundColor: theme.backgroundElement }]}
       />
+
+      {activeTeam && (
+        <Button variant="danger" onPress={handleDelete} loading={deleteMutation.isPending}>
+          Delete this team
+        </Button>
+      )}
 
       <ThemedText type="small">
         Budget: {eligible.budget} · Used: {formatAmount(totalPrice)} · Left:{" "}
@@ -188,7 +305,7 @@ export default function FantasyBuilderScreen() {
       <Collapsible title="Build" defaultOpen>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabRow}>
           {categories.map((cat) => {
-            const selectedInCategory = eligible.pool.filter((p) => p.categoryName === cat && selectedIds.has(p.id)).length;
+            const selectedInCategory = eligible.pool.filter((p) => p.categoryName === cat && selected.has(p.id)).length;
             const totalInCategory = eligible.pool.filter((p) => p.categoryName === cat).length;
             const isActive = effectiveCategory === cat;
             return (
@@ -211,10 +328,10 @@ export default function FantasyBuilderScreen() {
 
         <View>
           {visiblePlayers.map((p) => {
-            const isPicked = selectedIds.has(p.id);
-            const isLocked = p.id === eligible.selfAuctionPlayerId;
+            const isPicked = selected.has(p.id);
+            const isLocked = p.id === lockedPlayerId;
             const isUnsold = p.status !== "SOLD";
-            const wouldExceedCap = !isPicked && selectedIds.size >= eligible.cap;
+            const wouldExceedCap = !isPicked && selected.size >= eligible.cap;
             const wouldExceedBudget = !isPicked && totalPrice + Number(p.price) > budgetTotal;
             const disabled = isLocked || (!isPicked && (wouldExceedCap || wouldExceedBudget || isUnsold));
 
@@ -248,19 +365,17 @@ export default function FantasyBuilderScreen() {
         </Button>
       </Collapsible>
 
-      <Collapsible title={`Current team (${selectedIds.size})`}>
+      <Collapsible title={`Current team (${selected.size})`}>
         <TeamStrengthSummary players={teamSoFar} squadSize={eligible.cap} />
         <RosterRibbon
           grid
-          highlightId={eligible.selfAuctionPlayerId}
+          highlightId={lockedPlayerId}
           players={eligible.pool
-            .filter((p) => selectedIds.has(p.id))
+            .filter((p) => selected.has(p.id))
             .map((p) => ({ id: p.id, playerName: p.name, photoUrl: p.photoUrl, position: p.position, soldPrice: p.price }))}
         />
       </Collapsible>
-
-      <SponsorRibbon auctionId={id} />
-    </ScrollView>
+    </>
   );
 }
 

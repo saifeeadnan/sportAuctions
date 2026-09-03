@@ -28,20 +28,34 @@ export function FantasyTeamForm({
   budget,
   players,
   lockedPlayerId,
+  selfPickRequired,
+  fantasyTeamId,
   initialSelected,
   initialName,
+  onSaved,
 }: {
   auctionId: string;
   cap: number;
   budget: string;
   players: PlayerOption[];
-  lockedPlayerId: string;
+  /** The viewer's own auction-player entry, if any — only force-included
+   * and locked when `selfPickRequired` is also true; may be non-null even
+   * when it isn't (a genuine self-match on an auction that doesn't require
+   * one), in which case it's just a normal, freely-toggleable pick. */
+  lockedPlayerId: string | null;
+  selfPickRequired: boolean;
+  /** Omitted = this form is building a brand-new team (subject to the
+   * auction's max-teams-per-user cap); provided = editing this specific
+   * existing team. */
+  fantasyTeamId?: string;
   initialSelected?: string[];
   initialName?: string;
+  onSaved?: (team: { id: string }) => void;
 }) {
   const router = useRouter();
+  const isLockedPick = (id: string) => selfPickRequired && id === lockedPlayerId;
   const [selected, setSelected] = useState<Set<string>>(
-    new Set([lockedPlayerId, ...(initialSelected ?? [])])
+    new Set([...(selfPickRequired && lockedPlayerId ? [lockedPlayerId] : []), ...(initialSelected ?? [])])
   );
   const [name, setName] = useState(initialName ?? "");
   const [error, setError] = useState<string | null>(null);
@@ -61,7 +75,7 @@ export function FantasyTeamForm({
   const [activeCategory, setActiveCategory] = useState<string>(categories[0] ?? "");
 
   function toggle(id: string) {
-    if (id === lockedPlayerId) return;
+    if (isLockedPick(id)) return;
     setSelected((prev) => {
       const next = new Set(prev);
       if (next.has(id)) {
@@ -90,12 +104,13 @@ export function FantasyTeamForm({
     }
     setLoading(true);
     setError(null);
-    const result = await submitFantasyTeamAction(auctionId, Array.from(selected), name);
+    const result = await submitFantasyTeamAction(auctionId, Array.from(selected), name, fantasyTeamId);
     setLoading(false);
     if (result.error) {
       setError(result.error);
       return;
     }
+    if (result.data) onSaved?.(result.data);
     router.refresh();
   }
 
@@ -154,7 +169,7 @@ export function FantasyTeamForm({
 
           <ul className="flex flex-col gap-1.5">
             {visiblePlayers.map((p) => {
-              const isLocked = p.id === lockedPlayerId;
+              const isLocked = isLockedPick(p.id);
               const isUnsold = p.status !== "SOLD";
               const wouldExceedBudget =
                 !selected.has(p.id) && totalPrice + Number(p.price) > budgetTotal;

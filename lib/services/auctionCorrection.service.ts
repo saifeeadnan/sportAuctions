@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/app/generated/prisma/client";
 import { ValidationError, InvalidStateTransitionError } from "@/lib/errors";
 import { assertAuctionLeagueNotReadOnly } from "@/lib/services/league.service";
+import { repriceFantasyTeamPlayers } from "@/lib/services/fantasyTeam.service";
 
 function assertCompleted(auction: { status: string }) {
   if (auction.status !== "COMPLETED") {
@@ -120,10 +121,15 @@ export async function correctSoldPrice(
       });
     }
 
-    await tx.fantasyTeamPlayer.updateMany({
-      where: { auctionPlayerId },
-      data: { price: newPriceDecimal },
-    });
+    // Unconditional, not just when a category-average pricing model is in
+    // play: a narrow "set this one player's picks to the new sold price"
+    // update would silently corrupt any fantasy pick of this player that's
+    // actually someone's self-pick — those must never reflect sold price at
+    // all (they're always priced at their category's average) — and under
+    // CATEGORY_AVERAGE mode this one player's price shift also moves the
+    // whole category's average for every other pick in it. Repricing
+    // everything from scratch is the only way to stay correct in both cases.
+    await repriceFantasyTeamPlayers(auctionId, tx);
 
     await tx.auctionCorrectionLog.create({
       data: {
@@ -154,10 +160,11 @@ export async function correctSoldPrice(
 }
 
 /**
- * Fixes a category base-price typo on a COMPLETED auction. Only ever affects
- * fantasy pricing for that category's currently-UNSOLD players (fantasyPrice()
- * falls back to the category's basePrice for a non-SOLD pick) — never touches
- * any TeamAuctionEntry.budgetRemaining, which is derived solely from soldPrice.
+ * Fixes a category base-price typo on a COMPLETED auction. Never touches any
+ * TeamAuctionEntry.budgetRemaining, which is derived solely from soldPrice —
+ * but does trigger a full fantasy-price reprice for the auction (see
+ * repriceFantasyTeamPlayers), since this can change what an UNSOLD or
+ * self-picked player in this category is worth for fantasy purposes.
  */
 export async function correctCategoryBasePrice(
   auctionId: string,
@@ -187,16 +194,17 @@ export async function correctCategoryBasePrice(
       data: { basePrice: newBasePriceDecimal },
     });
 
-    const unsoldPlayers = await tx.auctionPlayer.findMany({
-      where: { auctionId, categoryId, status: "UNSOLD" },
-      select: { id: true },
-    });
-    if (unsoldPlayers.length > 0) {
-      await tx.fantasyTeamPlayer.updateMany({
-        where: { auctionPlayerId: { in: unsoldPlayers.map((p) => p.id) } },
-        data: { price: newBasePriceDecimal },
-      });
-    }
+    // Unconditional, same reasoning as correctSoldPrice above: a narrow
+    // "set this category's unsold players to the new base price" update
+    // would miss a self-pick in a zero-SOLD category (which should get the
+    // category average, not basePrice, the moment any player in it sells —
+    // but while the category stays entirely unsold, basePrice IS the
+    // correct fallback for a self-pick too, so this correction can still
+    // change it) and would never touch SOLD players' picks even under
+    // CATEGORY_AVERAGE mode, where a base-price change alone actually has no
+    // effect on the average (computed only from SOLD prices) but a full
+    // reprice stays correct and cheap either way.
+    await repriceFantasyTeamPlayers(auctionId, tx);
 
     await tx.auctionCorrectionLog.create({
       data: {

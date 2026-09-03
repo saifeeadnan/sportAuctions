@@ -5,7 +5,8 @@ import { createAuctionReadyFixture } from "../helpers/fixtures";
 import { prisma } from "@/lib/prisma";
 import { createAuction, openPreAuction, lockPreAuction, startBidding } from "@/lib/services/auction.service";
 import { adminAssignPlayer, concludeAuction } from "@/lib/services/bidding.service";
-import { submitFantasyTeam } from "@/lib/services/fantasyTeam.service";
+import { submitFantasyTeam, updateFantasySettings } from "@/lib/services/fantasyTeam.service";
+import { updateLeagueSettings } from "@/lib/services/league.service";
 import {
   correctSoldPrice,
   correctCategoryBasePrice,
@@ -109,6 +110,7 @@ async function buildCorrectionFixture(options?: { leaveSelfPlayerUnsold?: boolea
 
   return {
     adminId: fx.admin.id,
+    league: fx.league,
     tournamentId: fx.tournament.id,
     auction,
     viewer,
@@ -249,7 +251,7 @@ describe("correctSoldPrice", () => {
 });
 
 describe("correctCategoryBasePrice", () => {
-  it("cascades only to the viewer's own unsold self-pick, never touches budgetRemaining or a SOLD player's price", async () => {
+  it("never touches budgetRemaining or a SOLD player's price, and leaves an unsold self-pick's category-average price alone since it isn't derived from basePrice", async () => {
     const fx = await buildCorrectionFixture({ leaveSelfPlayerUnsold: true });
     // Self Player is unsold, so it's the only way it can appear on a fantasy
     // team (submitFantasyTeam force-includes the self-pick regardless of
@@ -259,13 +261,23 @@ describe("correctCategoryBasePrice", () => {
     const category = await prisma.auctionCategory.findFirstOrThrow({ where: { auctionId: fx.auction.id } });
     const team1Before = await prisma.teamAuctionEntry.findUniqueOrThrow({ where: { id: fx.team1Entry.id } });
 
+    // "Regular" already has SOLD players (A@100, B@200, C@150), so the
+    // self-pick — always priced at the category average of SOLD prices,
+    // even while unsold — is 150 here, not the category's basePrice.
+    const selfBefore = await prisma.fantasyTeamPlayer.findFirstOrThrow({
+      where: { auctionPlayerId: fx.selfAuctionPlayer.id },
+    });
+    expect(String(selfBefore.price)).toBe("150");
+
     await prisma.tournament.update({ where: { id: fx.tournamentId }, data: { startDate: PAST } });
     await correctCategoryBasePrice(fx.auction.id, category.id, 250, fx.adminId);
 
+    // basePrice changed, but the self-pick's price is derived from SOLD
+    // prices, not basePrice, so it's unaffected by this correction.
     const selfFantasyPick = await prisma.fantasyTeamPlayer.findFirstOrThrow({
       where: { auctionPlayerId: fx.selfAuctionPlayer.id },
     });
-    expect(String(selfFantasyPick.price)).toBe("250");
+    expect(String(selfFantasyPick.price)).toBe("150");
 
     const soldFantasyPick = await prisma.fantasyTeamPlayer.findFirstOrThrow({
       where: { auctionPlayerId: fx.soldAuctionPlayerA.id },
@@ -326,5 +338,90 @@ describe("correctTeamBudget", () => {
     await expect(correctTeamBudget(auction.id, 2000, fx.admin.id)).rejects.toThrow(
       /only available once the auction has concluded/
     );
+  });
+});
+
+describe("fantasy pricing cascade", () => {
+  it("a sold-price correction under CATEGORY_AVERAGE mode cascades to every fantasy pick in that category, not just the corrected player's own", async () => {
+    const fx = await buildCorrectionFixture();
+    await updateFantasySettings(fx.auction.id, { pricingModel: "CATEGORY_AVERAGE" });
+    // Self forced-included (100) + Sold Player B (200) picked directly.
+    await submitFantasyTeam(fx.auction.id, fx.viewer.id, [fx.soldAuctionPlayerB.id], null);
+
+    // Category average across Self(100)/A(100)/B(200) = 400/3 = 133.33 — B's
+    // own pick is priced off the category, not its own sold price.
+    const before = await prisma.fantasyTeamPlayer.findFirstOrThrow({
+      where: { auctionPlayerId: fx.soldAuctionPlayerB.id },
+    });
+    expect(String(before.price)).toBe("133.33");
+
+    await prisma.tournament.update({ where: { id: fx.tournamentId }, data: { startDate: PAST } });
+    // Correcting A (unrelated to B, and not on this fantasy team at all)
+    // still moves the shared category average, so B's stored price must
+    // shift too: (100 self + 400 A + 200 B) / 3 = 233.33.
+    await correctSoldPrice(fx.auction.id, fx.soldAuctionPlayerA.id, 400, fx.adminId);
+
+    const after = await prisma.fantasyTeamPlayer.findFirstOrThrow({
+      where: { auctionPlayerId: fx.soldAuctionPlayerB.id },
+    });
+    expect(String(after.price)).toBe("233.33");
+  });
+
+  it("never overwrites a self-pick's price with a corrected sold price — self-picks always reprice to the category average instead", async () => {
+    const fx = await buildCorrectionFixture();
+    await submitFantasyTeam(fx.auction.id, fx.viewer.id, [], null);
+
+    // Default SOLD_PRICE mode, but the self-pick is always category-average
+    // priced regardless: (100 self + 100 A + 200 B) / 3 = 133.33.
+    const before = await prisma.fantasyTeamPlayer.findFirstOrThrow({
+      where: { auctionPlayerId: fx.selfAuctionPlayer.id },
+    });
+    expect(String(before.price)).toBe("133.33");
+
+    await prisma.tournament.update({ where: { id: fx.tournamentId }, data: { startDate: PAST } });
+    await correctSoldPrice(fx.auction.id, fx.selfAuctionPlayer.id, 500, fx.adminId);
+
+    // A narrow "set this player's picks to the new sold price" update would
+    // have landed here at 500. Repricing correctly reads the post-correction
+    // value within the same transaction and recomputes the average instead:
+    // (500 self + 100 A + 200 B) / 3 = 266.67.
+    const after = await prisma.fantasyTeamPlayer.findFirstOrThrow({
+      where: { auctionPlayerId: fx.selfAuctionPlayer.id },
+    });
+    expect(String(after.price)).toBe("266.67");
+  });
+});
+
+describe("updateFantasySettings", () => {
+  it("reprices every existing FantasyTeamPlayer.price when the pricing model changes, in both directions", async () => {
+    const fx = await buildCorrectionFixture();
+    await submitFantasyTeam(fx.auction.id, fx.viewer.id, [fx.soldAuctionPlayerA.id], null);
+
+    const soldModePick = await prisma.fantasyTeamPlayer.findFirstOrThrow({
+      where: { auctionPlayerId: fx.soldAuctionPlayerA.id },
+    });
+    expect(String(soldModePick.price)).toBe("100");
+
+    await updateFantasySettings(fx.auction.id, { pricingModel: "CATEGORY_AVERAGE" });
+    const avgModePick = await prisma.fantasyTeamPlayer.findFirstOrThrow({
+      where: { auctionPlayerId: fx.soldAuctionPlayerA.id },
+    });
+    // (100 self + 100 A + 200 B) / 3 = 133.33
+    expect(String(avgModePick.price)).toBe("133.33");
+
+    await updateFantasySettings(fx.auction.id, { pricingModel: "SOLD_PRICE" });
+    const backToSoldPick = await prisma.fantasyTeamPlayer.findFirstOrThrow({
+      where: { auctionPlayerId: fx.soldAuctionPlayerA.id },
+    });
+    expect(String(backToSoldPick.price)).toBe("100");
+  });
+
+  it("is blocked once the league is read-only", async () => {
+    const fx = await buildCorrectionFixture();
+    await updateLeagueSettings(fx.league.id, { endDate: PAST });
+
+    await expect(
+      updateFantasySettings(fx.auction.id, { pricingModel: "CATEGORY_AVERAGE" })
+    ).rejects.toThrow(/read-only/);
   });
 });

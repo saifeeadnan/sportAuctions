@@ -20,7 +20,7 @@ export function RosterRibbon({
   /** Wrap into a 4-per-row grid instead of a single horizontally-scrolling strip. */
   grid?: boolean;
   /** Player id to visually call out (e.g. "you" on a fantasy team). */
-  highlightId?: string;
+  highlightId?: string | null;
 }) {
   if (players.length === 0) {
     return <p className="text-sm text-black/60 dark:text-white/60">No players confirmed yet.</p>;

@@ -28,7 +28,7 @@ export function RosterRibbon({
 }: {
   players: RosterRibbonPlayer[];
   grid?: boolean;
-  highlightId?: string;
+  highlightId?: string | null;
 }) {
   const theme = useTheme();
 

@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { Prisma } from "@/app/generated/prisma/client";
+import { Prisma, FantasyPricingModel } from "@/app/generated/prisma/client";
 import {
   ValidationError,
   InsufficientBudgetError,
@@ -9,13 +9,58 @@ import {
 import { computeTeamStrength, type RatedPlayer } from "@/lib/teamStrength";
 import { assertAuctionLeagueNotReadOnly } from "@/lib/services/league.service";
 
-/** The price a fantasy pick costs: what it actually sold for, or its category
- * base price if it went unsold — the real auction's outcome either way. */
-function fantasyPrice(auctionPlayer: {
-  status: string;
-  soldPrice: Prisma.Decimal | null;
-  category: { basePrice: Prisma.Decimal };
-}): Prisma.Decimal {
+type PrismaClientOrTx = typeof prisma | Prisma.TransactionClient;
+
+/** Average soldPrice across every SOLD player in each category, this
+ * auction — the basis for CATEGORY_AVERAGE pricing and for pricing any
+ * "selected by default" self-pick (which always uses this, regardless of
+ * the auction's own pricing model). A category with zero SOLD players has
+ * no average; callers fall back to that category's basePrice. Takes an
+ * explicit client so a caller running inside a transaction (a correction's
+ * cascade, a settings change) reads that transaction's own snapshot rather
+ * than a stale value from outside it. */
+async function computeCategoryAveragePrices(
+  auctionId: string,
+  client: PrismaClientOrTx
+): Promise<Map<string, Prisma.Decimal>> {
+  const grouped = await client.auctionPlayer.groupBy({
+    by: ["categoryId"],
+    where: { auctionId, status: "SOLD", soldPrice: { not: null } },
+    _avg: { soldPrice: true },
+  });
+  return new Map(
+    grouped
+      .filter((g) => g._avg.soldPrice != null)
+      .map((g) => [g.categoryId, g._avg.soldPrice!.toDecimalPlaces(2)])
+  );
+}
+
+/** The price a fantasy pick costs. A player "selected by default" (the
+ * force-included self-pick, only possible when fantasySelfPickRequired is
+ * true) always costs their category's average — regardless of whether they
+ * were actually sold, and regardless of the auction's own pricing model —
+ * since a guaranteed pick isn't really a value judgment the way a freely
+ * chosen one is. Everyone else follows the auction's chosen pricingModel:
+ * either the real sold price (or category basePrice if unsold), or the
+ * category average for every pick alike. Either way, a category with no
+ * SOLD players at all has no average to fall back to, so it falls back
+ * further to basePrice. */
+function fantasyPrice(
+  auctionPlayer: {
+    status: string;
+    soldPrice: Prisma.Decimal | null;
+    categoryId: string;
+    category: { basePrice: Prisma.Decimal };
+  },
+  context: {
+    pricingModel: FantasyPricingModel;
+    categoryAverages: Map<string, Prisma.Decimal>;
+    isSelfPick: boolean;
+  }
+): Prisma.Decimal {
+  if (context.isSelfPick || context.pricingModel === "CATEGORY_AVERAGE") {
+    return context.categoryAverages.get(auctionPlayer.categoryId) ?? auctionPlayer.category.basePrice;
+  }
   if (auctionPlayer.status === "SOLD" && auctionPlayer.soldPrice != null) {
     return auctionPlayer.soldPrice;
   }
@@ -40,10 +85,17 @@ export async function getMaxRosterSize(auctionId: string): Promise<number> {
 
 /** The viewer's own auction-player entry for this specific auction, if they
  * were part of its pool — this is what guarantees them a spot on their own
- * fantasy team, the same way a manager's own pick is auto-included in the
- * real pre-auction draft. */
-async function findSelfAuctionPlayer(auctionId: string, rosterId: string, loginId: string) {
-  return prisma.auctionPlayer.findFirst({
+ * fantasy team (when fantasySelfPickRequired), the same way a manager's own
+ * pick is auto-included in the real pre-auction draft. Accepts an explicit
+ * client so callers running inside a transaction (repriceFantasyTeamPlayers)
+ * read that transaction's own snapshot. */
+async function findSelfAuctionPlayer(
+  auctionId: string,
+  rosterId: string,
+  loginId: string,
+  client: PrismaClientOrTx = prisma
+) {
+  return client.auctionPlayer.findFirst({
     where: {
       auctionId,
       player: { rosterId, loginId: { equals: loginId, mode: "insensitive" } },
@@ -51,18 +103,27 @@ async function findSelfAuctionPlayer(auctionId: string, rosterId: string, loginI
   });
 }
 
-/** Completed auctions this viewer was actually part of (i.e. eligible for a fantasy team). */
+/** Completed auctions this viewer is eligible to build a fantasy team for —
+ * either they were actually part of its player pool (the usual case), or
+ * the auction has fantasySelfPickRequired turned off, in which case being
+ * in the pool isn't required at all and every in-league viewer/manager is
+ * eligible. Deliberately doesn't early-return on a missing loginId: a user
+ * with none can still see/use an open (fantasySelfPickRequired: false)
+ * auction, so the loginId-based branch of the OR is just omitted for them
+ * rather than short-circuiting the whole function. */
 export async function listEligibleCompletedAuctionsForViewer(userId: string, leagueIds: string[] | null) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user?.loginId) return [];
 
   return prisma.auction.findMany({
     where: {
       status: "COMPLETED",
       tournament: leagueIds ? { leagueId: { in: leagueIds } } : undefined,
-      auctionPlayers: {
-        some: { player: { loginId: { equals: user.loginId, mode: "insensitive" } } },
-      },
+      OR: [
+        user?.loginId
+          ? { auctionPlayers: { some: { player: { loginId: { equals: user.loginId, mode: "insensitive" as const } } } } }
+          : undefined,
+        { fantasySelfPickRequired: false },
+      ].filter(Boolean) as Prisma.AuctionWhereInput[],
     },
     include: { tournament: true },
     orderBy: { completedAt: "desc" },
@@ -114,27 +175,27 @@ export async function getFantasyEligibility(auctionId: string, userId: string, l
     return { eligible: false as const, reason: "This auction hasn't completed yet" };
   }
 
+  // The loginId requirement is scoped to "needed to attempt a self-match,"
+  // not "needed to use the feature at all" — a user with no loginId can
+  // still be eligible when fantasySelfPickRequired is off.
   const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user?.loginId) return { eligible: false as const, reason: "Your account has no login ID" };
-  // An auction can only be created once its tournament has a roster
-  // attached (see auction.service.ts createAuction), so a COMPLETED
-  // auction's tournament always has one — this null check is just to
-  // satisfy the type, not a real runtime possibility.
-  if (!auction.tournament.rosterId) return { eligible: false as const, reason: "Auction not found" };
-
-  const selfAuctionPlayer = await findSelfAuctionPlayer(
-    auctionId,
-    auction.tournament.rosterId,
-    user.loginId
-  );
-  if (!selfAuctionPlayer) {
-    return {
-      eligible: false as const,
-      reason: "You weren't part of this auction's player pool, so you can't build a fantasy team for it",
-    };
+  let selfAuctionPlayerId: string | null = null;
+  if (user?.loginId && auction.tournament.rosterId) {
+    const self = await findSelfAuctionPlayer(auctionId, auction.tournament.rosterId, user.loginId);
+    selfAuctionPlayerId = self?.id ?? null;
   }
 
-  return { eligible: true as const, auction, selfAuctionPlayerId: selfAuctionPlayer.id };
+  if (auction.fantasySelfPickRequired) {
+    if (!user?.loginId) return { eligible: false as const, reason: "Your account has no login ID" };
+    if (!selfAuctionPlayerId) {
+      return {
+        eligible: false as const,
+        reason: "You weren't part of this auction's player pool, so you can't build a fantasy team for it",
+      };
+    }
+  }
+
+  return { eligible: true as const, auction, selfAuctionPlayerId };
 }
 
 /** All fantasy teams submitted for an auction, for the admin overview. */
@@ -241,29 +302,47 @@ export async function getMostPickedPlayersByCategory(auctionId: string, limit = 
     .filter((c) => c.players.length > 0);
 }
 
-export async function deleteFantasyTeam(fantasyTeamId: string) {
-  const { count } = await prisma.fantasyTeam.deleteMany({ where: { id: fantasyTeamId } });
+/** `ownerUserId` given: only deletes if it's also owned by that user (viewer
+ * self-service delete). Omitted: deletes by id alone (existing admin path). */
+export async function deleteFantasyTeam(fantasyTeamId: string, ownerUserId?: string) {
+  const { count } = await prisma.fantasyTeam.deleteMany({
+    where: { id: fantasyTeamId, ...(ownerUserId ? { userId: ownerUserId } : {}) },
+  });
   if (count === 0) {
     throw new ValidationError("Fantasy team not found");
   }
 }
 
-export async function getFantasyTeam(auctionId: string, userId: string) {
-  return prisma.fantasyTeam.findUnique({
-    where: { auctionId_userId: { auctionId, userId } },
+/** Every fantasy team a user has for one auction — plural now that
+ * Auction.fantasyMaxTeamsPerUser can be >1 (FantasyTeam's unique constraint
+ * on [auctionId, userId] was relaxed to a plain index for exactly this). */
+export async function listMyFantasyTeams(auctionId: string, userId: string) {
+  return prisma.fantasyTeam.findMany({
+    where: { auctionId, userId },
     include: {
       picks: { include: { auctionPlayer: { include: { player: true, category: true } } } },
     },
+    orderBy: { createdAt: "asc" },
   });
 }
 
-/** All auction players available for fantasy picking, priced as they'd cost. */
-export async function listFantasyPlayerPool(auctionId: string) {
-  const auctionPlayers = await prisma.auctionPlayer.findMany({
-    where: { auctionId },
-    include: { player: true, category: true },
-    orderBy: { player: { name: "asc" } },
-  });
+/** All auction players available for fantasy picking, priced as they'd cost
+ * for this specific viewer — `selfAuctionPlayerId` (their own force-included
+ * pick, if any and if required) prices differently from everyone else, so
+ * the pool is inherently viewer-specific, not a single shared price list. */
+export async function listFantasyPlayerPool(
+  auctionId: string,
+  pricingModel: FantasyPricingModel,
+  selfAuctionPlayerId: string | null
+) {
+  const [auctionPlayers, categoryAverages] = await Promise.all([
+    prisma.auctionPlayer.findMany({
+      where: { auctionId },
+      include: { player: true, category: true },
+      orderBy: { player: { name: "asc" } },
+    }),
+    computeCategoryAveragePrices(auctionId, prisma),
+  ]);
   return auctionPlayers.map((ap) => ({
     id: ap.id,
     name: ap.player.name,
@@ -271,7 +350,11 @@ export async function listFantasyPlayerPool(auctionId: string) {
     photoUrl: ap.player.photoUrl,
     categoryName: ap.category.name,
     status: ap.status,
-    price: fantasyPrice(ap).toString(),
+    price: fantasyPrice(ap, {
+      pricingModel,
+      categoryAverages,
+      isSelfPick: ap.id === selfAuctionPlayerId,
+    }).toString(),
     rating: ap.player.rating != null ? String(ap.player.rating) : null,
     battingRating: ap.player.battingRating != null ? String(ap.player.battingRating) : null,
     bowlingRating: ap.player.bowlingRating != null ? String(ap.player.bowlingRating) : null,
@@ -307,12 +390,112 @@ export async function updateFantasyLockDate(auctionId: string, fantasyLockDate: 
   return prisma.auction.update({ where: { id: auctionId }, data: { fantasyLockDate } });
 }
 
+/** Recomputes and overwrites every FantasyTeamPlayer.price in this auction
+ * from scratch, using the auction's current settings — the single place
+ * "existing snapshots are now stale, bring them back in sync" lives. Called
+ * from two places: a sold-price/category-base-price correction (the
+ * category average shifting, or a self-pick's stale sold-price snapshot,
+ * both need every affected pick repriced, not just the one player's own
+ * row), and updateFantasySettings when the pricing model itself changes.
+ * Always takes an explicit transaction client — never defaults to the
+ * top-level `prisma` — so it's never possible to accidentally read/write
+ * outside the caller's own transaction snapshot. Self-pick status is
+ * resolved per team (per user), since it's who's on the team that decides
+ * it, not anything about the auction as a whole. */
+export async function repriceFantasyTeamPlayers(auctionId: string, tx: Prisma.TransactionClient): Promise<void> {
+  const auction = await tx.auction.findUniqueOrThrow({
+    where: { id: auctionId },
+    include: { tournament: true },
+  });
+  const categoryAverages = await computeCategoryAveragePrices(auctionId, tx);
+  const teams = await tx.fantasyTeam.findMany({
+    where: { auctionId },
+    include: { user: true, picks: { include: { auctionPlayer: { include: { category: true } } } } },
+  });
+
+  for (const team of teams) {
+    let selfAuctionPlayerId: string | null = null;
+    if (auction.fantasySelfPickRequired && team.user.loginId && auction.tournament.rosterId) {
+      const self = await findSelfAuctionPlayer(auctionId, auction.tournament.rosterId, team.user.loginId, tx);
+      selfAuctionPlayerId = self?.id ?? null;
+    }
+    for (const pick of team.picks) {
+      const price = fantasyPrice(pick.auctionPlayer, {
+        pricingModel: auction.fantasyPricingModel,
+        categoryAverages,
+        isSelfPick: pick.auctionPlayerId === selfAuctionPlayerId,
+      });
+      await tx.fantasyTeamPlayer.update({ where: { id: pick.id }, data: { price } });
+    }
+  }
+}
+
+/** Admin/League-Admin-only: the three fantasy configuration knobs for an
+ * auction. Editable any time, not write-once, same posture as
+ * updateFantasyLockDate — lets an admin pre-configure at auction creation
+ * time, not just after it concludes. Lowering maxTeamsPerUser below
+ * someone's current team count is intentionally allowed and never touches
+ * existing rows — same "only the threshold future creation is checked
+ * against changes" convention as updateLeagueSettings's cap-lowering. */
+export async function updateFantasySettings(
+  auctionId: string,
+  input: {
+    pricingModel?: FantasyPricingModel;
+    selfPickRequired?: boolean;
+    maxTeamsPerUser?: number;
+  }
+) {
+  await assertAuctionLeagueNotReadOnly(auctionId);
+  const auction = await prisma.auction.findUnique({ where: { id: auctionId } });
+  if (!auction) throw new ValidationError("Auction not found");
+  if (
+    input.maxTeamsPerUser !== undefined &&
+    (!Number.isInteger(input.maxTeamsPerUser) || input.maxTeamsPerUser < 1)
+  ) {
+    throw new ValidationError("Max teams per user must be at least 1");
+  }
+
+  const data = {
+    fantasyPricingModel: input.pricingModel ?? auction.fantasyPricingModel,
+    fantasySelfPickRequired: input.selfPickRequired ?? auction.fantasySelfPickRequired,
+    fantasyMaxTeamsPerUser: input.maxTeamsPerUser ?? auction.fantasyMaxTeamsPerUser,
+  };
+
+  // Flipping the pricing model leaves every existing FantasyTeamPlayer.price
+  // stale until something else happens to touch it — reprice immediately,
+  // in the same transaction as the setting change, rather than leaving
+  // different teams priced under different models depending on when they
+  // last happened to resubmit.
+  const pricingModelChanged =
+    input.pricingModel !== undefined && input.pricingModel !== auction.fantasyPricingModel;
+  if (pricingModelChanged) {
+    return prisma.$transaction(async (tx) => {
+      const updated = await tx.auction.update({ where: { id: auctionId }, data });
+      await repriceFantasyTeamPlayers(auctionId, tx);
+      return updated;
+    });
+  }
+  return prisma.auction.update({ where: { id: auctionId }, data });
+}
+
+/**
+ * Creates or edits one of a user's fantasy teams for an auction.
+ *
+ * `fantasyTeamId` decides which: **omitted always means "create a new
+ * team"** (subject to the fantasyMaxTeamsPerUser cap); **provided means
+ * "edit this specific team"** (ownership-verified, never subject to the cap
+ * since it isn't a new team). This is a deliberate contract every caller
+ * must respect — omitting it on what the user intends as an edit would get
+ * silently treated as a new-team attempt and rejected once at the cap,
+ * instead of updating their existing team.
+ */
 export async function submitFantasyTeam(
   auctionId: string,
   userId: string,
   auctionPlayerIds: string[],
   leagueIds: string[] | null,
-  name?: string
+  name?: string,
+  fantasyTeamId?: string
 ) {
   const auction = await prisma.auction.findUnique({
     where: { id: auctionId },
@@ -334,25 +517,43 @@ export async function submitFantasyTeam(
   }
 
   const user = await prisma.user.findUnique({ where: { id: userId } });
-  if (!user?.loginId) throw new ValidationError("Your account has no login ID");
-  // Same invariant as getFantasyEligibility above — a COMPLETED auction's
-  // tournament always has a roster attached.
-  if (!auction.tournament.rosterId) throw new ValidationError("Auction not found");
 
-  const selfAuctionPlayer = await findSelfAuctionPlayer(
-    auctionId,
-    auction.tournament.rosterId,
-    user.loginId
-  );
-  if (!selfAuctionPlayer) {
-    throw new ValidationError("You weren't part of this auction's player pool");
+  let existingTeamId: string | null = null;
+  if (fantasyTeamId) {
+    const existing = await prisma.fantasyTeam.findFirst({
+      where: { id: fantasyTeamId, auctionId, userId },
+    });
+    if (!existing) throw new ValidationError("Fantasy team not found");
+    existingTeamId = existing.id;
+  } else {
+    const existingCount = await prisma.fantasyTeam.count({ where: { auctionId, userId } });
+    if (existingCount >= auction.fantasyMaxTeamsPerUser) {
+      throw new SquadCapExceededError(
+        `You can have at most ${auction.fantasyMaxTeamsPerUser} fantasy team(s) for this auction`
+      );
+    }
   }
 
-  // You're always on your own fantasy team, whether or not the client sent your
-  // own pick — this only ever fills one of the total squad slots, same as a
-  // manager's own guaranteed pick in the real pre-auction draft.
+  // A self-match is still looked up whenever possible (needed either way to
+  // price/highlight "you" on the roster), but only REQUIRED — and only
+  // force-included/exempted from the unsold-picks rule — when the auction's
+  // fantasySelfPickRequired setting is on.
+  let selfAuctionPlayer: Awaited<ReturnType<typeof findSelfAuctionPlayer>> = null;
+  if (user?.loginId && auction.tournament.rosterId) {
+    selfAuctionPlayer = await findSelfAuctionPlayer(auctionId, auction.tournament.rosterId, user.loginId);
+  }
+  if (auction.fantasySelfPickRequired) {
+    if (!user?.loginId) throw new ValidationError("Your account has no login ID");
+    if (!selfAuctionPlayer) throw new ValidationError("You weren't part of this auction's player pool");
+  }
+  const forcedSelfId = auction.fantasySelfPickRequired ? selfAuctionPlayer?.id : undefined;
+
+  // When required, you're always on your own fantasy team, whether or not
+  // the client sent your own pick — this only ever fills one of the total
+  // squad slots, same as a manager's own guaranteed pick in the real
+  // pre-auction draft. When not required, no player is force-added.
   const uniqueIds = new Set(auctionPlayerIds);
-  uniqueIds.add(selfAuctionPlayer.id);
+  if (forcedSelfId) uniqueIds.add(forcedSelfId);
 
   const idsArray = Array.from(uniqueIds);
   const maxRosterSize = await getMaxRosterSize(auctionId);
@@ -368,17 +569,23 @@ export async function submitFantasyTeam(
     throw new ValidationError("One or more selected players are not part of this auction");
   }
   // Nobody actually acquired an unsold player, so there's no real-world team
-  // for them to represent — the guaranteed self-pick is exempt, matching how
-  // it's already force-included above regardless of status.
-  const unsoldPicks = players.filter((ap) => ap.status !== "SOLD" && ap.id !== selfAuctionPlayer.id);
+  // for them to represent — the guaranteed self-pick is exempt (only when
+  // self-pick is actually required; otherwise an unsold self-match is just
+  // a normal pick, and normal picks can never be unsold).
+  const unsoldPicks = players.filter((ap) => ap.status !== "SOLD" && ap.id !== forcedSelfId);
   if (unsoldPicks.length > 0) {
     throw new ValidationError("Unsold players can't be picked for a fantasy team");
   }
 
-  const totalPrice = players.reduce(
-    (sum, ap) => sum.plus(fantasyPrice(ap)),
-    new Prisma.Decimal(0)
-  );
+  const categoryAverages = await computeCategoryAveragePrices(auctionId, prisma);
+  const priceFor = (ap: (typeof players)[number]) =>
+    fantasyPrice(ap, {
+      pricingModel: auction.fantasyPricingModel,
+      categoryAverages,
+      isSelfPick: ap.id === forcedSelfId,
+    });
+
+  const totalPrice = players.reduce((sum, ap) => sum.plus(priceFor(ap)), new Prisma.Decimal(0));
   if (totalPrice.greaterThan(auction.teamBudget)) {
     throw new InsufficientBudgetError(
       `Total price of selected players (${totalPrice.toString()}) exceeds the budget (${auction.teamBudget.toString()})`
@@ -390,22 +597,21 @@ export async function submitFantasyTeam(
   // every other user-provided display name in this codebase.
   const trimmedName = name?.trim() || null;
 
-  // Re-submittable: upsert the team row (keeping its id/createdAt stable
-  // across edits) and replace its picks wholesale, same delete-then-recreate
-  // pattern the manager pre-auction draft already uses for its own
-  // keep-editing-until-locked flow (see preAuctionDraft.service.ts's submitDraft).
+  // Re-submittable: create-or-update the team row (keeping its id/createdAt
+  // stable across edits when editing) and replace its picks wholesale, same
+  // delete-then-recreate pattern the manager pre-auction draft already uses
+  // for its own keep-editing-until-locked flow (see
+  // preAuctionDraft.service.ts's submitDraft).
   return prisma.$transaction(async (tx) => {
-    const fantasyTeam = await tx.fantasyTeam.upsert({
-      where: { auctionId_userId: { auctionId, userId } },
-      create: { auctionId, userId, name: trimmedName },
-      update: { name: trimmedName },
-    });
+    const fantasyTeam = existingTeamId
+      ? await tx.fantasyTeam.update({ where: { id: existingTeamId }, data: { name: trimmedName } })
+      : await tx.fantasyTeam.create({ data: { auctionId, userId, name: trimmedName } });
     await tx.fantasyTeamPlayer.deleteMany({ where: { fantasyTeamId: fantasyTeam.id } });
     await tx.fantasyTeamPlayer.createMany({
       data: players.map((ap) => ({
         fantasyTeamId: fantasyTeam.id,
         auctionPlayerId: ap.id,
-        price: fantasyPrice(ap),
+        price: priceFor(ap),
       })),
     });
     return tx.fantasyTeam.findUniqueOrThrow({

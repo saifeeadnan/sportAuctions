@@ -9,6 +9,7 @@ import { FantasyStandingsList } from "@/components/fantasy/FantasyStandingsList"
 import { MostPickedPlayersTable } from "@/components/fantasy/MostPickedPlayersTable";
 import { UploadPointsForm } from "@/components/admin/UploadPointsForm";
 import { EditFantasyLockDateForm } from "@/components/admin/EditFantasyLockDateForm";
+import { EditFantasySettingsForm } from "@/components/admin/EditFantasySettingsForm";
 import { SponsorRibbon } from "@/components/tournament/SponsorRibbon";
 import { formatCalendarDate, toDateInputValue } from "@/lib/dates";
 import { card } from "@/lib/ui";
@@ -58,6 +59,13 @@ export default async function FantasyTeamsPage({
           effectiveLockDate={toDateInputValue(effectiveLockDate)}
         />
       </div>
+
+      <EditFantasySettingsForm
+        auctionId={auction.id}
+        pricingModel={auction.fantasyPricingModel}
+        selfPickRequired={auction.fantasySelfPickRequired}
+        maxTeamsPerUser={auction.fantasyMaxTeamsPerUser}
+      />
 
       <details className={card}>
         <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">

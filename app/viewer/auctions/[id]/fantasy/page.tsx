@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { requireRole, allLeagueIds } from "@/lib/auth/guards";
 import {
   getFantasyEligibility,
-  getFantasyTeam,
+  listMyFantasyTeams,
   getFantasyStandings,
   getMostPickedPlayersByCategory,
   listFantasyPlayerPool,
@@ -11,7 +11,7 @@ import {
 } from "@/lib/services/fantasyTeam.service";
 import { resolveFantasySort, sortFantasyStandings, resolveFantasyPage } from "@/lib/fantasyStandingsSort";
 import { listTournamentSponsors } from "@/lib/services/tournamentSponsor.service";
-import { FantasyTeamForm } from "@/components/viewer/FantasyTeamForm";
+import { FantasyTeamsManager } from "@/components/viewer/FantasyTeamsManager";
 import { FantasyStandingsList } from "@/components/fantasy/FantasyStandingsList";
 import { MostPickedPlayersTable } from "@/components/fantasy/MostPickedPlayersTable";
 import { SponsorRibbon } from "@/components/tournament/SponsorRibbon";
@@ -41,12 +41,13 @@ export default async function FantasyTeamPage({
   const { auction } = eligibility;
   const locked = isFantasyEditingLocked(auction);
   const effectiveLockDate = auction.fantasyLockDate ?? auction.tournament.startDate;
-  const existingTeam = await getFantasyTeam(id, session.user.id);
+  const myTeams = await listMyFantasyTeams(id, session.user.id);
   const sponsors = await listTournamentSponsors(auction.tournament.id);
 
   // Once locked, everyone eligible sees the same read-only standings — the
   // admin overview, minus admin-only controls — rather than just their own
-  // team; their own row is highlighted within it instead of a separate card.
+  // team(s); their own rows are highlighted within it instead of a separate
+  // card.
   let standingsSection: React.ReactNode = null;
   if (locked) {
     const { hasPoints, standings: rankedStandings } = await getFantasyStandings(id);
@@ -54,16 +55,22 @@ export default async function FantasyTeamPage({
     const { sortKey, sortDir } = resolveFantasySort(rawSort, rawDir);
     const page = resolveFantasyPage(rawPage);
     const standings = sortFantasyStandings(rankedStandings, sortKey, sortDir);
-    const myStanding = rankedStandings.find((s) => s.team.userId === session.user.id);
+    // A user can have more than one team, so this is every one of their
+    // rows, not just the first match.
+    const myStandings = rankedStandings.filter((s) => s.team.userId === session.user.id);
     standingsSection =
       standings.length === 0 ? (
         <p className="text-black/60 dark:text-white/60">No fantasy teams were submitted.</p>
       ) : (
         <>
-          {myStanding && (
-            <p className="text-sm font-medium">
-              Current rank: #{myStanding.rank} of {standings.length}
-            </p>
+          {myStandings.length > 0 && (
+            <div className="text-sm font-medium flex flex-col gap-0.5">
+              {myStandings.map((s) => (
+                <p key={s.team.id}>
+                  {s.team.name || "Your team"} — current rank: #{s.rank} of {standings.length}
+                </p>
+              ))}
+            </div>
           )}
           <FantasyStandingsList
             auctionId={auction.id}
@@ -101,7 +108,7 @@ export default async function FantasyTeamPage({
         {locked && <> &middot; budget: {String(auction.teamBudget)}</>}
       </p>
 
-      {locked && !existingTeam && (
+      {locked && myTeams.length === 0 && (
         <p className="text-black/60 dark:text-white/60">
           You didn&apos;t save a fantasy team in time.
         </p>
@@ -110,14 +117,23 @@ export default async function FantasyTeamPage({
       {locked ? (
         standingsSection
       ) : (
-        <FantasyTeamForm
+        <FantasyTeamsManager
           auctionId={auction.id}
           cap={await getMaxRosterSize(auction.id)}
           budget={String(auction.teamBudget)}
-          players={await listFantasyPlayerPool(auction.id)}
+          players={await listFantasyPlayerPool(
+            auction.id,
+            auction.fantasyPricingModel,
+            eligibility.selfAuctionPlayerId
+          )}
           lockedPlayerId={eligibility.selfAuctionPlayerId}
-          initialSelected={existingTeam?.picks.map((p) => p.auctionPlayerId) ?? []}
-          initialName={existingTeam?.name ?? undefined}
+          selfPickRequired={auction.fantasySelfPickRequired}
+          maxTeams={auction.fantasyMaxTeamsPerUser}
+          initialTeams={myTeams.map((t) => ({
+            id: t.id,
+            name: t.name,
+            picks: t.picks.map((p) => p.auctionPlayerId),
+          }))}
         />
       )}
 
