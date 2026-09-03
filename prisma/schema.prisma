@@ -376,6 +376,13 @@ model Auction {
   fantasyPricingModel     FantasyPricingModel @default(SOLD_PRICE)
   fantasySelfPickRequired Boolean             @default(true)
   fantasyMaxTeamsPerUser  Int                 @default(1)
+  // Fantasy teams default to a viewer/spectator feature — a user whose role
+  // in this auction's own league is TEAM_MANAGER can't build one unless an
+  // admin opts this auction in. Existing manager-built teams (from before
+  // this setting existed) are never touched — only future create/edit
+  // attempts are gated, same "grandfather existing rows" posture as
+  // fantasyMaxTeamsPerUser being lowered.
+  fantasyManagersAllowed  Boolean             @default(false)
 
   categories     AuctionCategory[]
   auctionPlayers AuctionPlayer[]

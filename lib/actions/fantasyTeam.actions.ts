@@ -66,6 +66,7 @@ export async function updateFantasySettingsAction(
     pricingModel?: FantasyPricingModel;
     selfPickRequired?: boolean;
     maxTeamsPerUser?: number;
+    managersAllowed?: boolean;
   }
 ): Promise<ActionResult> {
   return toActionResult(async () => {

@@ -103,6 +103,21 @@ async function findSelfAuctionPlayer(
   });
 }
 
+/** True when this user's role in the auction's own league is TEAM_MANAGER
+ * and the auction hasn't opted into fantasyManagersAllowed — fantasy teams
+ * default to a viewer/spectator feature. Queries LeagueMembership fresh
+ * rather than trusting a caller-supplied role, since the functions that use
+ * this (getFantasyEligibility, submitFantasyTeam) only ever receive a
+ * userId, never a session. Scoped to the auction's specific league — a user
+ * who's TEAM_MANAGER in some other league is unaffected here. */
+async function isManagerBlocked(userId: string, leagueId: string, managersAllowed: boolean): Promise<boolean> {
+  if (managersAllowed) return false;
+  const membership = await prisma.leagueMembership.findUnique({
+    where: { userId_leagueId: { userId, leagueId } },
+  });
+  return membership?.role === "TEAM_MANAGER";
+}
+
 /** Completed auctions this viewer is eligible to build a fantasy team for —
  * either they were actually part of its player pool (the usual case), or
  * the auction has fantasySelfPickRequired turned off, in which case being
@@ -110,7 +125,10 @@ async function findSelfAuctionPlayer(
  * eligible. Deliberately doesn't early-return on a missing loginId: a user
  * with none can still see/use an open (fantasySelfPickRequired: false)
  * auction, so the loginId-based branch of the OR is just omitted for them
- * rather than short-circuiting the whole function. */
+ * rather than short-circuiting the whole function. Separately, a TEAM_MANAGER
+ * is excluded unless fantasyManagersAllowed is on for that auction — same
+ * rule as isManagerBlocked, expressed as a query filter instead of a
+ * per-auction lookup, since this lists many auctions at once. */
 export async function listEligibleCompletedAuctionsForViewer(userId: string, leagueIds: string[] | null) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
 
@@ -124,6 +142,14 @@ export async function listEligibleCompletedAuctionsForViewer(userId: string, lea
           : undefined,
         { fantasySelfPickRequired: false },
       ].filter(Boolean) as Prisma.AuctionWhereInput[],
+      AND: [
+        {
+          OR: [
+            { fantasyManagersAllowed: true },
+            { tournament: { league: { memberships: { none: { userId, role: "TEAM_MANAGER" } } } } },
+          ],
+        },
+      ],
     },
     include: { tournament: true },
     orderBy: { completedAt: "desc" },
@@ -173,6 +199,9 @@ export async function getFantasyEligibility(auctionId: string, userId: string, l
   }
   if (auction.status !== "COMPLETED") {
     return { eligible: false as const, reason: "This auction hasn't completed yet" };
+  }
+  if (await isManagerBlocked(userId, auction.tournament.leagueId, auction.fantasyManagersAllowed)) {
+    return { eligible: false as const, reason: "Team managers can't build a fantasy team for this auction" };
   }
 
   // The loginId requirement is scoped to "needed to attempt a self-match,"
@@ -430,19 +459,22 @@ export async function repriceFantasyTeamPlayers(auctionId: string, tx: Prisma.Tr
   }
 }
 
-/** Admin/League-Admin-only: the three fantasy configuration knobs for an
+/** Admin/League-Admin-only: the four fantasy configuration knobs for an
  * auction. Editable any time, not write-once, same posture as
  * updateFantasyLockDate — lets an admin pre-configure at auction creation
  * time, not just after it concludes. Lowering maxTeamsPerUser below
- * someone's current team count is intentionally allowed and never touches
- * existing rows — same "only the threshold future creation is checked
- * against changes" convention as updateLeagueSettings's cap-lowering. */
+ * someone's current team count, or turning managersAllowed off after
+ * managers already have teams, is intentionally allowed and never touches
+ * existing rows — same "only future create/edit attempts are checked
+ * against the current setting" convention as updateLeagueSettings's
+ * cap-lowering. */
 export async function updateFantasySettings(
   auctionId: string,
   input: {
     pricingModel?: FantasyPricingModel;
     selfPickRequired?: boolean;
     maxTeamsPerUser?: number;
+    managersAllowed?: boolean;
   }
 ) {
   await assertAuctionLeagueNotReadOnly(auctionId);
@@ -459,6 +491,7 @@ export async function updateFantasySettings(
     fantasyPricingModel: input.pricingModel ?? auction.fantasyPricingModel,
     fantasySelfPickRequired: input.selfPickRequired ?? auction.fantasySelfPickRequired,
     fantasyMaxTeamsPerUser: input.maxTeamsPerUser ?? auction.fantasyMaxTeamsPerUser,
+    fantasyManagersAllowed: input.managersAllowed ?? auction.fantasyManagersAllowed,
   };
 
   // Flipping the pricing model leaves every existing FantasyTeamPlayer.price
@@ -514,6 +547,9 @@ export async function submitFantasyTeam(
     throw new InvalidStateTransitionError(
       "Fantasy team picks are locked and can no longer be changed"
     );
+  }
+  if (await isManagerBlocked(userId, auction.tournament.leagueId, auction.fantasyManagersAllowed)) {
+    throw new ValidationError("Team managers can't build a fantasy team for this auction");
   }
 
   const user = await prisma.user.findUnique({ where: { id: userId } });

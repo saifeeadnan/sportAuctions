@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import bcrypt from "bcryptjs";
 import { resetDb } from "../helpers/resetDb";
-import { createAuctionReadyFixture } from "../helpers/fixtures";
+import { createAuctionReadyFixture, createFixtureLeague, createFixtureManager } from "../helpers/fixtures";
 import { prisma } from "@/lib/prisma";
 import { createAuction, openPreAuction, lockPreAuction, startBidding } from "@/lib/services/auction.service";
 import { adminAssignPlayer, concludeAuction } from "@/lib/services/bidding.service";
@@ -11,6 +11,7 @@ import {
   updateFantasyLockDate,
   updateFantasySettings,
   getFantasyEligibility,
+  listEligibleCompletedAuctionsForViewer,
   listMyFantasyTeams,
   listFantasyPlayerPool,
   getMostPickedPlayersByCategory,
@@ -84,9 +85,16 @@ async function buildFantasyEligibleFixture(options?: { leaveSelfPlayerUnsold?: b
   // future so submitFantasyTeam's own edit-window check doesn't fire first.
   await prisma.tournament.update({ where: { id: fx.tournament.id }, data: { startDate: FUTURE } });
 
+  // createAuctionReadyFixture already gives "Team 1" a real manager with a
+  // TEAM_MANAGER LeagueMembership in this same league — exactly what the
+  // fantasyManagersAllowed tests need, for free.
+  const manager = await prisma.user.findUniqueOrThrow({ where: { id: fx.teams[0].managerId! } });
+
   return {
     auction,
+    league: fx.league,
     viewer,
+    manager,
     selfAuctionPlayer: await prisma.auctionPlayer.findUniqueOrThrow({ where: { id: selfAuctionPlayer.id } }),
     soldAuctionPlayer,
     unsoldAuctionPlayer,
@@ -568,5 +576,75 @@ describe("getMostPickedPlayersByCategory with multiple teams per user", () => {
     const regular = result.find((c) => c.categoryName === "Regular")!;
     const soldPlayerEntry = regular.players.find((p) => p.playerId === fx.soldAuctionPlayer.playerId)!;
     expect(soldPlayerEntry.teamCount).toBe(2);
+  });
+});
+
+describe("fantasyManagersAllowed", () => {
+  it("blocks a TEAM_MANAGER's eligibility by default, with a manager-specific reason", async () => {
+    const fx = await buildFantasyEligibleFixture();
+
+    const result = await getFantasyEligibility(fx.auction.id, fx.manager.id, null);
+    expect(result.eligible).toBe(false);
+    if (!result.eligible) expect(result.reason).toMatch(/Team managers can't build/);
+  });
+
+  it("falls through to the ordinary self-pick check once the setting is turned on", async () => {
+    const fx = await buildFantasyEligibleFixture();
+    await updateFantasySettings(fx.auction.id, { managersAllowed: true });
+
+    // The manager gate is lifted, but the manager still has no self-match —
+    // this now fails for the same reason a self-unmatched viewer would.
+    const result = await getFantasyEligibility(fx.auction.id, fx.manager.id, null);
+    expect(result.eligible).toBe(false);
+    if (!result.eligible) expect(result.reason).toMatch(/weren't part of this auction's player pool/);
+  });
+
+  it("lets an allowed manager submit a team once self-pick isn't required either", async () => {
+    const fx = await buildFantasyEligibleFixture();
+    await updateFantasySettings(fx.auction.id, { managersAllowed: true, selfPickRequired: false });
+
+    const team = await submitFantasyTeam(fx.auction.id, fx.manager.id, [fx.soldAuctionPlayer.id], null);
+    expect(team.picks.map((p) => p.auctionPlayerId)).toEqual([fx.soldAuctionPlayer.id]);
+  });
+
+  it("submitFantasyTeam rejects a blocked manager directly, not just the eligibility check", async () => {
+    const fx = await buildFantasyEligibleFixture();
+    // Isolate the manager gate: turn off self-pick so that's not what
+    // rejects this call.
+    await updateFantasySettings(fx.auction.id, { selfPickRequired: false });
+
+    await expect(
+      submitFantasyTeam(fx.auction.id, fx.manager.id, [fx.soldAuctionPlayer.id], null)
+    ).rejects.toThrow(/Team managers can't build/);
+  });
+
+  it("doesn't block a TEAM_MANAGER whose managed league is unrelated to this auction's own league", async () => {
+    const fx = await buildFantasyEligibleFixture();
+    const otherLeague = await createFixtureLeague();
+    const otherLeagueManager = await createFixtureManager(otherLeague.id);
+    // Self-matched to "Sold Player" in *this* auction's roster — otherwise
+    // eligible, so a passing result proves the manager gate didn't leak
+    // across leagues, not that some other check happened to also fail.
+    await prisma.player.update({
+      where: { id: fx.soldAuctionPlayer.playerId },
+      data: { loginId: otherLeagueManager.loginId },
+    });
+
+    const result = await getFantasyEligibility(fx.auction.id, otherLeagueManager.id, null);
+    expect(result.eligible).toBe(true);
+  });
+
+  it("excludes a blocked manager's auction from listEligibleCompletedAuctionsForViewer, then includes it once allowed", async () => {
+    const fx = await buildFantasyEligibleFixture();
+    // Take self-pick out of the equation so only the manager gate is under
+    // test here.
+    await updateFantasySettings(fx.auction.id, { selfPickRequired: false });
+
+    const before = await listEligibleCompletedAuctionsForViewer(fx.manager.id, null);
+    expect(before.map((a) => a.id)).not.toContain(fx.auction.id);
+
+    await updateFantasySettings(fx.auction.id, { managersAllowed: true });
+    const after = await listEligibleCompletedAuctionsForViewer(fx.manager.id, null);
+    expect(after.map((a) => a.id)).toContain(fx.auction.id);
   });
 });

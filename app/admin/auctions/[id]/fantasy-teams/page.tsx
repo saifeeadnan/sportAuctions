@@ -65,6 +65,7 @@ export default async function FantasyTeamsPage({
         pricingModel={auction.fantasyPricingModel}
         selfPickRequired={auction.fantasySelfPickRequired}
         maxTeamsPerUser={auction.fantasyMaxTeamsPerUser}
+        managersAllowed={auction.fantasyManagersAllowed}
       />
 
       <details className={card}>

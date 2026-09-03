@@ -16,17 +16,20 @@ export function EditFantasySettingsForm({
   pricingModel,
   selfPickRequired,
   maxTeamsPerUser,
+  managersAllowed,
 }: {
   auctionId: string;
   pricingModel: FantasyPricingModel;
   selfPickRequired: boolean;
   maxTeamsPerUser: number;
+  managersAllowed: boolean;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pricingModelValue, setPricingModelValue] = useState<FantasyPricingModel>(pricingModel);
   const [selfPickRequiredValue, setSelfPickRequiredValue] = useState(selfPickRequired);
   const [maxTeamsValue, setMaxTeamsValue] = useState(String(maxTeamsPerUser));
+  const [managersAllowedValue, setManagersAllowedValue] = useState(managersAllowed);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,6 +37,7 @@ export function EditFantasySettingsForm({
     setPricingModelValue(pricingModel);
     setSelfPickRequiredValue(selfPickRequired);
     setMaxTeamsValue(String(maxTeamsPerUser));
+    setManagersAllowedValue(managersAllowed);
     setError(null);
   }
 
@@ -46,7 +50,8 @@ export function EditFantasySettingsForm({
       >
         Fantasy settings ({PRICING_MODEL_LABELS[pricingModel]}
         {!selfPickRequired && ", self-pick optional"}
-        {maxTeamsPerUser > 1 && `, up to ${maxTeamsPerUser} teams`})
+        {maxTeamsPerUser > 1 && `, up to ${maxTeamsPerUser} teams`}
+        {managersAllowed && ", managers allowed"})
       </button>
     );
   }
@@ -59,6 +64,7 @@ export function EditFantasySettingsForm({
       pricingModel: pricingModelValue,
       selfPickRequired: selfPickRequiredValue,
       maxTeamsPerUser: maxTeamsPerUserValue,
+      managersAllowed: managersAllowedValue,
     });
     setLoading(false);
     if (result.error) {
@@ -107,6 +113,15 @@ export function EditFantasySettingsForm({
           onChange={(e) => setMaxTeamsValue(e.target.value)}
           className={`${inputClass} py-1 text-xs w-20`}
         />
+      </label>
+      <label className="flex items-center gap-2 text-xs">
+        <input
+          type="checkbox"
+          checked={managersAllowedValue}
+          onChange={(e) => setManagersAllowedValue(e.target.checked)}
+        />
+        Allow team managers to build a fantasy team — off by default, since fantasy teams are a
+        viewer/spectator feature
       </label>
       <div className="flex items-center gap-2">
         <button
