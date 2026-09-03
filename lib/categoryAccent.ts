@@ -88,3 +88,37 @@ function hashString(input: string): number {
 export function categoryAccent(categoryName: string): CategoryAccent {
   return PALETTE[hashString(categoryName) % PALETTE.length];
 }
+
+/**
+ * Resolves every category in a known, bounded set (e.g. "every category on
+ * this auction's highlights page") to a *distinct* palette entry — plain
+ * categoryAccent() has no memory of sibling categories, so two names can
+ * legitimately hash to the same hue (a real collision users noticed, not
+ * just theoretical). Each name keeps its usual hash-derived color when that
+ * slot is still free; only an actual collision gets nudged to the nearest
+ * free slot, so results stay stable as long as the category set doesn't
+ * change. Beyond 7 distinct names, the palette is exhausted and reuse
+ * becomes unavoidable — same graceful-degradation behavior as
+ * categoryAccent() itself once you're this deep into a hash-mod palette.
+ */
+export function assignDistinctCategoryAccents(categoryNames: string[]): Map<string, CategoryAccent> {
+  const uniqueSorted = [...new Set(categoryNames)].sort();
+  const used = new Set<number>();
+  const result = new Map<string, CategoryAccent>();
+
+  for (const name of uniqueSorted) {
+    const preferred = hashString(name) % PALETTE.length;
+    let index = preferred;
+    for (let attempt = 0; attempt < PALETTE.length; attempt++) {
+      const candidate = (preferred + attempt) % PALETTE.length;
+      if (!used.has(candidate)) {
+        index = candidate;
+        break;
+      }
+    }
+    used.add(index);
+    result.set(name, PALETTE[index]);
+  }
+
+  return result;
+}

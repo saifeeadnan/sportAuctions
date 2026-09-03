@@ -3,7 +3,7 @@ import { Bebas_Neue } from "next/font/google";
 import { getAuctionHighlights } from "@/lib/services/auctionHighlights.service";
 import { listTournamentSponsors } from "@/lib/services/tournamentSponsor.service";
 import { SponsorRibbon } from "@/components/tournament/SponsorRibbon";
-import { categoryAccent } from "@/lib/categoryAccent";
+import { assignDistinctCategoryAccents, type CategoryAccent } from "@/lib/categoryAccent";
 
 const displayFont = Bebas_Neue({ weight: "400", subsets: ["latin"] });
 
@@ -31,7 +31,17 @@ export default async function HighlightsPage({
   if (!highlights) notFound();
 
   const sponsors = await listTournamentSponsors(highlights.tournamentId);
-  const maxSpend = Math.max(1, ...highlights.spendByCategory.map((c) => Number(c.totalSpent)));
+  const maxAvgPrice = Math.max(
+    1,
+    ...highlights.spendByCategory.map((c) => Number(c.totalSpent) / c.playersSold)
+  );
+  // spendByCategory covers every category with at least one sale — a
+  // superset of biggestBuyByCategory/teamCaptains/bestValuePick's category
+  // sets — so resolving distinct colors against it guarantees every
+  // category shown anywhere on this page gets its own color.
+  const accentByCategory = assignDistinctCategoryAccents(
+    highlights.spendByCategory.map((c) => c.categoryName)
+  );
 
   return (
     <div className="dark">
@@ -86,6 +96,7 @@ export default async function HighlightsPage({
                     playerName={b.playerName}
                     photoUrl={b.photoUrl}
                     categoryName={b.categoryName}
+                    accent={accentByCategory.get(b.categoryName)!}
                     teamName={b.teamName}
                     price={b.price}
                     bidCount={b.bidCount}
@@ -109,6 +120,7 @@ export default async function HighlightsPage({
                     playerName={c.playerName}
                     photoUrl={c.photoUrl}
                     categoryName={c.categoryName}
+                    accent={accentByCategory.get(c.categoryName)!}
                     teamName={c.teamName}
                     price={c.price}
                     emphasizeTeamName
@@ -127,6 +139,7 @@ export default async function HighlightsPage({
                   playerName={highlights.bestValuePick.playerName}
                   photoUrl={highlights.bestValuePick.photoUrl}
                   categoryName={highlights.bestValuePick.categoryName}
+                  accent={accentByCategory.get(highlights.bestValuePick.categoryName)!}
                   teamName={highlights.bestValuePick.teamName}
                   price={highlights.bestValuePick.price}
                   featured
@@ -135,41 +148,48 @@ export default async function HighlightsPage({
             )
           )}
 
-          {/* Spend by category — horizontal bar chart */}
+          {/* Spend by category — a dot (lollipop) plot keyed on average price
+              per player, not total spend: "how much does a typical Gold
+              player go for" is a more interesting recap stat than a raw
+              total, which is partly just a function of how many players
+              landed in that category. Total spent and player count ride
+              along as supporting text rather than a second scale — a bar's
+              length still means exactly one thing. */}
           {highlights.spendByCategory.length > 0 && (
             <section className="flex flex-col gap-4">
               <h2 className="text-xs font-semibold uppercase tracking-[0.25em] text-indigo-300/80 text-center">
                 Spend by category
               </h2>
-              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5 flex flex-col gap-4">
+              <div className="rounded-xl border border-white/10 bg-white/[0.03] p-5 flex flex-col gap-5">
                 {highlights.spendByCategory.map((c) => {
-                  const accent = categoryAccent(c.categoryName);
-                  const pct = Math.max(4, (Number(c.totalSpent) / maxSpend) * 100);
+                  const accent = accentByCategory.get(c.categoryName)!;
+                  const avgPrice = Math.round(Number(c.totalSpent) / c.playersSold);
+                  const pct = Math.max(4, (avgPrice / maxAvgPrice) * 100);
                   return (
-                    <div key={c.categoryName} className="flex flex-col gap-1.5">
-                      <div className="flex items-baseline justify-between gap-2 text-sm">
-                        <span className="font-medium text-white">{c.categoryName}</span>
-                        <span className="text-white/50 text-xs shrink-0">
-                          {c.playersSold} player{c.playersSold === 1 ? "" : "s"}
+                    <div key={c.categoryName} className="flex flex-col gap-2">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="text-sm font-medium text-white">{c.categoryName}</span>
+                        <span className="flex items-baseline gap-1.5">
+                          <span className={`${displayFont.className} text-lg text-amber-300 tracking-wide leading-none`}>
+                            {avgPrice}
+                          </span>
+                          <span className="text-[10px] uppercase tracking-widest text-white/40">avg</span>
                         </span>
                       </div>
-                      <div className="h-3 rounded-full bg-white/[0.06] overflow-hidden">
+                      <div className="relative h-2.5">
+                        <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 h-px bg-white/10" />
                         <div
-                          className={`h-full rounded-full ${accent.bar} flex items-center justify-end pr-2`}
+                          className={`absolute top-1/2 -translate-y-1/2 left-0 h-0.5 rounded-full ${accent.bar}`}
                           style={{ width: `${pct}%` }}
-                        >
-                          {pct > 22 && (
-                            <span className="text-[11px] font-semibold text-black/70 tabular-nums">
-                              {c.totalSpent}
-                            </span>
-                          )}
-                        </div>
+                        />
+                        <div
+                          className={`absolute top-1/2 h-2.5 w-2.5 rounded-full -translate-y-1/2 -translate-x-1/2 ${accent.bar}`}
+                          style={{ left: `${pct}%`, boxShadow: "0 0 0 3px #05060c" }}
+                        />
                       </div>
-                      {pct <= 22 && (
-                        <span className="text-[11px] font-semibold text-white/70 tabular-nums self-end -mt-1">
-                          {c.totalSpent}
-                        </span>
-                      )}
+                      <span className="text-[11px] text-white/40">
+                        {c.playersSold} player{c.playersSold === 1 ? "" : "s"} &middot; {c.totalSpent} total spent
+                      </span>
                     </div>
                   );
                 })}
@@ -192,6 +212,7 @@ function PlayerCard({
   playerName,
   photoUrl,
   categoryName,
+  accent,
   teamName,
   price,
   bidCount,
@@ -202,6 +223,11 @@ function PlayerCard({
   playerName: string;
   photoUrl: string | null;
   categoryName: string;
+  /** Resolved by the page via assignDistinctCategoryAccents against every
+   * category shown on the page, not looked up here — a lone categoryAccent()
+   * call has no way to know about sibling categories, so it can't guarantee
+   * two different categories never end up the same color. */
+  accent: CategoryAccent;
   teamName: string;
   price: string;
   bidCount?: number;
@@ -214,8 +240,6 @@ function PlayerCard({
    * row entirely rather than showing a captain-selection price. */
   showPrice?: boolean;
 }) {
-  const accent = categoryAccent(categoryName);
-
   return (
     <div
       className={`relative rounded-2xl border border-white/10 bg-white/[0.04] overflow-hidden ${
