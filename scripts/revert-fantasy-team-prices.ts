@@ -56,19 +56,24 @@ async function main() {
   let totalChanged = 0;
 
   try {
-    await prisma.$transaction(async (tx) => {
-      for (const pick of picks) {
-        const legacy = legacyPrice(pick);
-        if (!pick.price.equals(legacy)) {
-          totalChanged += 1;
-          console.log(
-            `  [auction ${pick.auctionPlayer.auctionId}] ${pick.auctionPlayer.player.name} (team ${pick.fantasyTeam.user.loginId ?? pick.fantasyTeam.userId}): ${pick.price.toString()} -> ${legacy.toString()}`
-          );
-          await tx.fantasyTeamPlayer.update({ where: { id: pick.id }, data: { price: legacy } });
+    await prisma.$transaction(
+      async (tx) => {
+        for (const pick of picks) {
+          const legacy = legacyPrice(pick);
+          if (!pick.price.equals(legacy)) {
+            totalChanged += 1;
+            console.log(
+              `  [auction ${pick.auctionPlayer.auctionId}] ${pick.auctionPlayer.player.name} (team ${pick.fantasyTeam.user.loginId ?? pick.fantasyTeam.userId}): ${pick.price.toString()} -> ${legacy.toString()}`
+            );
+            await tx.fantasyTeamPlayer.update({ where: { id: pick.id }, data: { price: legacy } });
+          }
         }
-      }
-      if (!APPLY) throw new DryRunAbort();
-    });
+        if (!APPLY) throw new DryRunAbort();
+      },
+      // Same reasoning as migrate-fantasy-team-prices.ts: production's real
+      // network round-trip per query needs more than the 5s default.
+      { timeout: 120_000 }
+    );
   } catch (e) {
     if (!(e instanceof DryRunAbort)) throw e;
   }

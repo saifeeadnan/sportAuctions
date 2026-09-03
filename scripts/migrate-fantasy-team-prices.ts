@@ -56,49 +56,56 @@ async function main() {
     });
 
     try {
-      await prisma.$transaction(async (tx) => {
-        // Surface (never silently skip) any team whose owner's self-match
-        // can no longer be re-derived (e.g. their loginId changed since they
-        // built the team) — that team's self-pick falls back to normal
-        // pricing instead of the always-average rule, since the self-match
-        // relationship no longer holds.
-        if (auction.fantasySelfPickRequired && auction.tournament.rosterId) {
-          const teams = await tx.fantasyTeam.findMany({ where: { auctionId }, include: { user: true } });
-          for (const team of teams) {
-            if (!team.user.loginId) continue;
-            const self = await tx.auctionPlayer.findFirst({
-              where: {
-                auctionId,
-                player: {
-                  rosterId: auction.tournament.rosterId,
-                  loginId: { equals: team.user.loginId, mode: "insensitive" },
+      await prisma.$transaction(
+        async (tx) => {
+          // Surface (never silently skip) any team whose owner's self-match
+          // can no longer be re-derived (e.g. their loginId changed since
+          // they built the team) — that team's self-pick falls back to
+          // normal pricing instead of the always-average rule, since the
+          // self-match relationship no longer holds.
+          if (auction.fantasySelfPickRequired && auction.tournament.rosterId) {
+            const teams = await tx.fantasyTeam.findMany({ where: { auctionId }, include: { user: true } });
+            for (const team of teams) {
+              if (!team.user.loginId) continue;
+              const self = await tx.auctionPlayer.findFirst({
+                where: {
+                  auctionId,
+                  player: {
+                    rosterId: auction.tournament.rosterId,
+                    loginId: { equals: team.user.loginId, mode: "insensitive" },
+                  },
                 },
-              },
-            });
-            if (!self) {
-              totalUnresolvedSelfMatch += 1;
-              console.warn(
-                `  [auction ${auctionId}] team "${team.name ?? team.id}" (user ${team.user.loginId}) has no re-derivable self-match — its picks reprice under normal rules, no self-pick exemption.`
+              });
+              if (!self) {
+                totalUnresolvedSelfMatch += 1;
+                console.warn(
+                  `  [auction ${auctionId}] team "${team.name ?? team.id}" (user ${team.user.loginId}) has no re-derivable self-match — its picks reprice under normal rules, no self-pick exemption.`
+                );
+              }
+            }
+          }
+
+          await repriceFantasyTeamPlayers(auctionId, tx);
+
+          const after = await tx.fantasyTeamPlayer.findMany({ where: { fantasyTeam: { auctionId } } });
+          for (const pick of after) {
+            const prev = beforeById.get(pick.id);
+            if (prev && !prev.price.equals(pick.price)) {
+              totalChanged += 1;
+              console.log(
+                `  [auction ${auctionId}] ${prev.auctionPlayer.player.name} (team ${prev.fantasyTeam.user.loginId ?? prev.fantasyTeam.userId}): ${prev.price.toString()} -> ${pick.price.toString()}`
               );
             }
           }
-        }
 
-        await repriceFantasyTeamPlayers(auctionId, tx);
-
-        const after = await tx.fantasyTeamPlayer.findMany({ where: { fantasyTeam: { auctionId } } });
-        for (const pick of after) {
-          const prev = beforeById.get(pick.id);
-          if (prev && !prev.price.equals(pick.price)) {
-            totalChanged += 1;
-            console.log(
-              `  [auction ${auctionId}] ${prev.auctionPlayer.player.name} (team ${prev.fantasyTeam.user.loginId ?? prev.fantasyTeam.userId}): ${prev.price.toString()} -> ${pick.price.toString()}`
-            );
-          }
-        }
-
-        if (!APPLY) throw new DryRunAbort();
-      });
+          if (!APPLY) throw new DryRunAbort();
+        },
+        // Production runs over a real network round-trip per query (unlike
+        // local dev's near-instant Docker Postgres), and repriceFantasyTeamPlayers
+        // issues many small sequential queries — the 5s default interactive
+        // transaction timeout isn't enough headroom for that over a WAN link.
+        { timeout: 120_000 }
+      );
     } catch (e) {
       if (!(e instanceof DryRunAbort)) throw e;
     }
