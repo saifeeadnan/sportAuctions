@@ -12,6 +12,7 @@ import { EditFantasyLockDateForm } from "@/components/admin/EditFantasyLockDateF
 import { EditFantasySettingsForm } from "@/components/admin/EditFantasySettingsForm";
 import { SponsorRibbon } from "@/components/tournament/SponsorRibbon";
 import { formatCalendarDate, toDateInputValue } from "@/lib/dates";
+import { withLeagueParam } from "@/lib/adminNav";
 import { card } from "@/lib/ui";
 
 export default async function FantasyTeamsPage({
@@ -19,7 +20,7 @@ export default async function FantasyTeamsPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ sort?: string; dir?: string; page?: string }>;
+  searchParams: Promise<{ sort?: string; dir?: string; page?: string; league?: string }>;
 }) {
   const { id } = await params;
   const { leagueIds } = await requireAdminOrLeagueAdmin();
@@ -33,7 +34,7 @@ export default async function FantasyTeamsPage({
 
   const { hasPoints, standings: rankedStandings } = await getFantasyStandings(id);
 
-  const { sort: rawSort, dir: rawDir, page: rawPage } = await searchParams;
+  const { sort: rawSort, dir: rawDir, page: rawPage, league: leagueParam } = await searchParams;
   const { sortKey, sortDir } = resolveFantasySort(rawSort, rawDir);
   const page = resolveFantasyPage(rawPage);
   const standings = sortFantasyStandings(rankedStandings, sortKey, sortDir);
@@ -89,12 +90,16 @@ export default async function FantasyTeamsPage({
             sortDir={sortDir}
             page={page}
             showDeleteButton
+            leagueParam={leagueParam}
           />
           <MostPickedPlayersTable categories={await getMostPickedPlayersByCategory(auction.id)} />
         </>
       )}
 
-      <Link href={`/admin/auctions/${auction.id}`} className="text-sm underline underline-offset-2">
+      <Link
+        href={withLeagueParam(`/admin/auctions/${auction.id}`, leagueParam)}
+        className="text-sm underline underline-offset-2"
+      >
         Back to auction
       </Link>
 

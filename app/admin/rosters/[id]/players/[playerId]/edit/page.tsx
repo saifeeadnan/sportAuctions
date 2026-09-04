@@ -5,14 +5,18 @@ import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
 import { updatePlayerAction } from "@/lib/actions/roster.actions";
 import { ActionResultForm } from "@/components/ui/ActionResultForm";
 import { PlayerFormFields } from "@/components/roster/PlayerFormFields";
+import { withLeagueParam } from "@/lib/adminNav";
 import { card, buttonPrimary, buttonSecondary } from "@/lib/ui";
 
 export default async function EditPlayerPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string; playerId: string }>;
+  searchParams: Promise<{ league?: string }>;
 }) {
   const { id, playerId } = await params;
+  const { league: leagueParam } = await searchParams;
   const { leagueIds } = await requireAdminOrLeagueAdmin();
 
   const player = await prisma.player.findUnique({
@@ -52,7 +56,10 @@ export default async function EditPlayerPage({
             <button type="submit" className={`${buttonPrimary} self-start`}>
               Save changes
             </button>
-            <Link href={`/admin/rosters/${id}`} className={`${buttonSecondary} self-start`}>
+            <Link
+              href={withLeagueParam(`/admin/rosters/${id}`, leagueParam)}
+              className={`${buttonSecondary} self-start`}
+            >
               Cancel
             </Link>
           </div>

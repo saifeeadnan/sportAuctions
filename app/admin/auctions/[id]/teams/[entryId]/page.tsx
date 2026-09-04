@@ -7,15 +7,19 @@ import { ConfirmedRosterTable } from "@/components/roster/ConfirmedRosterTable";
 import { DeleteDraftPickButton } from "@/components/admin/DeleteDraftPickButton";
 import { ToggleAnalyticsEnabledButton } from "@/components/admin/ToggleAnalyticsEnabledButton";
 import { PostAuctionRosterForm } from "@/components/admin/PostAuctionRosterForm";
+import { withLeagueParam } from "@/lib/adminNav";
 import { card } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 
 export default async function TeamRosterPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string; entryId: string }>;
+  searchParams: Promise<{ league?: string }>;
 }) {
   const { id, entryId } = await params;
+  const { league: leagueParam } = await searchParams;
   const { leagueIds } = await requireAdminOrLeagueAdmin();
   // Enabling analytics is a site-Admin-only capability — leagueId is null
   // only for a site ADMIN (see scopeLeagueId in lib/auth/guards.ts).
@@ -220,7 +224,10 @@ export default async function TeamRosterPage({
         </section>
       )}
 
-      <Link href={`/admin/auctions/${id}`} className="text-sm underline underline-offset-2">
+      <Link
+        href={withLeagueParam(`/admin/auctions/${id}`, leagueParam)}
+        className="text-sm underline underline-offset-2"
+      >
         Back to auction
       </Link>
     </div>

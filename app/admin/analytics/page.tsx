@@ -38,11 +38,16 @@ function parsePage(value: string | undefined) {
 export default async function AdminAnalyticsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ loginsPage?: string; timeSpentPage?: string; clicksPage?: string }>;
+  searchParams: Promise<{
+    loginsPage?: string;
+    timeSpentPage?: string;
+    clicksPage?: string;
+    league?: string;
+  }>;
 }) {
   await requireRole("ADMIN");
 
-  const { loginsPage, timeSpentPage, clicksPage } = await searchParams;
+  const { loginsPage, timeSpentPage, clicksPage, league } = await searchParams;
   const loginsPageNum = parsePage(loginsPage);
   const timeSpentPageNum = parsePage(timeSpentPage);
   const clicksPageNum = parsePage(clicksPage);
@@ -105,7 +110,7 @@ export default async function AdminAnalyticsPage({
               pageSize={logins.pageSize}
               total={logins.total}
               paramName="loginsPage"
-              otherParams={{ timeSpentPage, clicksPage }}
+              otherParams={{ timeSpentPage, clicksPage, league }}
             />
           </>
         )}
@@ -152,7 +157,7 @@ export default async function AdminAnalyticsPage({
               pageSize={timeSpent.pageSize}
               total={timeSpent.total}
               paramName="timeSpentPage"
-              otherParams={{ loginsPage, clicksPage }}
+              otherParams={{ loginsPage, clicksPage, league }}
             />
           </>
         )}
@@ -192,7 +197,7 @@ export default async function AdminAnalyticsPage({
               pageSize={sponsorClicks.pageSize}
               total={sponsorClicks.total}
               paramName="clicksPage"
-              otherParams={{ loginsPage, timeSpentPage }}
+              otherParams={{ loginsPage, timeSpentPage, league }}
             />
           </>
         )}

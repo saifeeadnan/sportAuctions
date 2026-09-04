@@ -10,6 +10,7 @@ import {
 import { DeleteFantasyTeamButton } from "@/components/admin/DeleteFantasyTeamButton";
 import { TablePagination } from "@/components/admin/TablePagination";
 import { Badge } from "@/components/ui/Badge";
+import { withLeagueParam } from "@/lib/adminNav";
 import { card } from "@/lib/ui";
 
 /** A finalized team's roster, once picks can no longer change — just enough
@@ -74,6 +75,7 @@ export function FantasyStandingsList({
   page = 1,
   highlightUserId,
   showDeleteButton = false,
+  leagueParam,
 }: {
   auctionId: string;
   standings: FantasyStanding[];
@@ -84,6 +86,9 @@ export function FantasyStandingsList({
   /** Highlights this user's own row (e.g. a viewer looking at the full list). */
   highlightUserId?: string;
   showDeleteButton?: boolean;
+  /** Admin-only sidebar league filter — undefined on the viewer's read-only
+   * standings page, which has no such concept. */
+  leagueParam?: string;
 }) {
   const pageStart = (page - 1) * FANTASY_STANDINGS_PAGE_SIZE;
   const pagedStandings = standings.slice(pageStart, pageStart + FANTASY_STANDINGS_PAGE_SIZE);
@@ -101,7 +106,7 @@ export function FantasyStandingsList({
           {(Object.keys(FANTASY_SORT_LABELS) as FantasySortKey[]).map((key) => (
             <Link
               key={key}
-              href={fantasySortHref(key, sortKey, sortDir)}
+              href={withLeagueParam(fantasySortHref(key, sortKey, sortDir), leagueParam)}
               className={
                 key === sortKey
                   ? "font-semibold underline underline-offset-2"
@@ -171,7 +176,7 @@ export function FantasyStandingsList({
         pageSize={FANTASY_STANDINGS_PAGE_SIZE}
         total={standings.length}
         paramName="page"
-        otherParams={{ sort: sortKey, dir: sortDir }}
+        otherParams={{ sort: sortKey, dir: sortDir, league: leagueParam }}
       />
     </div>
   );

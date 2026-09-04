@@ -16,6 +16,7 @@ import { EditOnClockDisplayForm } from "@/components/admin/EditOnClockDisplayFor
 import { HighlightsLinkPanel } from "@/components/admin/HighlightsLinkPanel";
 import type { OnClockFieldKey } from "@/lib/onClockDisplay";
 import { SponsorRibbon } from "@/components/tournament/SponsorRibbon";
+import { withLeagueParam } from "@/lib/adminNav";
 import { card, cardInteractive, buttonPrimary, buttonSecondary } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 import { AUCTION_TYPE_LABELS } from "@/lib/auctionTypes";
@@ -28,10 +29,13 @@ const ENTRY_STATUS_VARIANT: Record<string, "neutral" | "info" | "success" | "war
 
 export default async function AuctionDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ league?: string }>;
 }) {
   const { id } = await params;
+  const { league: leagueParam } = await searchParams;
   const { leagueIds } = await requireAdminOrLeagueAdmin();
 
   const auction = await prisma.auction.findUnique({
@@ -159,7 +163,7 @@ export default async function AuctionDetailPage({
                   <tr key={entry.id} className="border-b border-black/5 dark:border-white/5 last:border-0">
                     <td className="py-2 pl-4 pr-4">
                       <Link
-                        href={`/admin/auctions/${auction.id}/teams/${entry.id}`}
+                        href={withLeagueParam(`/admin/auctions/${auction.id}/teams/${entry.id}`, leagueParam)}
                         className="underline underline-offset-2"
                       >
                         {entry.team.name}
@@ -379,7 +383,7 @@ export default async function AuctionDetailPage({
         )}
 
         {auction.status === "PRE_AUCTION_OPEN" && (
-          <Link href={`/admin/auctions/${auction.id}/lock-review`} className={buttonPrimary}>
+          <Link href={withLeagueParam(`/admin/auctions/${auction.id}/lock-review`, leagueParam)} className={buttonPrimary}>
             Lock &amp; resolve overlaps
           </Link>
         )}
@@ -400,13 +404,19 @@ export default async function AuctionDetailPage({
 
         {auction.status === "COMPLETED" && (
           <>
-            <Link href={`/admin/auctions/${auction.id}/results`} className={buttonSecondary}>
+            <Link href={withLeagueParam(`/admin/auctions/${auction.id}/results`, leagueParam)} className={buttonSecondary}>
               View results
             </Link>
-            <Link href={`/admin/auctions/${auction.id}/fantasy-teams`} className={buttonSecondary}>
+            <Link
+              href={withLeagueParam(`/admin/auctions/${auction.id}/fantasy-teams`, leagueParam)}
+              className={buttonSecondary}
+            >
               Fantasy teams
             </Link>
-            <Link href={`/admin/auctions/${auction.id}/correct-results`} className={buttonSecondary}>
+            <Link
+              href={withLeagueParam(`/admin/auctions/${auction.id}/correct-results`, leagueParam)}
+              className={buttonSecondary}
+            >
               Correct results
             </Link>
           </>
@@ -415,7 +425,7 @@ export default async function AuctionDetailPage({
         {(auction.status === "PRE_AUCTION_LOCKED" ||
           auction.status === "BIDDING" ||
           auction.status === "COMPLETED") && (
-          <Link href={`/admin/auctions/${auction.id}/lock-review`} className={buttonSecondary}>
+          <Link href={withLeagueParam(`/admin/auctions/${auction.id}/lock-review`, leagueParam)} className={buttonSecondary}>
             Submitted drafts
           </Link>
         )}

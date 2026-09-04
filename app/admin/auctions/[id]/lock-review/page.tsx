@@ -4,14 +4,18 @@ import { prisma } from "@/lib/prisma";
 import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
 import { lockPreAuctionAction } from "@/lib/actions/auction.actions";
 import { ActionResultForm } from "@/components/ui/ActionResultForm";
+import { withLeagueParam } from "@/lib/adminNav";
 import { card, buttonPrimary, buttonSecondary } from "@/lib/ui";
 
 export default async function LockReviewPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ league?: string }>;
 }) {
   const { id } = await params;
+  const { league: leagueParam } = await searchParams;
   const { leagueIds } = await requireAdminOrLeagueAdmin();
 
   const auction = await prisma.auction.findUnique({
@@ -174,7 +178,7 @@ export default async function LockReviewPage({
               </button>
             </ActionResultForm>
             <Link
-              href={`/admin/auctions/${auction.id}`}
+              href={withLeagueParam(`/admin/auctions/${auction.id}`, leagueParam)}
               className="text-sm underline underline-offset-2 self-center"
             >
               Cancel
@@ -182,7 +186,10 @@ export default async function LockReviewPage({
           </div>
         </>
       ) : (
-        <Link href={`/admin/auctions/${auction.id}`} className={`${buttonSecondary} self-start`}>
+        <Link
+          href={withLeagueParam(`/admin/auctions/${auction.id}`, leagueParam)}
+          className={`${buttonSecondary} self-start`}
+        >
           Back to auction
         </Link>
       )}

@@ -6,14 +6,18 @@ import { isLeagueReadOnly } from "@/lib/services/league.service";
 import { CorrectSoldPriceRow } from "@/components/admin/CorrectSoldPriceRow";
 import { CorrectCategoryBasePriceForm } from "@/components/admin/CorrectCategoryBasePriceForm";
 import { CorrectTeamBudgetForm } from "@/components/admin/CorrectTeamBudgetForm";
+import { withLeagueParam } from "@/lib/adminNav";
 import { card } from "@/lib/ui";
 
 export default async function CorrectResultsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ league?: string }>;
 }) {
   const { id } = await params;
+  const { league: leagueParam } = await searchParams;
   const { leagueIds } = await requireAdminOrLeagueAdmin();
 
   const auction = await prisma.auction.findUnique({
@@ -101,7 +105,10 @@ export default async function CorrectResultsPage({
         </>
       )}
 
-      <Link href={`/admin/auctions/${auction.id}`} className="text-sm underline underline-offset-2">
+      <Link
+        href={withLeagueParam(`/admin/auctions/${auction.id}`, leagueParam)}
+        className="text-sm underline underline-offset-2"
+      >
         Back to auction
       </Link>
     </div>

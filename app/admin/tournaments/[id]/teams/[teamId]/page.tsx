@@ -5,14 +5,18 @@ import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
 import { ConfirmedRosterTable } from "@/components/roster/ConfirmedRosterTable";
 import { UploadTeamSponsorImageForm } from "@/components/admin/UploadTeamSponsorImageForm";
 import { DeleteTeamSponsorImageButton } from "@/components/admin/DeleteTeamSponsorImageButton";
+import { withLeagueParam } from "@/lib/adminNav";
 import { card } from "@/lib/ui";
 
 export default async function TournamentTeamRosterPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string; teamId: string }>;
+  searchParams: Promise<{ league?: string }>;
 }) {
   const { id, teamId } = await params;
+  const { league: leagueParam } = await searchParams;
   const { leagueIds } = await requireAdminOrLeagueAdmin();
 
   const team = await prisma.team.findUnique({
@@ -98,7 +102,7 @@ export default async function TournamentTeamRosterPage({
               }))}
             />
             <Link
-              href={`/admin/auctions/${entry.auctionId}/teams/${entry.id}`}
+              href={withLeagueParam(`/admin/auctions/${entry.auctionId}/teams/${entry.id}`, leagueParam)}
               className="text-sm underline underline-offset-2 mt-2 inline-block"
             >
               View full details for this auction
@@ -107,7 +111,10 @@ export default async function TournamentTeamRosterPage({
         ))
       )}
 
-      <Link href={`/admin/tournaments/${id}`} className="text-sm underline underline-offset-2">
+      <Link
+        href={withLeagueParam(`/admin/tournaments/${id}`, leagueParam)}
+        className="text-sm underline underline-offset-2"
+      >
         Back to tournament
       </Link>
     </div>

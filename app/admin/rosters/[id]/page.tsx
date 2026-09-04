@@ -8,6 +8,7 @@ import { ActionResultForm } from "@/components/ui/ActionResultForm";
 import { PlayerFormFields } from "@/components/roster/PlayerFormFields";
 import { DeletePlayerButton } from "@/components/admin/DeletePlayerButton";
 import { RenameRosterForm } from "@/components/admin/RenameRosterForm";
+import { withLeagueParam } from "@/lib/adminNav";
 import { card, buttonPrimary } from "@/lib/ui";
 
 const SORT_FIELDS = ["name", "position", "category", "rating"] as const;
@@ -29,9 +30,14 @@ function resolveSortDir(value?: string): SortDir {
   return value === "desc" ? "desc" : "asc";
 }
 
-function sortHref(field: SortField, activeField: SortField, activeDir: SortDir): string {
+function sortHref(
+  field: SortField,
+  activeField: SortField,
+  activeDir: SortDir,
+  leagueParam: string | undefined
+): string {
   const nextDir: SortDir = activeField === field && activeDir === "asc" ? "desc" : "asc";
-  return `?sort=${field}&dir=${nextDir}`;
+  return withLeagueParam(`?sort=${field}&dir=${nextDir}`, leagueParam);
 }
 
 export default async function RosterDetailPage({
@@ -39,10 +45,10 @@ export default async function RosterDetailPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ sort?: string; dir?: string }>;
+  searchParams: Promise<{ sort?: string; dir?: string; league?: string }>;
 }) {
   const { id } = await params;
-  const { sort, dir } = await searchParams;
+  const { sort, dir, league: leagueParam } = await searchParams;
   const sortField = resolveSortField(sort);
   const sortDir = resolveSortDir(dir);
   const { leagueIds } = await requireAdminOrLeagueAdmin();
@@ -125,7 +131,7 @@ export default async function RosterDetailPage({
               {columns.map((col, i) => (
                 <th key={col.field} className={i === 0 ? "py-2 pl-4 pr-4" : "py-2 pr-4"}>
                   <Link
-                    href={sortHref(col.field, sortField, sortDir)}
+                    href={sortHref(col.field, sortField, sortDir, leagueParam)}
                     className="inline-flex items-center gap-1 hover:underline"
                   >
                     {col.label}
@@ -166,7 +172,7 @@ export default async function RosterDetailPage({
                 <td className="py-2 pr-4">
                   <div className="flex items-center justify-end gap-3">
                     <Link
-                      href={`/admin/rosters/${roster.id}/players/${player.id}/edit`}
+                      href={withLeagueParam(`/admin/rosters/${roster.id}/players/${player.id}/edit`, leagueParam)}
                       className="text-xs underline underline-offset-2"
                     >
                       Edit

@@ -16,6 +16,7 @@ import { DeleteTournamentSponsorButton } from "@/components/admin/DeleteTourname
 import { EditTournamentDatesForm } from "@/components/admin/EditTournamentDatesForm";
 import { SponsorLink } from "@/components/tournament/SponsorLink";
 import { toDateInputValue, formatCalendarDate } from "@/lib/dates";
+import { withLeagueParam } from "@/lib/adminNav";
 import { card, cardInteractive } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 import { SPONSOR_TIER_LABELS, type SponsorTier } from "@/lib/sponsorTiers";
@@ -35,10 +36,13 @@ const SPONSOR_TIER_BADGE_VARIANT: Record<SponsorTier, "success" | "info" | "neut
 
 export default async function TournamentDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ league?: string }>;
 }) {
   const { id } = await params;
+  const { league: leagueParam } = await searchParams;
   const { leagueIds } = await requireAdminOrLeagueAdmin();
 
   const tournament = await prisma.tournament.findUnique({
@@ -171,7 +175,7 @@ export default async function TournamentDetailPage({
             </div>
           ) : tournament.rosterId ? (
             <Link
-              href={`/admin/tournaments/${tournament.id}/auctions/new`}
+              href={withLeagueParam(`/admin/tournaments/${tournament.id}/auctions/new`, leagueParam)}
               className="block px-4 py-3 text-sm font-medium hover:bg-black/[0.02] dark:hover:bg-white/[0.03] transition-colors"
             >
               New auction
@@ -246,7 +250,7 @@ export default async function TournamentDetailPage({
                   />
                 </div>
                 <Link
-                  href={`/admin/tournaments/${tournament.id}/teams/${team.id}`}
+                  href={withLeagueParam(`/admin/tournaments/${tournament.id}/teams/${team.id}`, leagueParam)}
                   className="flex flex-col items-center gap-1"
                 >
                   {team.sponsorImage ? (
@@ -287,7 +291,7 @@ export default async function TournamentDetailPage({
                 className={`${cardInteractive} flex items-center justify-between gap-4 px-4 py-3`}
               >
                 <Link
-                  href={`/admin/auctions/${a.id}`}
+                  href={withLeagueParam(`/admin/auctions/${a.id}`, leagueParam)}
                   className="flex-1 flex items-center justify-between hover:underline"
                 >
                   <span>{a.name}</span>

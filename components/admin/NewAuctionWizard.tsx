@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createAuctionAction } from "@/lib/actions/auction.actions";
+import { withLeagueParam } from "@/lib/adminNav";
 import { buttonPrimary, buttonSecondary } from "@/lib/ui";
 import { WizardProgress } from "@/components/ui/WizardProgress";
 import { IMPLEMENTED_AUCTION_TYPES, type AuctionType } from "@/lib/auctionTypes";
@@ -35,6 +36,7 @@ export function NewAuctionWizard({
   players: WizardPlayer[];
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [step, setStep] = useState(0);
 
   const [name, setName] = useState("");
@@ -184,7 +186,7 @@ export function NewAuctionWizard({
       setError(result.error);
       return;
     }
-    router.push(`/admin/auctions/${result.data!.auctionId}`);
+    router.push(withLeagueParam(`/admin/auctions/${result.data!.auctionId}`, searchParams.get("league")));
   }
 
   return (

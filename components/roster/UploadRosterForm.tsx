@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { withLeagueParam } from "@/lib/adminNav";
 import { inputClass, selectClass, buttonPrimary, buttonSecondary } from "@/lib/ui";
 
 type RowError = { rowNumber: number; message: string };
@@ -36,6 +37,7 @@ export function UploadRosterForm({
   leagueId?: string;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [rosterName, setRosterName] = useState("");
   const [selectedLeagueId, setSelectedLeagueId] = useState(leagues?.[0]?.id ?? "");
   const effectiveLeagueId = leagues ? selectedLeagueId : fixedLeagueId;
@@ -84,7 +86,7 @@ export function UploadRosterForm({
       });
       if (!res.ok) throw new Error(await readErrorMessage(res, "Import failed"));
       const data = await res.json();
-      router.push(`/admin/rosters/${data.rosterId}`);
+      router.push(withLeagueParam(`/admin/rosters/${data.rosterId}`, searchParams.get("league")));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Import failed");
     } finally {
