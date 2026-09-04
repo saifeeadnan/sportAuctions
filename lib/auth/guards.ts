@@ -106,3 +106,24 @@ export async function requireAdminOrLeagueAdmin() {
   const session = await requireRole("ADMIN", "LEAGUE_ADMIN");
   return { session, leagueIds: leagueIdsForRoles(session, "LEAGUE_ADMIN") };
 }
+
+/**
+ * Who may act on one team's auction entry (its roster card, shareable
+ * link): the team's own manager, OR a league admin of the league the
+ * auction belongs to, OR the site Admin. An OR of independent grants —
+ * deliberately not "if you're a manager anywhere, you must manage THIS
+ * team", which would lock a league admin who also manages one team out of
+ * every other team; and deliberately keyed on LEAGUE_ADMIN memberships only
+ * (not `allLeagueIds`), so a league admin of A who is merely a viewer in B
+ * gets nothing in B. Pure — takes the already-loaded entry rather than
+ * querying, so it's usable from both route handlers and server actions.
+ */
+export function assertCanAccessTeamEntry(
+  session: Session,
+  entry: { team: { managerId: string | null }; auction: { tournament: { leagueId: string } } }
+) {
+  if (entry.team.managerId === session.user.id) return;
+  const adminLeagues = leagueIdsForRoles(session, "LEAGUE_ADMIN"); // null = site admin
+  if (adminLeagues === null || adminLeagues.includes(entry.auction.tournament.leagueId)) return;
+  throw new AuthError("Not authorized for this team's roster card");
+}

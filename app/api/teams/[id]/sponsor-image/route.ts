@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireSession, requireAdminOrLeagueAdmin } from "@/lib/auth/guards";
+import { requireAdminOrLeagueAdmin } from "@/lib/auth/guards";
 import { loadScopedTeam } from "@/lib/auth/scope";
 import { toErrorResponse } from "@/lib/api/errors";
 import {
@@ -31,10 +31,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    // Cosmetic branding, not sensitive — any authenticated user may view it
-    // (matching the precedent that player photos are served with no auth at
-    // all), so the only bar here is being logged in.
-    await requireSession();
+    // Cosmetic branding, not sensitive — deliberately no auth check at all,
+    // same posture as /api/tournament-sponsors/[id]: the public,
+    // unauthenticated roster-card page (app/roster-card/[token]) embeds this
+    // image for anyone with the share link, logged in or not, and gating it
+    // behind requireSession() would silently 403 the <img> for every
+    // anonymous visitor.
     const { id: teamId } = await params;
 
     const image = await getTeamSponsorImageContent(teamId);
@@ -45,7 +47,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     return new NextResponse(new Uint8Array(image.data), {
       headers: {
         "Content-Type": image.mimeType,
-        "Cache-Control": "private, max-age=300",
+        "Cache-Control": "public, max-age=300",
       },
     });
   } catch (error) {

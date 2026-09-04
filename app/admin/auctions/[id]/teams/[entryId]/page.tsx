@@ -7,6 +7,7 @@ import { ConfirmedRosterTable } from "@/components/roster/ConfirmedRosterTable";
 import { DeleteDraftPickButton } from "@/components/admin/DeleteDraftPickButton";
 import { ToggleAnalyticsEnabledButton } from "@/components/admin/ToggleAnalyticsEnabledButton";
 import { PostAuctionRosterForm } from "@/components/admin/PostAuctionRosterForm";
+import { RosterCardLinkPanel } from "@/components/roster/RosterCardLinkPanel";
 import { withLeagueParam } from "@/lib/adminNav";
 import { card } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
@@ -85,14 +86,23 @@ export default async function TeamRosterPage({
   return (
     <div className="mx-auto max-w-2xl px-4 py-8 flex flex-col gap-8">
       <div>
-        <div className="flex items-center justify-between gap-3 mb-1">
+        <div className="flex items-center justify-between gap-3 mb-1 flex-wrap">
           <h1 className="text-xl font-semibold">{entry.team.name}</h1>
-          <a
-            href={`/api/auctions/${id}/teams/${entryId}/roster-card`}
-            className="text-sm underline underline-offset-2 shrink-0"
-          >
-            Download roster card
-          </a>
+          <div className="flex items-center gap-3 flex-wrap">
+            {entry.auction.status === "COMPLETED" && (
+              <RosterCardLinkPanel
+                auctionId={id}
+                entryId={entryId}
+                initialToken={entry.rosterCardToken}
+              />
+            )}
+            <a
+              href={`/api/auctions/${id}/teams/${entryId}/roster-card`}
+              className="text-sm underline underline-offset-2 shrink-0"
+            >
+              Download roster card
+            </a>
+          </div>
         </div>
         <p className="text-sm text-black/60 dark:text-white/60">
           {entry.auction.tournament.name} &middot; {entry.auction.name} &middot; status:{" "}

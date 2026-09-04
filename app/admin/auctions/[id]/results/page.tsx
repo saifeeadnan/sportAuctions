@@ -5,6 +5,7 @@ import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
 import { isLeagueReadOnly } from "@/lib/services/league.service";
 import { TeamStrengthSummary } from "@/components/manager/TeamStrengthSummary";
 import { AssignTeamCaptainForm } from "@/components/admin/AssignTeamCaptainForm";
+import { RosterCardLinkPanel } from "@/components/roster/RosterCardLinkPanel";
 import { withLeagueParam } from "@/lib/adminNav";
 import { card, buttonSecondary } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
@@ -85,6 +86,18 @@ export default async function AuctionResultsPage({
                   teamAuctionEntryId={entry.id}
                   currentCaptainAuctionPlayerId={entry.captainAuctionPlayerId}
                   players={entry.playersWon.map((ap) => ({ id: ap.id, name: ap.player.name }))}
+                />
+              </div>
+            )}
+            {/* Not gated on readOnly (unlike captain assignment) — sharing a
+                past auction's final roster is fine for a closed league, same
+                as the highlights link. */}
+            {auction.status === "COMPLETED" && (
+              <div className="mb-2">
+                <RosterCardLinkPanel
+                  auctionId={auction.id}
+                  entryId={entry.id}
+                  initialToken={entry.rosterCardToken}
                 />
               </div>
             )}

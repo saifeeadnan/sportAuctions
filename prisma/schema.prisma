@@ -582,6 +582,10 @@ model TeamAuctionEntry {
   slotsFilled          Int                    @default(0)
   slotsTotal           Int
   analyticsEnabled     Boolean                @default(false)
+  // Set only via getOrCreateRosterCardToken, once an admin or the team's
+  // manager requests a public roster-card link for this COMPLETED auction.
+  // Nullable — most entries never get one; not backfilled.
+  rosterCardToken      String?                @unique
   // Settable only once the auction is COMPLETED, and only to a player this
   // entry actually won (soldToEntryId === this entry's id) — enforced in
   // teamCaptain.service.ts, not at the DB level. Nullable = no captain

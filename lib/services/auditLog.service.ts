@@ -66,7 +66,8 @@ export type AuditAction =
   | "RIVAL_ESTIMATE_SAVED"
   | "RIVAL_ESTIMATE_REMOVED"
   | "ANALYTICS_ENABLED"
-  | "ANALYTICS_DISABLED";
+  | "ANALYTICS_DISABLED"
+  | "ROSTER_CARD_LINK_CREATED";
 
 /**
  * Writes one audit row. Always takes an explicit transaction client — never

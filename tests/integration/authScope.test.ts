@@ -15,7 +15,7 @@ vi.mock("@/auth", () => ({ auth: vi.fn() }));
 vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
 
 const { loadScopedAuction } = await import("@/lib/auth/scope");
-const { AuthError } = await import("@/lib/auth/guards");
+const { AuthError, assertCanAccessTeamEntry } = await import("@/lib/auth/guards");
 const { createAuction } = await import("@/lib/services/auction.service");
 
 beforeEach(resetDb);
@@ -87,5 +87,67 @@ describe("loadScopedAuction league scoping", () => {
     });
 
     await expect(loadScopedAuction(auction.id, null)).resolves.toMatchObject({ id: auction.id });
+  });
+});
+
+/**
+ * Pure policy check for one team's auction entry (roster-card PNG + public
+ * share link). Replaced an inline branch that had two real defects — a user
+ * with ANY manager membership was forced down the "must manage this team"
+ * path even when they were also a league admin, and the admin path scoped
+ * on every league of any role, so a league admin of A who was merely a
+ * viewer in B could reach B's teams. These cases pin the fixed policy.
+ */
+describe("assertCanAccessTeamEntry", () => {
+  type Session = Parameters<typeof assertCanAccessTeamEntry>[0];
+  const entry = (managerId: string | null, leagueId: string) => ({
+    team: { managerId },
+    auction: { tournament: { leagueId } },
+  });
+  const session = (
+    id: string,
+    memberships: { leagueId: string; role: string }[],
+    isSiteAdmin = false
+  ) => ({ user: { id, name: "Someone", isSiteAdmin, memberships } }) as unknown as Session;
+
+  it("allows the team's own manager", () => {
+    const s = session("mgr", [{ leagueId: "A", role: "TEAM_MANAGER" }]);
+    expect(() => assertCanAccessTeamEntry(s, entry("mgr", "A"))).not.toThrow();
+  });
+
+  it("rejects a manager of a different team", () => {
+    const s = session("mgr", [{ leagueId: "A", role: "TEAM_MANAGER" }]);
+    expect(() => assertCanAccessTeamEntry(s, entry("other-mgr", "A"))).toThrow(AuthError);
+  });
+
+  it("allows a league admin of the auction's league", () => {
+    const s = session("la", [{ leagueId: "A", role: "LEAGUE_ADMIN" }]);
+    expect(() => assertCanAccessTeamEntry(s, entry("other-mgr", "A"))).not.toThrow();
+  });
+
+  it("allows the site admin regardless of league", () => {
+    const s = session("root", [], true);
+    expect(() => assertCanAccessTeamEntry(s, entry("other-mgr", "Z"))).not.toThrow();
+  });
+
+  it("rejects a league admin of another league who is only a viewer here", () => {
+    const s = session("la", [
+      { leagueId: "A", role: "LEAGUE_ADMIN" },
+      { leagueId: "B", role: "VIEWER" },
+    ]);
+    expect(() => assertCanAccessTeamEntry(s, entry("other-mgr", "B"))).toThrow(AuthError);
+  });
+
+  it("allows a league admin who also manages one team to reach the league's other teams", () => {
+    const s = session("la", [
+      { leagueId: "A", role: "LEAGUE_ADMIN" },
+      { leagueId: "A", role: "TEAM_MANAGER" },
+    ]);
+    expect(() => assertCanAccessTeamEntry(s, entry("other-mgr", "A"))).not.toThrow();
+  });
+
+  it("rejects a plain viewer of the league", () => {
+    const s = session("v", [{ leagueId: "A", role: "VIEWER" }]);
+    expect(() => assertCanAccessTeamEntry(s, entry("other-mgr", "A"))).toThrow(AuthError);
   });
 });

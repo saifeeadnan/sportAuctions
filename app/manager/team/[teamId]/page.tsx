@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { ConfirmedRosterTable } from "@/components/roster/ConfirmedRosterTable";
+import { RosterCardLinkPanel } from "@/components/roster/RosterCardLinkPanel";
 import { Badge } from "@/components/ui/Badge";
 
 const ENTRY_STATUS_VARIANT: Record<string, "neutral" | "info" | "success" | "warning"> = {
@@ -86,7 +87,7 @@ export default async function ManagerTeamDetailPage({
                 isCaptain: ap.id === entry.captainAuctionPlayerId,
               }))}
             />
-            <div className="flex items-center gap-4 mt-2">
+            <div className="flex items-center gap-4 mt-2 flex-wrap">
               {DRAFT_STATUSES.has(entry.status) && (
                 <Link
                   href={`/manager/teams/${entry.id}/draft`}
@@ -119,6 +120,13 @@ export default async function ManagerTeamDetailPage({
               >
                 Download roster card
               </a>
+              {entry.auction.status === "COMPLETED" && (
+                <RosterCardLinkPanel
+                  auctionId={entry.auctionId}
+                  entryId={entry.id}
+                  initialToken={entry.rosterCardToken}
+                />
+              )}
             </div>
           </section>
         ))
