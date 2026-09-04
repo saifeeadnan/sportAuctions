@@ -29,18 +29,13 @@ export function HighlightsLinkPanel({
   }
 
   if (token) {
-    return (
-      <div className="flex items-center gap-2 text-sm">
-        <code className="text-black/60 dark:text-white/60">/highlights/{token}</code>
-        <CopyInviteLinkButton path={`/highlights/${token}`} label="Copy shareable link" />
-      </div>
-    );
+    return <CopyInviteLinkButton path={`/highlights/${token}`} label="Copy highlights link" />;
   }
 
   return (
     <div className="flex flex-col gap-1">
       <button type="button" disabled={loading} onClick={handleCreate} className={buttonSecondary}>
-        {loading ? "Creating…" : "Create shareable link"}
+        {loading ? "Creating…" : "Create highlights link"}
       </button>
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
     </div>

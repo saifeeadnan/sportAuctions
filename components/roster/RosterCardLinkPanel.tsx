@@ -34,12 +34,7 @@ export function RosterCardLinkPanel({
   }
 
   if (token) {
-    return (
-      <div className="flex items-center gap-2 text-sm flex-wrap">
-        <code className="text-black/60 dark:text-white/60 break-all">/roster-card/{token}</code>
-        <CopyInviteLinkButton path={`/roster-card/${token}`} label="Copy shareable link" />
-      </div>
-    );
+    return <CopyInviteLinkButton path={`/roster-card/${token}`} label="Copy roster card link" />;
   }
 
   return (
@@ -50,7 +45,7 @@ export function RosterCardLinkPanel({
         onClick={handleCreate}
         className={`${buttonSecondary} px-2 py-1 text-xs`}
       >
-        {loading ? "Creating…" : "Create shareable link"}
+        {loading ? "Creating…" : "Create roster card link"}
       </button>
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
     </div>
