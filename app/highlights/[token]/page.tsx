@@ -58,6 +58,8 @@ export default async function HighlightsPage({
         />
 
         <div className="relative mx-auto max-w-4xl px-4 py-12 flex flex-col gap-12">
+          <SponsorRibbon sponsors={sponsors} showTopBorder={false} />
+
           {/* Header */}
           <div className="flex flex-col items-center text-center gap-3">
             <h1
@@ -66,21 +68,6 @@ export default async function HighlightsPage({
               Auction Legends
             </h1>
             <p className="text-sm text-white/50">{highlights.tournamentName}</p>
-
-            <div className="flex items-center gap-3 mt-2">
-              <div className="rounded-xl border border-white/10 bg-white/[0.04] px-5 py-2.5 text-center">
-                <p className={`${displayFont.className} text-3xl text-emerald-400 leading-none`}>
-                  {highlights.soldCount}
-                </p>
-                <p className="text-[10px] uppercase tracking-widest text-white/40 mt-1">Sold</p>
-              </div>
-              <div className="rounded-xl border border-white/10 bg-white/[0.04] px-5 py-2.5 text-center">
-                <p className={`${displayFont.className} text-3xl text-white/60 leading-none`}>
-                  {highlights.unsoldCount}
-                </p>
-                <p className="text-[10px] uppercase tracking-widest text-white/40 mt-1">Unsold</p>
-              </div>
-            </div>
           </div>
 
           {/* Biggest buy per category */}
@@ -196,8 +183,6 @@ export default async function HighlightsPage({
               </div>
             </section>
           )}
-
-          <SponsorRibbon sponsors={sponsors} />
 
           <p className="text-center text-[11px] uppercase tracking-[0.3em] text-white/25">
             Champions are built here

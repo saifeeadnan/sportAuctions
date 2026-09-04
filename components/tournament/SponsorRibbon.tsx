@@ -93,7 +93,16 @@ function buildRotationSequence(orderedSponsors: Sponsor[], seed: number): number
  * compete with the actual bidding UI for attention. The display order is
  * also randomized once per browser session (not per render) so no sponsor
  * structurally always leads, while staying stable as you navigate around. */
-export function SponsorRibbon({ sponsors }: { sponsors: Sponsor[] }) {
+export function SponsorRibbon({
+  sponsors,
+  showTopBorder = true,
+}: {
+  sponsors: Sponsor[];
+  /** False when this ribbon leads a page's content rather than trailing it
+   * (e.g. the highlights recap, which puts sponsors first) — the default
+   * top rule/margin only makes sense as a separator from something above. */
+  showTopBorder?: boolean;
+}) {
   const [featuredStep, setFeaturedStep] = useState(0);
   // Starts in the server-rendered order (already tier-sorted) so hydration
   // matches exactly, then reorders once on the client via the session's
@@ -124,7 +133,7 @@ export function SponsorRibbon({ sponsors }: { sponsors: Sponsor[] }) {
   if (sponsors.length === 0) return null;
 
   return (
-    <div className="mt-4 pt-4 border-t border-black/[0.08] dark:border-white/10">
+    <div className={showTopBorder ? "mt-4 pt-4 border-t border-black/[0.08] dark:border-white/10" : ""}>
       <p className="text-xs text-black/50 dark:text-white/50 mb-2">Sponsors</p>
       <div className="flex flex-nowrap items-center gap-4 overflow-x-auto pb-2">
         {orderedSponsors.map((sponsor, i) => {
