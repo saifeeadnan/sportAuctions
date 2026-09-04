@@ -6,7 +6,7 @@ import { ValidationError } from "@/lib/errors";
 import { toActionResult, type ActionResult } from "@/lib/actions/result";
 import { savePrediction, removePrediction } from "@/lib/services/auctionPrediction.service";
 
-async function requireOwnedAnalyticsEntry(teamAuctionEntryId: string) {
+async function requireOwnedAnalyticsEntry(teamAuctionEntryId: string): Promise<string> {
   const session = await requireRole("TEAM_MANAGER");
 
   const entry = await prisma.teamAuctionEntry.findUnique({
@@ -19,6 +19,7 @@ async function requireOwnedAnalyticsEntry(teamAuctionEntryId: string) {
   if (!entry.analyticsEnabled) {
     throw new ValidationError("The analytics dashboard is not enabled for this team");
   }
+  return session.user.id;
 }
 
 // No revalidatePath — like placeBidAction, the caller updates its own local
@@ -32,8 +33,8 @@ export async function savePredictionAction(
   predictedAmount: number | null
 ): Promise<ActionResult> {
   return toActionResult(async () => {
-    await requireOwnedAnalyticsEntry(teamAuctionEntryId);
-    await savePrediction(teamAuctionEntryId, auctionPlayerId, predictedWinnerEntryId, predictedAmount);
+    const actorUserId = await requireOwnedAnalyticsEntry(teamAuctionEntryId);
+    await savePrediction(teamAuctionEntryId, auctionPlayerId, predictedWinnerEntryId, predictedAmount, actorUserId);
   });
 }
 
@@ -42,7 +43,7 @@ export async function removePredictionAction(
   auctionPlayerId: string
 ): Promise<ActionResult> {
   return toActionResult(async () => {
-    await requireOwnedAnalyticsEntry(teamAuctionEntryId);
-    await removePrediction(teamAuctionEntryId, auctionPlayerId);
+    const actorUserId = await requireOwnedAnalyticsEntry(teamAuctionEntryId);
+    await removePrediction(teamAuctionEntryId, auctionPlayerId, actorUserId);
   });
 }

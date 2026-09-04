@@ -27,7 +27,13 @@ export async function saveRivalCategoryEstimateAction(
       throw new ValidationError("The analytics dashboard is not enabled for this team");
     }
 
-    await upsertRivalCategoryEstimate(teamAuctionEntryId, targetEntryId, categoryId, estimatedBudget);
+    await upsertRivalCategoryEstimate(
+      teamAuctionEntryId,
+      targetEntryId,
+      categoryId,
+      estimatedBudget,
+      session.user.id
+    );
     revalidatePath(`/manager/teams/${teamAuctionEntryId}/analytics-v2`);
   });
 }

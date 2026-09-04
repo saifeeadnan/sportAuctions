@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { ValidationError, InvalidStateTransitionError } from "@/lib/errors";
+import { writeAuditLog } from "@/lib/services/auditLog.service";
 
 export type StrategyBudgetTargetInput = { categoryId: string; targetAvgPrice: number };
 
@@ -36,7 +37,8 @@ export async function saveStrategy(
   teamAuctionEntryId: string,
   mustHaveIds: string[],
   avoidIds: string[],
-  budgetTargets: StrategyBudgetTargetInput[]
+  budgetTargets: StrategyBudgetTargetInput[],
+  actorUserId: string
 ) {
   const entry = await prisma.teamAuctionEntry.findUnique({
     where: { id: teamAuctionEntryId },
@@ -85,6 +87,9 @@ export async function saveStrategy(
   }
 
   await prisma.$transaction(async (tx) => {
+    const existingPreferences = await tx.auctionPlayerPreference.findMany({ where: { teamAuctionEntryId } });
+    const existingBudgetTargets = await tx.auctionCategoryBudgetTarget.findMany({ where: { teamAuctionEntryId } });
+
     await tx.auctionPlayerPreference.deleteMany({ where: { teamAuctionEntryId } });
     const preferenceRows = [
       ...mustHaveIds.map((auctionPlayerId) => ({
@@ -112,5 +117,23 @@ export async function saveStrategy(
         })),
       });
     }
+
+    await writeAuditLog(tx, {
+      entityType: "TeamAuctionEntry",
+      entityId: teamAuctionEntryId,
+      auctionId: entry.auctionId,
+      action: "STRATEGY_SAVED",
+      actorUserId,
+      before: {
+        mustHaveCount: existingPreferences.filter((p) => p.type === "MUST_HAVE").length,
+        avoidCount: existingPreferences.filter((p) => p.type === "AVOID").length,
+        budgetTargetCount: existingBudgetTargets.length,
+      },
+      after: {
+        mustHaveCount: mustHaveIds.length,
+        avoidCount: avoidIds.length,
+        budgetTargetCount: budgetTargets.length,
+      },
+    });
   });
 }

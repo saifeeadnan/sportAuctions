@@ -14,9 +14,9 @@ export async function setAnalyticsEnabledAction(
   enabled: boolean
 ): Promise<ActionResult> {
   return toActionResult(async () => {
-    await requireRole("ADMIN");
+    const session = await requireRole("ADMIN");
     await loadScopedAuction(auctionId, null);
-    await setAnalyticsEnabled(teamAuctionEntryId, enabled);
+    await setAnalyticsEnabled(teamAuctionEntryId, enabled, session.user.id);
     revalidatePath(`/admin/auctions/${auctionId}/teams/${teamAuctionEntryId}`);
   });
 }

@@ -59,7 +59,14 @@ export type AuditAction =
   | "PASSWORD_CHANGED_SELF"
   | "PASSWORD_RESET_BY_ADMIN"
   | "PROFILE_UPDATED_SELF"
-  | "PROFILE_UPDATED_BY_ADMIN";
+  | "PROFILE_UPDATED_BY_ADMIN"
+  | "STRATEGY_SAVED"
+  | "PREDICTION_SAVED"
+  | "PREDICTION_REMOVED"
+  | "RIVAL_ESTIMATE_SAVED"
+  | "RIVAL_ESTIMATE_REMOVED"
+  | "ANALYTICS_ENABLED"
+  | "ANALYTICS_DISABLED";
 
 /**
  * Writes one audit row. Always takes an explicit transaction client — never

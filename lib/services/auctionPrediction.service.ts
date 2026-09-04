@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { ValidationError } from "@/lib/errors";
+import { writeAuditLog } from "@/lib/services/auditLog.service";
 
 export type PredictionEntry = {
   predictedWinnerEntryId: string;
@@ -31,7 +32,8 @@ export async function savePrediction(
   teamAuctionEntryId: string,
   auctionPlayerId: string,
   predictedWinnerEntryId: string,
-  predictedAmount: number | null
+  predictedAmount: number | null,
+  actorUserId: string
 ) {
   if (predictedWinnerEntryId === teamAuctionEntryId) {
     throw new ValidationError("You cannot predict your own team as the winner");
@@ -42,7 +44,7 @@ export async function savePrediction(
 
   const [entry, auctionPlayer, winnerEntry] = await Promise.all([
     prisma.teamAuctionEntry.findUnique({ where: { id: teamAuctionEntryId } }),
-    prisma.auctionPlayer.findUnique({ where: { id: auctionPlayerId } }),
+    prisma.auctionPlayer.findUnique({ where: { id: auctionPlayerId }, include: { player: true } }),
     prisma.teamAuctionEntry.findUnique({ where: { id: predictedWinnerEntryId } }),
   ]);
   if (!entry) throw new ValidationError("Team auction entry not found");
@@ -58,13 +60,60 @@ export async function savePrediction(
     throw new ValidationError("This player has already been sold");
   }
 
-  await prisma.auctionPlayerPrediction.upsert({
-    where: { teamAuctionEntryId_auctionPlayerId: { teamAuctionEntryId, auctionPlayerId } },
-    create: { teamAuctionEntryId, auctionPlayerId, predictedWinnerEntryId, predictedAmount },
-    update: { predictedWinnerEntryId, predictedAmount },
+  await prisma.$transaction(async (tx) => {
+    const existing = await tx.auctionPlayerPrediction.findUnique({
+      where: { teamAuctionEntryId_auctionPlayerId: { teamAuctionEntryId, auctionPlayerId } },
+    });
+    await tx.auctionPlayerPrediction.upsert({
+      where: { teamAuctionEntryId_auctionPlayerId: { teamAuctionEntryId, auctionPlayerId } },
+      create: { teamAuctionEntryId, auctionPlayerId, predictedWinnerEntryId, predictedAmount },
+      update: { predictedWinnerEntryId, predictedAmount },
+    });
+    await writeAuditLog(tx, {
+      entityType: "TeamAuctionEntry",
+      entityId: teamAuctionEntryId,
+      auctionId: entry.auctionId,
+      action: "PREDICTION_SAVED",
+      actorUserId,
+      before: existing
+        ? {
+            playerName: auctionPlayer.player.name,
+            predictedWinnerEntryId: existing.predictedWinnerEntryId,
+            predictedAmount: existing.predictedAmount?.toString() ?? null,
+          }
+        : null,
+      after: {
+        playerName: auctionPlayer.player.name,
+        predictedWinnerEntryId,
+        predictedAmount: predictedAmount?.toString() ?? null,
+      },
+    });
   });
 }
 
-export async function removePrediction(teamAuctionEntryId: string, auctionPlayerId: string) {
-  await prisma.auctionPlayerPrediction.deleteMany({ where: { teamAuctionEntryId, auctionPlayerId } });
+export async function removePrediction(teamAuctionEntryId: string, auctionPlayerId: string, actorUserId: string) {
+  const [entry, existing] = await Promise.all([
+    prisma.teamAuctionEntry.findUnique({ where: { id: teamAuctionEntryId } }),
+    prisma.auctionPlayerPrediction.findUnique({
+      where: { teamAuctionEntryId_auctionPlayerId: { teamAuctionEntryId, auctionPlayerId } },
+      include: { auctionPlayer: { include: { player: true } } },
+    }),
+  ]);
+  if (!existing) return;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.auctionPlayerPrediction.deleteMany({ where: { teamAuctionEntryId, auctionPlayerId } });
+    await writeAuditLog(tx, {
+      entityType: "TeamAuctionEntry",
+      entityId: teamAuctionEntryId,
+      auctionId: entry?.auctionId,
+      action: "PREDICTION_REMOVED",
+      actorUserId,
+      before: {
+        playerName: existing.auctionPlayer.player.name,
+        predictedWinnerEntryId: existing.predictedWinnerEntryId,
+        predictedAmount: existing.predictedAmount?.toString() ?? null,
+      },
+    });
+  });
 }

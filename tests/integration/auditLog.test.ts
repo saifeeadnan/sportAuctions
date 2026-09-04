@@ -25,6 +25,10 @@ import {
   changePassword,
   updateUserProfile,
 } from "@/lib/services/user.service";
+import { saveStrategy } from "@/lib/services/auctionStrategy.service";
+import { savePrediction, removePrediction } from "@/lib/services/auctionPrediction.service";
+import { upsertRivalCategoryEstimate } from "@/lib/services/rivalCategoryEstimate.service";
+import { setAnalyticsEnabled } from "@/lib/services/auctionAnalyticsEntitlement.service";
 
 beforeEach(resetDb);
 
@@ -270,6 +274,133 @@ describe("audit log — membership & profile", () => {
       entityId: user.id,
       action: "USER_DEACTIVATED",
       actorUserId: admin.id,
+    });
+  });
+});
+
+/** A live (BIDDING) two-team auction — the Analytics v2 planning tools
+ * (strategy, predictions, rival estimates) are all usable mid-auction, not
+ * just pre/post, and predicting/estimating against a *second* team needs one
+ * to exist. No drafts submitted — force-locked straight to BIDDING. */
+async function buildAnalyticsFixture() {
+  const fx = await createAuctionReadyFixture({
+    playerNames: ["Player One", "Player Two"],
+    teamNames: ["Team 1", "Team 2"],
+    squadSize: 2,
+  });
+  const auction = await createAuction({
+    tournamentId: fx.tournament.id,
+    name: "Auction",
+    teamBudget: 1000,
+    createdById: fx.admin.id,
+    categories: [{ name: "Regular", basePrice: 100 }],
+    playerAssignments: fx.players.map((p) => ({ playerId: p.id, categoryName: "Regular" })),
+  });
+  await openPreAuction(auction.id, fx.admin.id);
+  await lockPreAuction(auction.id, true, fx.admin.id);
+  await startBidding(auction.id, fx.admin.id);
+
+  const [entry1, entry2] = await prisma.teamAuctionEntry.findMany({
+    where: { auctionId: auction.id },
+    include: { team: true },
+    orderBy: { team: { name: "asc" } },
+  });
+  const category = await prisma.auctionCategory.findFirstOrThrow({ where: { auctionId: auction.id } });
+  const playerOne = await prisma.auctionPlayer.findFirstOrThrow({
+    where: { auctionId: auction.id, playerId: fx.players[0].id },
+  });
+
+  return { ...fx, auction, entry1, entry2, category, playerOne };
+}
+
+describe("audit log — analytics dashboard", () => {
+  it("saveStrategy writes a STRATEGY_SAVED row with must-have/avoid/budget-target counts", async () => {
+    const fx = await buildAnalyticsFixture();
+
+    await saveStrategy(
+      fx.entry1.id,
+      [fx.playerOne.id],
+      [],
+      [{ categoryId: fx.category.id, targetAvgPrice: 150 }],
+      fx.entry1.team.managerId!
+    );
+
+    const log = await expectAuditLog({
+      entityType: "TeamAuctionEntry",
+      entityId: fx.entry1.id,
+      action: "STRATEGY_SAVED",
+      actorUserId: fx.entry1.team.managerId!,
+    });
+    expect(log.auctionId).toBe(fx.auction.id);
+    expect((log.before as { mustHaveCount?: number })?.mustHaveCount).toBe(0);
+    expect((log.after as { mustHaveCount?: number })?.mustHaveCount).toBe(1);
+    expect((log.after as { budgetTargetCount?: number })?.budgetTargetCount).toBe(1);
+  });
+
+  it("savePrediction writes PREDICTION_SAVED, then removePrediction writes PREDICTION_REMOVED", async () => {
+    const fx = await buildAnalyticsFixture();
+    const actorId = fx.entry1.team.managerId!;
+
+    await savePrediction(fx.entry1.id, fx.playerOne.id, fx.entry2.id, 250, actorId);
+    const saved = await expectAuditLog({
+      entityType: "TeamAuctionEntry",
+      entityId: fx.entry1.id,
+      action: "PREDICTION_SAVED",
+      actorUserId: actorId,
+    });
+    expect((saved.after as { predictedAmount?: string })?.predictedAmount).toBe("250");
+    expect(saved.before).toBeNull();
+
+    await removePrediction(fx.entry1.id, fx.playerOne.id, actorId);
+    const removed = await expectAuditLog({
+      entityType: "TeamAuctionEntry",
+      entityId: fx.entry1.id,
+      action: "PREDICTION_REMOVED",
+      actorUserId: actorId,
+    });
+    expect((removed.before as { predictedAmount?: string })?.predictedAmount).toBe("250");
+  });
+
+  it("upsertRivalCategoryEstimate writes RIVAL_ESTIMATE_SAVED, then RIVAL_ESTIMATE_REMOVED when cleared", async () => {
+    const fx = await buildAnalyticsFixture();
+    const actorId = fx.entry1.team.managerId!;
+
+    await upsertRivalCategoryEstimate(fx.entry1.id, fx.entry2.id, fx.category.id, 300, actorId);
+    const saved = await expectAuditLog({
+      entityType: "TeamAuctionEntry",
+      entityId: fx.entry1.id,
+      action: "RIVAL_ESTIMATE_SAVED",
+      actorUserId: actorId,
+    });
+    expect((saved.after as { estimatedBudget?: string })?.estimatedBudget).toBe("300");
+
+    await upsertRivalCategoryEstimate(fx.entry1.id, fx.entry2.id, fx.category.id, null, actorId);
+    const removed = await expectAuditLog({
+      entityType: "TeamAuctionEntry",
+      entityId: fx.entry1.id,
+      action: "RIVAL_ESTIMATE_REMOVED",
+      actorUserId: actorId,
+    });
+    expect((removed.before as { estimatedBudget?: string })?.estimatedBudget).toBe("300");
+  });
+
+  it("setAnalyticsEnabled writes ANALYTICS_ENABLED / ANALYTICS_DISABLED", async () => {
+    const fx = await buildAnalyticsFixture();
+
+    await setAnalyticsEnabled(fx.entry1.id, true, fx.admin.id);
+    await expectAuditLog({
+      entityType: "TeamAuctionEntry",
+      entityId: fx.entry1.id,
+      action: "ANALYTICS_ENABLED",
+      actorUserId: fx.admin.id,
+    });
+
+    await setAnalyticsEnabled(fx.entry1.id, false, fx.admin.id);
+    await expectAuditLog({
+      entityType: "TeamAuctionEntry",
+      entityId: fx.entry1.id,
+      action: "ANALYTICS_DISABLED",
+      actorUserId: fx.admin.id,
     });
   });
 });

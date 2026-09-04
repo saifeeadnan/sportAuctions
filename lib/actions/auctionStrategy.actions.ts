@@ -27,7 +27,7 @@ export async function saveStrategyAction(
       throw new ValidationError("The analytics dashboard is not enabled for this team");
     }
 
-    await saveStrategy(teamAuctionEntryId, mustHaveIds, avoidIds, budgetTargets);
+    await saveStrategy(teamAuctionEntryId, mustHaveIds, avoidIds, budgetTargets, session.user.id);
     revalidatePath(`/manager/teams/${teamAuctionEntryId}/strategy`);
   });
 }
