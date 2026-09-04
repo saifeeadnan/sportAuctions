@@ -165,6 +165,7 @@ export async function GET(
             background: "#000000",
             padding: "72px 64px",
             fontFamily: "sans-serif",
+            border: "2px solid rgba(255, 255, 255, 0.14)",
           }}
         >
           {/* Team identity */}
@@ -251,7 +252,11 @@ export async function GET(
                       src={photo}
                       width={125}
                       height={125}
-                      style={{ borderRadius: "50%", objectFit: "cover" }}
+                      style={{
+                        borderRadius: 16,
+                        objectFit: "cover",
+                        border: "2px solid rgba(255, 255, 255, 0.18)",
+                      }}
                     />
                   ) : (
                     <div
@@ -259,7 +264,8 @@ export async function GET(
                         display: "flex",
                         width: 125,
                         height: 125,
-                        borderRadius: "50%",
+                        borderRadius: 16,
+                        border: "2px solid rgba(255, 255, 255, 0.18)",
                         background: colorFor(ap.player.name),
                         color: "white",
                         fontSize: 39,
@@ -322,7 +328,8 @@ export async function GET(
                     display: "flex",
                     width: 125,
                     height: 125,
-                    borderRadius: "50%",
+                    borderRadius: 16,
+                    border: "2px solid rgba(255, 255, 255, 0.18)",
                     background: "#374151",
                     color: "#F9FAFB",
                     fontSize: 34,
