@@ -123,8 +123,18 @@ export async function GET(
       include: { player: true, category: true },
       orderBy: { player: { name: "asc" } },
     });
-    const shown = confirmedPlayers.slice(0, MAX_PLAYERS_SHOWN);
-    const overflowCount = confirmedPlayers.length - shown.length;
+    // The captain (if assigned) leads the card, ahead of the alphabetical
+    // order everyone else keeps — sorted before the MAX_PLAYERS_SHOWN slice
+    // so a captain is never pushed into the "+N more" overflow tile.
+    const captainId = entry.captainAuctionPlayerId;
+    const orderedPlayers = captainId
+      ? [
+          ...confirmedPlayers.filter((ap) => ap.id === captainId),
+          ...confirmedPlayers.filter((ap) => ap.id !== captainId),
+        ]
+      : confirmedPlayers;
+    const shown = orderedPlayers.slice(0, MAX_PLAYERS_SHOWN);
+    const overflowCount = orderedPlayers.length - shown.length;
 
     // Processed one at a time (not Promise.all) — each source photo can be a
     // multi-megabyte camera original, and decoding several of those
@@ -272,6 +282,25 @@ export async function GET(
                   >
                     {ap.player.name}
                   </div>
+                  {ap.id === captainId && (
+                    // Its own line below the name, not inline beside it — a
+                    // wrapped two-line name would otherwise leave "(C)"
+                    // vertically stranded between the lines.
+                    <div
+                      style={{
+                        display: "flex",
+                        marginTop: 4,
+                        padding: "1px 10px",
+                        borderRadius: 999,
+                        background: "rgba(245, 158, 11, 0.15)",
+                        color: "#FBBF24",
+                        fontSize: 14,
+                        fontWeight: 700,
+                      }}
+                    >
+                      (C)
+                    </div>
+                  )}
                   <div style={{ fontSize: 15, color: "#9CA3AF", marginTop: 2 }}>
                     {ap.category.name}
                   </div>

@@ -51,20 +51,17 @@ this could plug into it later.
 
 ---
 
-## Native mobile app (iOS / Android)
+## Native mobile app (iOS / Android) — Done 2026-08-31
 
-A real phone app — likely React Native/Expo to share logic with the existing TypeScript codebase,
-rather than two fully separate native codebases — for managers bidding live and for viewers
-watching, as an alternative to the mobile-responsive web app.
-
-Main draws over the current mobile-web experience: push notifications (e.g. "you've been
-outbid"), a home-screen icon/app-switcher presence during a long live auction, and generally
-snappier perceived performance than a browser tab.
-
-**Rough size:** large. The app today is Server Actions + React Server Components, not a
-REST/GraphQL API a mobile client could call directly — this would need a real API layer built out
-first (or a shared data layer the app exposes both ways), on top of the actual mobile client work
-and app-store submission/review for both platforms.
+~~A real phone app... for managers bidding live and for viewers watching, as an alternative to the
+mobile-responsive web app.~~ **Done 2026-08-31.** Shipped in two phases: Phase 0 (2026-08-21) added
+a server-side bearer-token auth layer alongside the existing cookie sessions
+(`app/api/mobile/**`) — the "real API layer" this used to say was a prerequisite. Phase 1
+(2026-08-31, `02e025f`) is the actual Expo (SDK 54) client: auth, live bidding, and fantasy teams,
+scoped to VIEWER/TEAM_MANAGER, redesigned to mirror the web app. Home-screen presence and snappier
+perceived performance are both realized. The one draw from the original pitch still open is push
+notifications (e.g. "you've been outbid") — tracked as its own item below, since it's additive to
+an app that already exists rather than a prerequisite for one.
 
 ---
 
@@ -91,9 +88,12 @@ enough to build on its own.
   anti-spam, not a public clock).
 - [ ] **Real-time "you've been outbid" push notifications** — a lighter-weight version of the native
   mobile app idea above; deliverable via browser web push alone, no app store needed.
-- [ ] **Post-auction highlights/recap page** — a shareable summary once the auction ends (biggest
-  buy, best-value pick, spend by category) — reuses data already being collected, good for social
-  sharing/engagement.
+- [x] **Post-auction highlights/recap page** — ~~a shareable summary once the auction ends (biggest
+  buy, best-value pick, spend by category)~~. **Done 2026-08-21, most recently polished
+  2026-09-03.** Public token-based share link (`app/highlights/[token]/page.tsx`) showing sold/
+  unsold counts, biggest buy per category, team captains, the best-value pick, sponsor placements,
+  and a spend-by-category chart (redesigned 2026-09-03 to show average price per player as a
+  dot/lollipop plot rather than total spend, per the dataviz skill's one-axis rule).
 - [ ] **Player comparison tool** — side-by-side stats for a manager's shortlisted players, for
   pre-auction planning or live in-the-moment decisions.
 - [ ] **Multi-day auction scheduling** — pause/resume an auction across multiple sessions for larger
@@ -110,6 +110,33 @@ spotlight (weighted 3x/2x/1x), and always leads with Title before Marquee before
 `SponsorSplash`'s one-time modal sizes logos the same way. The admin sponsor grid shows a tier
 badge per sponsor. Every sponsor that existed before this shipped was backfilled to `MARQUEE` as a
 one-time goodwill bump; new sponsors default to `COMMUNITY`.
+
+---
+
+## Multi-factor authentication + email/text sending capability
+
+Two related pieces: (1) a general-purpose ability for the app to actually send email and SMS
+messages, which doesn't exist today at all, and (2) multi-factor authentication on login, built on
+top of that — a one-time code sent to email or phone as a second factor beyond today's single
+loginId+password `Credentials` check.
+
+**Why:** Login is currently one leaked/guessed password away from full account takeover, which
+matters most for Admin/League-Admin accounts (they control team budgets, corrections, and league
+settings). The messaging capability itself is also independently useful beyond MFA — password
+reset via email, and a channel for the "you've been outbid" notification idea already in the
+Auction enhancements list above (SMS/email as an alternative or companion to a native push
+notification).
+
+**Rough size:** medium-to-large, in two separable pieces. `User.email`/`User.phone` already exist
+as optional, unique fields on the model (`prisma/schema.prisma`) — collected but never actually
+used to send anything today — so the destination data is already there. What's missing: a
+third-party provider integration for actually sending (email: e.g. Resend/SendGrid/SES; SMS:
+Twilio or similar — new external dependency + API credentials), and, for MFA specifically, new
+enrollment/challenge state (an MFA-enabled flag, a pending-challenge record, backup codes) plus a
+second step inserted into the login flow after password check — not a drop-in NextAuth
+`Credentials` provider option, since MFA isn't a first-class concept there, so this needs a custom
+challenge screen/flow in `auth.ts`/`auth.config.ts`. The messaging capability could ship on its own
+first (unlocking password reset + notifications) with MFA following once it exists.
 
 ---
 
