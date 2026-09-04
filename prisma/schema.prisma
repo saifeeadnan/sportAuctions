@@ -126,6 +126,7 @@ model User {
   analyticsSessions  AnalyticsSession[]
   sponsorClicks      SponsorClickEvent[]
   auctionCorrections AuctionCorrectionLog[]
+  auditLogs          AuditLog[]
 
   @@map("users")
 }
@@ -416,6 +417,41 @@ model AuctionCorrectionLog {
   @@index([adminUserId])
   @@index([createdAt])
   @@map("auction_correction_logs")
+}
+
+// The generic audit trail — supersedes AuctionCorrectionLog (kept temporarily
+// alongside it; existing rows are migrated in via
+// scripts/migrate-correction-log-to-audit-log.ts, then this becomes the only
+// place "what changed on this auction / this person's access" is answered
+// from). entityType/entityId/auctionId are deliberately bare strings, not
+// typed relations — polymorphic across many models, and must survive
+// deletion of the row they describe (an audit trail that vanishes when the
+// audited row is deleted defeats its own purpose). Only actorUserId gets a
+// real FK, since it always points at the same single model; actorLabel is a
+// denormalized snapshot of that actor's own loginId at write time, so
+// attribution survives even past a hard User deletion (onDelete: SetNull
+// only nulls the FK, never actorLabel).
+model AuditLog {
+  id          String   @id @default(cuid())
+  entityType  String
+  entityId    String
+  auctionId   String?
+  action      String
+  actorUserId String?
+  actor       User?    @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+  actorLabel  String?
+  // Only the fields a given action actually changed — never a whole-row
+  // dump, and never a password hash or other secret, in either direction.
+  before      Json?
+  after       Json?
+  note        String?
+  createdAt   DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([auctionId])
+  @@index([actorUserId])
+  @@index([createdAt])
+  @@map("audit_logs")
 }
 
 model AuctionCategory {

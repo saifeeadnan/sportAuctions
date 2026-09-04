@@ -184,9 +184,9 @@ describe("read-only league blocks every creation path", () => {
   });
 
   it("blocks createTeam", async () => {
-    const { tournament } = await buildReadOnlyFixture();
+    const { tournament, admin } = await buildReadOnlyFixture();
     await expect(
-      createTeam({ tournamentId: tournament.id, name: "New Team", managerOccupiesSlot: true })
+      createTeam({ tournamentId: tournament.id, name: "New Team", managerOccupiesSlot: true }, admin.id)
     ).rejects.toThrow(/read-only/);
   });
 
@@ -318,11 +318,11 @@ describe("deleteTeam blocked when league is read-only", () => {
       tournamentId: tournament.id,
       name: "Team A",
       managerOccupiesSlot: true,
-    });
+    }, admin.id);
 
     await updateLeagueSettings(league.id, { endDate: PAST });
 
-    await expect(deleteTeam(team.id)).rejects.toThrow(/read-only/);
+    await expect(deleteTeam(team.id, admin.id)).rejects.toThrow(/read-only/);
   });
 });
 
@@ -374,9 +374,9 @@ describe("read-only league freezes the Auctioneer console and auction-settings e
       playerAssignments: players.map((p) => ({ playerId: p.id, categoryName: "Regular" })),
     });
 
-    await openPreAuction(auction.id);
-    await lockPreAuction(auction.id, true);
-    await startBidding(auction.id);
+    await openPreAuction(auction.id, admin.id);
+    await lockPreAuction(auction.id, true, admin.id);
+    await startBidding(auction.id, admin.id);
 
     const entries = await prisma.teamAuctionEntry.findMany({ where: { auctionId: auction.id } });
     const auctionPlayers = await prisma.auctionPlayer.findMany({ where: { auctionId: auction.id } });
@@ -394,54 +394,54 @@ describe("read-only league freezes the Auctioneer console and auction-settings e
   });
 
   it("blocks every Auctioneer-console bidding action", async () => {
-    const { league, auction, entries, auctionPlayers } = await buildBiddingReadyFixture();
+    const { league, admin, auction, entries, auctionPlayers } = await buildBiddingReadyFixture();
     await updateLeagueSettings(league.id, { endDate: PAST });
 
     await expect(selectNextPlayer(auction.id, auctionPlayers[0].id)).rejects.toThrow(/read-only/);
     await expect(placeBid(auction.id, auctionPlayers[0].id, entries[0].id, 100)).rejects.toThrow(
       /read-only/
     );
-    await expect(markUnsold(auction.id, auctionPlayers[0].id)).rejects.toThrow(/read-only/);
-    await expect(removePlayerFromTeam(auction.id, auctionPlayers[0].id)).rejects.toThrow(
+    await expect(markUnsold(auction.id, auctionPlayers[0].id, admin.id)).rejects.toThrow(/read-only/);
+    await expect(removePlayerFromTeam(auction.id, auctionPlayers[0].id, admin.id)).rejects.toThrow(
       /read-only/
     );
-    await expect(concludeAuction(auction.id)).rejects.toThrow(/read-only/);
+    await expect(concludeAuction(auction.id, admin.id)).rejects.toThrow(/read-only/);
   });
 
   it("blocks recordSale once a player is on the clock", async () => {
-    const { league, auction, entries, auctionPlayers } = await buildBiddingReadyFixture();
+    const { league, admin, auction, entries, auctionPlayers } = await buildBiddingReadyFixture();
     const onClock = await selectNextPlayer(auction.id, auctionPlayers[0].id);
 
     await updateLeagueSettings(league.id, { endDate: PAST });
 
     await expect(
-      recordSale(auction.id, onClock.id, entries[0].id, 100)
+      recordSale(auction.id, onClock.id, entries[0].id, 100, admin.id)
     ).rejects.toThrow(/read-only/);
   });
 
   it("blocks adminAssignPlayer", async () => {
-    const { league, auction, entries, auctionPlayers } = await buildBiddingReadyFixture();
+    const { league, admin, auction, entries, auctionPlayers } = await buildBiddingReadyFixture();
     await updateLeagueSettings(league.id, { endDate: PAST });
 
     await expect(
-      adminAssignPlayer(auction.id, auctionPlayers[0].id, entries[0].id, 100)
+      adminAssignPlayer(auction.id, auctionPlayers[0].id, entries[0].id, 100, admin.id)
     ).rejects.toThrow(/read-only/);
   });
 
   it("blocks every auction-settings edit", async () => {
-    const { league, auction, players, categories } = await buildBiddingReadyFixture();
+    const { league, admin, auction, players, categories } = await buildBiddingReadyFixture();
     await updateLeagueSettings(league.id, { endDate: PAST });
 
     await expect(
-      addPlayerToAuction(auction.id, players[0].id, categories[0].id)
+      addPlayerToAuction(auction.id, players[0].id, categories[0].id, admin.id)
     ).rejects.toThrow(/read-only/);
     await expect(
-      updateAuctionPlayerCategory(auction.id, "placeholder", categories[0].id)
+      updateAuctionPlayerCategory(auction.id, "placeholder", categories[0].id, admin.id)
     ).rejects.toThrow(/read-only/);
-    await expect(updateCategoryBidIncrement(categories[0].id, 10)).rejects.toThrow(/read-only/);
-    await expect(resetAuctionToPreBidding(auction.id)).rejects.toThrow(/read-only/);
+    await expect(updateCategoryBidIncrement(categories[0].id, 10, admin.id)).rejects.toThrow(/read-only/);
+    await expect(resetAuctionToPreBidding(auction.id, admin.id)).rejects.toThrow(/read-only/);
     await expect(
-      updateAuctionTeamSettings(auction.id, { newTeamBudget: 2000 })
+      updateAuctionTeamSettings(auction.id, { newTeamBudget: 2000 }, admin.id)
     ).rejects.toThrow(/read-only/);
   });
 });

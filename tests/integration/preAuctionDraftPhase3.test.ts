@@ -38,7 +38,7 @@ describe("pre-auction draft -> overlap resolution", () => {
       ],
     });
 
-    await openPreAuction(auction.id);
+    await openPreAuction(auction.id, fixture.admin.id);
 
     const [e1, e2, e3] = await Promise.all(
       fixture.teams.map((t) =>
@@ -58,11 +58,19 @@ describe("pre-auction draft -> overlap resolution", () => {
     const contested = "P2"; // Icon, drafted by both Team 1 and Team 2
     const untouched = "P10"; // never drafted
 
-    await submitDraft(e1.id, [apByPlayerName.get(uniqueA)!.id, apByPlayerName.get(contested)!.id]);
-    await submitDraft(e2.id, [apByPlayerName.get(uniqueB)!.id, apByPlayerName.get(contested)!.id]);
-    await submitDraft(e3.id, [apByPlayerName.get(uniqueC)!.id]);
+    await submitDraft(
+      e1.id,
+      [apByPlayerName.get(uniqueA)!.id, apByPlayerName.get(contested)!.id],
+      fixture.teams[0].managerId!
+    );
+    await submitDraft(
+      e2.id,
+      [apByPlayerName.get(uniqueB)!.id, apByPlayerName.get(contested)!.id],
+      fixture.teams[1].managerId!
+    );
+    await submitDraft(e3.id, [apByPlayerName.get(uniqueC)!.id], fixture.teams[2].managerId!);
 
-    await lockPreAuction(auction.id, false);
+    await lockPreAuction(auction.id, false, fixture.admin.id);
 
     const finalPlayers = await prisma.auctionPlayer.findMany({
       where: { auctionId: auction.id },

@@ -12,9 +12,9 @@ export async function assignTeamCaptainAction(
   auctionPlayerId: string | null
 ): Promise<ActionResult> {
   return toActionResult(async () => {
-    const { leagueIds } = await requireAdminOrLeagueAdmin();
+    const { session, leagueIds } = await requireAdminOrLeagueAdmin();
     await loadScopedAuction(auctionId, leagueIds);
-    await assignTeamCaptain(auctionId, teamAuctionEntryId, auctionPlayerId);
+    await assignTeamCaptain(auctionId, teamAuctionEntryId, auctionPlayerId, session.user.id);
     revalidatePath(`/admin/auctions/${auctionId}/results`);
   });
 }

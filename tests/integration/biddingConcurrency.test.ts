@@ -31,9 +31,9 @@ describe("placeBid concurrency", () => {
       categories: [{ name: "Regular", basePrice: 100 }],
       playerAssignments: fixture.players.map((p) => ({ playerId: p.id, categoryName: "Regular" })),
     });
-    await openPreAuction(auction.id);
-    await lockPreAuction(auction.id, true);
-    await startBidding(auction.id);
+    await openPreAuction(auction.id, fixture.admin.id);
+    await lockPreAuction(auction.id, true, fixture.admin.id);
+    await startBidding(auction.id, fixture.admin.id);
 
     const [entry1, entry2] = await Promise.all(
       fixture.teams.map((t) =>
@@ -83,9 +83,9 @@ describe("placeBid concurrency", () => {
       categories: [{ name: "Regular", basePrice: 100 }],
       playerAssignments: fixture.players.map((p) => ({ playerId: p.id, categoryName: "Regular" })),
     });
-    await openPreAuction(auction.id);
-    await lockPreAuction(auction.id, true);
-    await startBidding(auction.id);
+    await openPreAuction(auction.id, fixture.admin.id);
+    await lockPreAuction(auction.id, true, fixture.admin.id);
+    await startBidding(auction.id, fixture.admin.id);
 
     const entry1 = await prisma.teamAuctionEntry.findFirstOrThrow({
       where: { auctionId: auction.id, teamId: fixture.teams[0].id },

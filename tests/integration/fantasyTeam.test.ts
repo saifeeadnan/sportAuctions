@@ -57,9 +57,9 @@ async function buildFantasyEligibleFixture(options?: { leaveSelfPlayerUnsold?: b
     playerAssignments: fx.players.map((p) => ({ playerId: p.id, categoryName: "Regular" })),
   });
 
-  await openPreAuction(auction.id);
-  await lockPreAuction(auction.id, true);
-  await startBidding(auction.id);
+  await openPreAuction(auction.id, fx.admin.id);
+  await lockPreAuction(auction.id, true, fx.admin.id);
+  await startBidding(auction.id, fx.admin.id);
 
   const team1Entry = await prisma.teamAuctionEntry.findFirstOrThrow({
     where: { auctionId: auction.id },
@@ -75,10 +75,10 @@ async function buildFantasyEligibleFixture(options?: { leaveSelfPlayerUnsold?: b
   });
 
   if (!options?.leaveSelfPlayerUnsold) {
-    await adminAssignPlayer(auction.id, selfAuctionPlayer.id, team1Entry.id, 100);
+    await adminAssignPlayer(auction.id, selfAuctionPlayer.id, team1Entry.id, 100, fx.admin.id);
   }
-  await adminAssignPlayer(auction.id, soldAuctionPlayer.id, team1Entry.id, 100);
-  await concludeAuction(auction.id);
+  await adminAssignPlayer(auction.id, soldAuctionPlayer.id, team1Entry.id, 100, fx.admin.id);
+  await concludeAuction(auction.id, fx.admin.id);
 
   // isFantasyEditingLocked compares against the tournament's startDate, which
   // the shared createAuctionReadyFixture sets to "now" — push it into the
@@ -93,6 +93,7 @@ async function buildFantasyEligibleFixture(options?: { leaveSelfPlayerUnsold?: b
   return {
     auction,
     league: fx.league,
+    admin: fx.admin,
     viewer,
     manager,
     selfAuctionPlayer: await prisma.auctionPlayer.findUniqueOrThrow({ where: { id: selfAuctionPlayer.id } }),
@@ -188,7 +189,7 @@ describe("Auction.fantasyLockDate override", () => {
     // buildFantasyEligibleFixture already pushed tournament.startDate into
     // FUTURE — without an override, submission would still succeed here.
     const PAST = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    await updateFantasyLockDate(fx.auction.id, PAST);
+    await updateFantasyLockDate(fx.auction.id, PAST, fx.admin.id);
 
     await expect(
       submitFantasyTeam(fx.auction.id, fx.viewer.id, [fx.soldAuctionPlayer.id], null)
@@ -201,7 +202,7 @@ describe("Auction.fantasyLockDate override", () => {
     // Flip the tournament's own startDate into the past — without an
     // override this alone would already lock submission.
     await prisma.tournament.update({ where: { id: fx.auction.tournamentId }, data: { startDate: PAST } });
-    await updateFantasyLockDate(fx.auction.id, FUTURE);
+    await updateFantasyLockDate(fx.auction.id, FUTURE, fx.admin.id);
 
     const team = await submitFantasyTeam(fx.auction.id, fx.viewer.id, [fx.soldAuctionPlayer.id], null);
     expect(team.id).toBeTruthy();
@@ -210,8 +211,8 @@ describe("Auction.fantasyLockDate override", () => {
   it("clearing the override (null) reverts to the tournament's startDate", async () => {
     const fx = await buildFantasyEligibleFixture();
     const PAST = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    await updateFantasyLockDate(fx.auction.id, PAST);
-    await updateFantasyLockDate(fx.auction.id, null);
+    await updateFantasyLockDate(fx.auction.id, PAST, fx.admin.id);
+    await updateFantasyLockDate(fx.auction.id, null, fx.admin.id);
 
     // tournament.startDate is still FUTURE (set by the fixture), so clearing
     // the override should un-lock submission again.
@@ -225,7 +226,7 @@ describe("Auction.fantasyLockDate override", () => {
   it("rejects an invalid date", async () => {
     const fx = await buildFantasyEligibleFixture();
     await expect(
-      updateFantasyLockDate(fx.auction.id, new Date("not-a-date"))
+      updateFantasyLockDate(fx.auction.id, new Date("not-a-date"), fx.admin.id)
     ).rejects.toThrow(/Invalid date/);
   });
 });
@@ -267,9 +268,9 @@ describe("fantasy team cap follows the actual max roster size, not the configure
       playerAssignments: fx.players.map((p) => ({ playerId: p.id, categoryName: "Regular" })),
     });
 
-    await openPreAuction(auction.id);
-    await lockPreAuction(auction.id, true);
-    await startBidding(auction.id);
+    await openPreAuction(auction.id, fx.admin.id);
+    await lockPreAuction(auction.id, true, fx.admin.id);
+    await startBidding(auction.id, fx.admin.id);
 
     const [team1Entry, team2Entry] = await prisma.teamAuctionEntry.findMany({
       where: { auctionId: auction.id },
@@ -280,12 +281,12 @@ describe("fantasy team cap follows the actual max roster size, not the configure
       prisma.auctionPlayer.findFirstOrThrow({ where: { auctionId: auction.id, playerId } });
 
     // Team 1: 2 sold (Self Player, P2). Team 2: 3 sold (P3, P4, P5). P6/P7 unsold.
-    await adminAssignPlayer(auction.id, (await auctionPlayerFor(byName("Self Player").id)).id, team1Entry.id, 100);
-    await adminAssignPlayer(auction.id, (await auctionPlayerFor(byName("P2").id)).id, team1Entry.id, 100);
-    await adminAssignPlayer(auction.id, (await auctionPlayerFor(byName("P3").id)).id, team2Entry.id, 100);
-    await adminAssignPlayer(auction.id, (await auctionPlayerFor(byName("P4").id)).id, team2Entry.id, 100);
-    await adminAssignPlayer(auction.id, (await auctionPlayerFor(byName("P5").id)).id, team2Entry.id, 100);
-    await concludeAuction(auction.id);
+    await adminAssignPlayer(auction.id, (await auctionPlayerFor(byName("Self Player").id)).id, team1Entry.id, 100, fx.admin.id);
+    await adminAssignPlayer(auction.id, (await auctionPlayerFor(byName("P2").id)).id, team1Entry.id, 100, fx.admin.id);
+    await adminAssignPlayer(auction.id, (await auctionPlayerFor(byName("P3").id)).id, team2Entry.id, 100, fx.admin.id);
+    await adminAssignPlayer(auction.id, (await auctionPlayerFor(byName("P4").id)).id, team2Entry.id, 100, fx.admin.id);
+    await adminAssignPlayer(auction.id, (await auctionPlayerFor(byName("P5").id)).id, team2Entry.id, 100, fx.admin.id);
+    await concludeAuction(auction.id, fx.admin.id);
     await prisma.tournament.update({ where: { id: fx.tournament.id }, data: { startDate: FUTURE } });
 
     return {
@@ -369,9 +370,9 @@ async function buildPricingFixture(options?: { leaveSelfPlayerUnsold?: boolean }
     ],
   });
 
-  await openPreAuction(auction.id);
-  await lockPreAuction(auction.id, true);
-  await startBidding(auction.id);
+  await openPreAuction(auction.id, fx.admin.id);
+  await lockPreAuction(auction.id, true, fx.admin.id);
+  await startBidding(auction.id, fx.admin.id);
 
   const team1Entry = await prisma.teamAuctionEntry.findFirstOrThrow({ where: { auctionId: auction.id } });
   const auctionPlayerFor = async (playerId: string) =>
@@ -382,20 +383,21 @@ async function buildPricingFixture(options?: { leaveSelfPlayerUnsold?: boolean }
   const silverAAP = await auctionPlayerFor(byName("Silver A").id);
 
   if (!options?.leaveSelfPlayerUnsold) {
-    await adminAssignPlayer(auction.id, selfAP.id, team1Entry.id, 300);
+    await adminAssignPlayer(auction.id, selfAP.id, team1Entry.id, 300, fx.admin.id);
   }
-  await adminAssignPlayer(auction.id, goldBAP.id, team1Entry.id, 100);
-  await adminAssignPlayer(auction.id, silverAAP.id, team1Entry.id, 40);
+  await adminAssignPlayer(auction.id, goldBAP.id, team1Entry.id, 100, fx.admin.id);
+  await adminAssignPlayer(auction.id, silverAAP.id, team1Entry.id, 40, fx.admin.id);
   // "Bronze Solo" is deliberately left unassigned — concludeAuction flips it
   // to UNSOLD, and it's the only player ever in Bronze, so Bronze ends up
   // with zero SOLD players.
 
-  await concludeAuction(auction.id);
+  await concludeAuction(auction.id, fx.admin.id);
   await prisma.tournament.update({ where: { id: fx.tournament.id }, data: { startDate: FUTURE } });
 
   return {
     auction,
     viewer,
+    admin: fx.admin,
     selfAP: await auctionPlayerFor(byName("Self Player").id),
     goldBAP: await auctionPlayerFor(byName("Gold B").id),
     silverAAP: await auctionPlayerFor(byName("Silver A").id),
@@ -416,7 +418,7 @@ describe("fantasy pricing", () => {
 
   it("under CATEGORY_AVERAGE pricing, every non-self pick also costs its category average", async () => {
     const fx = await buildPricingFixture();
-    await updateFantasySettings(fx.auction.id, { pricingModel: "CATEGORY_AVERAGE" });
+    await updateFantasySettings(fx.auction.id, { pricingModel: "CATEGORY_AVERAGE" }, fx.admin.id);
 
     const team = await submitFantasyTeam(fx.auction.id, fx.viewer.id, [fx.goldBAP.id, fx.silverAAP.id], null);
     const goldBPick = team.picks.find((p) => p.auctionPlayerId === fx.goldBAP.id)!;
@@ -439,7 +441,7 @@ describe("fantasy pricing", () => {
     const soldPricePool = await listFantasyPlayerPool(fx.auction.id, "SOLD_PRICE", null);
     expect(soldPricePool.find((p) => p.id === fx.bronzeSoloAP.id)?.price).toBe("10");
 
-    await updateFantasySettings(fx.auction.id, { pricingModel: "CATEGORY_AVERAGE" });
+    await updateFantasySettings(fx.auction.id, { pricingModel: "CATEGORY_AVERAGE" }, fx.admin.id);
     const categoryAveragePool = await listFantasyPlayerPool(fx.auction.id, "CATEGORY_AVERAGE", null);
     expect(categoryAveragePool.find((p) => p.id === fx.bronzeSoloAP.id)?.price).toBe("10");
   });
@@ -448,7 +450,7 @@ describe("fantasy pricing", () => {
 describe("fantasySelfPickRequired: false", () => {
   async function buildOpenFantasyFixture() {
     const fx = await buildFantasyEligibleFixture();
-    await updateFantasySettings(fx.auction.id, { selfPickRequired: false });
+    await updateFantasySettings(fx.auction.id, { selfPickRequired: false }, fx.admin.id);
     return fx;
   }
 
@@ -491,7 +493,7 @@ describe("fantasySelfPickRequired: false", () => {
 
   it("no longer exempts an unsold self-match from the unsold-picks rule", async () => {
     const fx = await buildFantasyEligibleFixture({ leaveSelfPlayerUnsold: true });
-    await updateFantasySettings(fx.auction.id, { selfPickRequired: false });
+    await updateFantasySettings(fx.auction.id, { selfPickRequired: false }, fx.admin.id);
 
     await expect(
       submitFantasyTeam(fx.auction.id, fx.viewer.id, [fx.selfAuctionPlayer.id], null)
@@ -512,7 +514,7 @@ describe("fantasyMaxTeamsPerUser", () => {
 
   it("raising the cap allows a second team", async () => {
     const fx = await buildFantasyEligibleFixture();
-    await updateFantasySettings(fx.auction.id, { maxTeamsPerUser: 2 });
+    await updateFantasySettings(fx.auction.id, { maxTeamsPerUser: 2 }, fx.admin.id);
 
     const first = await submitFantasyTeam(fx.auction.id, fx.viewer.id, [fx.soldAuctionPlayer.id], null, "Team A");
     const second = await submitFantasyTeam(fx.auction.id, fx.viewer.id, [fx.soldAuctionPlayer.id], null, "Team B");
@@ -568,7 +570,7 @@ describe("fantasyMaxTeamsPerUser", () => {
 describe("getMostPickedPlayersByCategory with multiple teams per user", () => {
   it("counts each of one user's teams picking the same player separately, not deduped", async () => {
     const fx = await buildFantasyEligibleFixture();
-    await updateFantasySettings(fx.auction.id, { maxTeamsPerUser: 2 });
+    await updateFantasySettings(fx.auction.id, { maxTeamsPerUser: 2 }, fx.admin.id);
     await submitFantasyTeam(fx.auction.id, fx.viewer.id, [fx.soldAuctionPlayer.id], null, "Team A");
     await submitFantasyTeam(fx.auction.id, fx.viewer.id, [fx.soldAuctionPlayer.id], null, "Team B");
 
@@ -590,7 +592,7 @@ describe("fantasyManagersAllowed", () => {
 
   it("falls through to the ordinary self-pick check once the setting is turned on", async () => {
     const fx = await buildFantasyEligibleFixture();
-    await updateFantasySettings(fx.auction.id, { managersAllowed: true });
+    await updateFantasySettings(fx.auction.id, { managersAllowed: true }, fx.admin.id);
 
     // The manager gate is lifted, but the manager still has no self-match —
     // this now fails for the same reason a self-unmatched viewer would.
@@ -601,7 +603,7 @@ describe("fantasyManagersAllowed", () => {
 
   it("lets an allowed manager submit a team once self-pick isn't required either", async () => {
     const fx = await buildFantasyEligibleFixture();
-    await updateFantasySettings(fx.auction.id, { managersAllowed: true, selfPickRequired: false });
+    await updateFantasySettings(fx.auction.id, { managersAllowed: true, selfPickRequired: false }, fx.admin.id);
 
     const team = await submitFantasyTeam(fx.auction.id, fx.manager.id, [fx.soldAuctionPlayer.id], null);
     expect(team.picks.map((p) => p.auctionPlayerId)).toEqual([fx.soldAuctionPlayer.id]);
@@ -611,7 +613,7 @@ describe("fantasyManagersAllowed", () => {
     const fx = await buildFantasyEligibleFixture();
     // Isolate the manager gate: turn off self-pick so that's not what
     // rejects this call.
-    await updateFantasySettings(fx.auction.id, { selfPickRequired: false });
+    await updateFantasySettings(fx.auction.id, { selfPickRequired: false }, fx.admin.id);
 
     await expect(
       submitFantasyTeam(fx.auction.id, fx.manager.id, [fx.soldAuctionPlayer.id], null)
@@ -638,12 +640,12 @@ describe("fantasyManagersAllowed", () => {
     const fx = await buildFantasyEligibleFixture();
     // Take self-pick out of the equation so only the manager gate is under
     // test here.
-    await updateFantasySettings(fx.auction.id, { selfPickRequired: false });
+    await updateFantasySettings(fx.auction.id, { selfPickRequired: false }, fx.admin.id);
 
     const before = await listEligibleCompletedAuctionsForViewer(fx.manager.id, null);
     expect(before.map((a) => a.id)).not.toContain(fx.auction.id);
 
-    await updateFantasySettings(fx.auction.id, { managersAllowed: true });
+    await updateFantasySettings(fx.auction.id, { managersAllowed: true }, fx.admin.id);
     const after = await listEligibleCompletedAuctionsForViewer(fx.manager.id, null);
     expect(after.map((a) => a.id)).toContain(fx.auction.id);
   });

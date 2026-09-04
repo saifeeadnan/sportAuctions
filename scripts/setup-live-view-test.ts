@@ -27,9 +27,9 @@ async function main() {
     playerAssignments: players.map((p) => ({ playerId: p.id, categoryName: "Regular" })),
   });
 
-  await openPreAuction(auction.id);
-  await lockPreAuction(auction.id, true); // force lock, no one drafted anything
-  await startBidding(auction.id);
+  await openPreAuction(auction.id, admin.id);
+  await lockPreAuction(auction.id, true, admin.id); // force lock, no one drafted anything
+  await startBidding(auction.id, admin.id);
 
   const firstPlayer = await prisma.auctionPlayer.findFirstOrThrow({
     where: { auctionId: auction.id, status: "AVAILABLE" },

@@ -18,6 +18,11 @@ beforeEach(resetDb);
 const FUTURE = new Date(Date.now() + 24 * 60 * 60 * 1000);
 const PAST = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
+// AuctionCorrectionLog was merged into the generic AuditLog table — these
+// three actions are the only ones a correction ever writes, so filtering on
+// them replicates what counting the old dedicated table used to prove.
+const CORRECTION_ACTIONS = ["SOLD_PRICE_CORRECTED", "CATEGORY_BASE_PRICE_CORRECTED", "TEAM_BUDGET_CORRECTED"];
+
 /**
  * A concluded, two-team auction (teamBudget 1000, squad 3, category base
  * 100, default manager fee 50 per team) with "Self Player" matched to a
@@ -67,9 +72,9 @@ async function buildCorrectionFixture(options?: { leaveSelfPlayerUnsold?: boolea
     playerAssignments: fx.players.map((p) => ({ playerId: p.id, categoryName: "Regular" })),
   });
 
-  await openPreAuction(auction.id);
-  await lockPreAuction(auction.id, true);
-  await startBidding(auction.id);
+  await openPreAuction(auction.id, fx.admin.id);
+  await lockPreAuction(auction.id, true, fx.admin.id);
+  await startBidding(auction.id, fx.admin.id);
 
   const team1Entry = await prisma.teamAuctionEntry.findFirstOrThrow({
     where: { auctionId: auction.id, team: { name: "Team 1" } },
@@ -89,18 +94,18 @@ async function buildCorrectionFixture(options?: { leaveSelfPlayerUnsold?: boolea
   });
 
   if (!options?.leaveSelfPlayerUnsold) {
-    await adminAssignPlayer(auction.id, selfAuctionPlayer.id, team1Entry.id, 100);
+    await adminAssignPlayer(auction.id, selfAuctionPlayer.id, team1Entry.id, 100, fx.admin.id);
   } else {
     const soldPlayerC = fx.players.find((p) => p.name === "Sold Player C")!;
     const soldAuctionPlayerC = await prisma.auctionPlayer.findFirstOrThrow({
       where: { auctionId: auction.id, playerId: soldPlayerC.id },
     });
-    await adminAssignPlayer(auction.id, soldAuctionPlayerC.id, team2Entry.id, 150);
+    await adminAssignPlayer(auction.id, soldAuctionPlayerC.id, team2Entry.id, 150, fx.admin.id);
   }
-  await adminAssignPlayer(auction.id, soldAuctionPlayerA.id, team1Entry.id, 100);
-  await adminAssignPlayer(auction.id, soldAuctionPlayerB.id, team2Entry.id, 200);
+  await adminAssignPlayer(auction.id, soldAuctionPlayerA.id, team1Entry.id, 100, fx.admin.id);
+  await adminAssignPlayer(auction.id, soldAuctionPlayerB.id, team2Entry.id, 200, fx.admin.id);
 
-  await concludeAuction(auction.id);
+  await concludeAuction(auction.id, fx.admin.id);
 
   // Fantasy submission must happen while the edit window is still open —
   // push the deadline into the future for setup, tests push it back into
@@ -185,7 +190,7 @@ describe("correctSoldPrice", () => {
     expect(String(entry.budgetRemaining)).toBe("750");
     const auction = await prisma.auction.findUniqueOrThrow({ where: { id: fx.auction.id } });
     expect(String(auction.teamBudget)).toBe("1000");
-    expect(await prisma.auctionCorrectionLog.count()).toBe(0);
+    expect(await prisma.auditLog.count({ where: { action: { in: CORRECTION_ACTIONS } } })).toBe(0);
   });
 
   it("applies fully when a sufficient confirmed budget is given, shifting every team uniformly", async () => {
@@ -206,9 +211,11 @@ describe("correctSoldPrice", () => {
     const team2 = await prisma.teamAuctionEntry.findUniqueOrThrow({ where: { id: fx.team2Entry.id } });
     expect(String(team2.budgetRemaining)).toBe("800");
 
-    const logs = await prisma.auctionCorrectionLog.findMany({ where: { auctionId: fx.auction.id } });
+    const logs = await prisma.auditLog.findMany({
+      where: { auctionId: fx.auction.id, action: { in: CORRECTION_ACTIONS } },
+    });
     expect(logs).toHaveLength(2);
-    expect(logs.map((l) => l.correctionType).sort()).toEqual(["SOLD_PRICE", "TEAM_BUDGET"]);
+    expect(logs.map((l) => l.action).sort()).toEqual(["SOLD_PRICE_CORRECTED", "TEAM_BUDGET_CORRECTED"]);
   });
 
   it("rejects a still-insufficient confirmed budget", async () => {
@@ -220,7 +227,7 @@ describe("correctSoldPrice", () => {
 
     const entry = await prisma.teamAuctionEntry.findUniqueOrThrow({ where: { id: fx.team1Entry.id } });
     expect(String(entry.budgetRemaining)).toBe("750");
-    expect(await prisma.auctionCorrectionLog.count()).toBe(0);
+    expect(await prisma.auditLog.count({ where: { action: { in: CORRECTION_ACTIONS } } })).toBe(0);
   });
 
   it("rejects correcting a player that isn't SOLD", async () => {
@@ -306,8 +313,10 @@ describe("correctTeamBudget", () => {
     const auction = await prisma.auction.findUniqueOrThrow({ where: { id: fx.auction.id } });
     expect(String(auction.teamBudget)).toBe("1200");
 
-    const log = await prisma.auctionCorrectionLog.findFirstOrThrow({ where: { auctionId: fx.auction.id } });
-    expect(log.correctionType).toBe("TEAM_BUDGET");
+    const log = await prisma.auditLog.findFirstOrThrow({
+      where: { auctionId: fx.auction.id, action: { in: CORRECTION_ACTIONS } },
+    });
+    expect(log.action).toBe("TEAM_BUDGET_CORRECTED");
   });
 
   it("rejects a decrease that would put a team into deficit", async () => {
@@ -318,7 +327,7 @@ describe("correctTeamBudget", () => {
 
     const auction = await prisma.auction.findUniqueOrThrow({ where: { id: fx.auction.id } });
     expect(String(auction.teamBudget)).toBe("1000");
-    expect(await prisma.auctionCorrectionLog.count()).toBe(0);
+    expect(await prisma.auditLog.count({ where: { action: { in: CORRECTION_ACTIONS } } })).toBe(0);
   });
 
   it("rejects a correction on a non-COMPLETED auction", async () => {
@@ -344,7 +353,7 @@ describe("correctTeamBudget", () => {
 describe("fantasy pricing cascade", () => {
   it("a sold-price correction under CATEGORY_AVERAGE mode cascades to every fantasy pick in that category, not just the corrected player's own", async () => {
     const fx = await buildCorrectionFixture();
-    await updateFantasySettings(fx.auction.id, { pricingModel: "CATEGORY_AVERAGE" });
+    await updateFantasySettings(fx.auction.id, { pricingModel: "CATEGORY_AVERAGE" }, fx.adminId);
     // Self forced-included (100) + Sold Player B (200) picked directly.
     await submitFantasyTeam(fx.auction.id, fx.viewer.id, [fx.soldAuctionPlayerB.id], null);
 
@@ -402,14 +411,14 @@ describe("updateFantasySettings", () => {
     });
     expect(String(soldModePick.price)).toBe("100");
 
-    await updateFantasySettings(fx.auction.id, { pricingModel: "CATEGORY_AVERAGE" });
+    await updateFantasySettings(fx.auction.id, { pricingModel: "CATEGORY_AVERAGE" }, fx.adminId);
     const avgModePick = await prisma.fantasyTeamPlayer.findFirstOrThrow({
       where: { auctionPlayerId: fx.soldAuctionPlayerA.id },
     });
     // (100 self + 100 A + 200 B) / 3 = 133.33
     expect(String(avgModePick.price)).toBe("133.33");
 
-    await updateFantasySettings(fx.auction.id, { pricingModel: "SOLD_PRICE" });
+    await updateFantasySettings(fx.auction.id, { pricingModel: "SOLD_PRICE" }, fx.adminId);
     const backToSoldPick = await prisma.fantasyTeamPlayer.findFirstOrThrow({
       where: { auctionPlayerId: fx.soldAuctionPlayerA.id },
     });
@@ -421,7 +430,7 @@ describe("updateFantasySettings", () => {
     await updateLeagueSettings(fx.league.id, { endDate: PAST });
 
     await expect(
-      updateFantasySettings(fx.auction.id, { pricingModel: "CATEGORY_AVERAGE" })
+      updateFantasySettings(fx.auction.id, { pricingModel: "CATEGORY_AVERAGE" }, fx.adminId)
     ).rejects.toThrow(/read-only/);
   });
 });

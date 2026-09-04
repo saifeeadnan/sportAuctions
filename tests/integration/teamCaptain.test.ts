@@ -33,9 +33,9 @@ async function buildCaptainFixture() {
     playerAssignments: fx.players.map((p) => ({ playerId: p.id, categoryName: "Regular" })),
   });
 
-  await openPreAuction(auction.id);
-  await lockPreAuction(auction.id, true);
-  await startBidding(auction.id);
+  await openPreAuction(auction.id, fx.admin.id);
+  await lockPreAuction(auction.id, true, fx.admin.id);
+  await startBidding(auction.id, fx.admin.id);
 
   const team1Entry = await prisma.teamAuctionEntry.findFirstOrThrow({
     where: { auctionId: auction.id, team: { name: "Team 1" } },
@@ -58,14 +58,15 @@ async function buildCaptainFixture() {
     where: { auctionId: auction.id, playerId: playerC.id },
   });
 
-  await adminAssignPlayer(auction.id, apA.id, team1Entry.id, 100);
-  await adminAssignPlayer(auction.id, apB.id, team1Entry.id, 100);
-  await adminAssignPlayer(auction.id, apC.id, team2Entry.id, 100);
+  await adminAssignPlayer(auction.id, apA.id, team1Entry.id, 100, fx.admin.id);
+  await adminAssignPlayer(auction.id, apB.id, team1Entry.id, 100, fx.admin.id);
+  await adminAssignPlayer(auction.id, apC.id, team2Entry.id, 100, fx.admin.id);
 
-  await concludeAuction(auction.id);
+  await concludeAuction(auction.id, fx.admin.id);
 
   return {
     league: fx.league,
+    admin: fx.admin,
     auction,
     team1Entry: await prisma.teamAuctionEntry.findUniqueOrThrow({ where: { id: team1Entry.id } }),
     team2Entry: await prisma.teamAuctionEntry.findUniqueOrThrow({ where: { id: team2Entry.id } }),
@@ -78,7 +79,7 @@ async function buildCaptainFixture() {
 describe("assignTeamCaptain", () => {
   it("assigns a captain from among the players this team actually won", async () => {
     const fx = await buildCaptainFixture();
-    await assignTeamCaptain(fx.auction.id, fx.team1Entry.id, fx.apA.id);
+    await assignTeamCaptain(fx.auction.id, fx.team1Entry.id, fx.apA.id, fx.admin.id);
 
     const entry = await prisma.teamAuctionEntry.findUniqueOrThrow({ where: { id: fx.team1Entry.id } });
     expect(entry.captainAuctionPlayerId).toBe(fx.apA.id);
@@ -87,7 +88,7 @@ describe("assignTeamCaptain", () => {
   it("rejects a player won by a different team in the same auction", async () => {
     const fx = await buildCaptainFixture();
     await expect(
-      assignTeamCaptain(fx.auction.id, fx.team1Entry.id, fx.apC.id)
+      assignTeamCaptain(fx.auction.id, fx.team1Entry.id, fx.apC.id, fx.admin.id)
     ).rejects.toThrow(/not won by this team/);
   });
 
@@ -109,7 +110,7 @@ describe("assignTeamCaptain", () => {
     const otherAp = await prisma.auctionPlayer.findFirstOrThrow({ where: { auctionId: otherAuction.id } });
 
     await expect(
-      assignTeamCaptain(fx.auction.id, fx.team1Entry.id, otherAp.id)
+      assignTeamCaptain(fx.auction.id, fx.team1Entry.id, otherAp.id, fx.admin.id)
     ).rejects.toThrow(/Player not found in this auction/);
   });
 
@@ -128,15 +129,15 @@ describe("assignTeamCaptain", () => {
       categories: [{ name: "Regular", basePrice: 100 }],
       playerAssignments: other.players.map((p) => ({ playerId: p.id, categoryName: "Regular" })),
     });
-    await openPreAuction(otherAuction.id);
-    await lockPreAuction(otherAuction.id, true);
-    await startBidding(otherAuction.id);
+    await openPreAuction(otherAuction.id, other.admin.id);
+    await lockPreAuction(otherAuction.id, true, other.admin.id);
+    await startBidding(otherAuction.id, other.admin.id);
     const otherEntry = await prisma.teamAuctionEntry.findFirstOrThrow({
       where: { auctionId: otherAuction.id },
     });
 
     await expect(
-      assignTeamCaptain(fx.auction.id, otherEntry.id, fx.apA.id)
+      assignTeamCaptain(fx.auction.id, otherEntry.id, fx.apA.id, fx.admin.id)
     ).rejects.toThrow(/Team entry not found in this auction/);
   });
 
@@ -154,15 +155,15 @@ describe("assignTeamCaptain", () => {
       categories: [{ name: "Regular", basePrice: 100 }],
       playerAssignments: fx.players.map((p) => ({ playerId: p.id, categoryName: "Regular" })),
     });
-    await expect(assignTeamCaptain(auction.id, "does-not-matter", null)).rejects.toThrow(
+    await expect(assignTeamCaptain(auction.id, "does-not-matter", null, fx.admin.id)).rejects.toThrow(
       /only be assigned once the auction has concluded/
     );
   });
 
   it("re-assigning to a different player overwrites cleanly", async () => {
     const fx = await buildCaptainFixture();
-    await assignTeamCaptain(fx.auction.id, fx.team1Entry.id, fx.apA.id);
-    await assignTeamCaptain(fx.auction.id, fx.team1Entry.id, fx.apB.id);
+    await assignTeamCaptain(fx.auction.id, fx.team1Entry.id, fx.apA.id, fx.admin.id);
+    await assignTeamCaptain(fx.auction.id, fx.team1Entry.id, fx.apB.id, fx.admin.id);
 
     const entry = await prisma.teamAuctionEntry.findUniqueOrThrow({ where: { id: fx.team1Entry.id } });
     expect(entry.captainAuctionPlayerId).toBe(fx.apB.id);
@@ -170,27 +171,27 @@ describe("assignTeamCaptain", () => {
 
   it("clears an existing captain when assigned null, and null-on-null is a safe no-op", async () => {
     const fx = await buildCaptainFixture();
-    await assignTeamCaptain(fx.auction.id, fx.team1Entry.id, fx.apA.id);
-    await assignTeamCaptain(fx.auction.id, fx.team1Entry.id, null);
+    await assignTeamCaptain(fx.auction.id, fx.team1Entry.id, fx.apA.id, fx.admin.id);
+    await assignTeamCaptain(fx.auction.id, fx.team1Entry.id, null, fx.admin.id);
 
     const entry = await prisma.teamAuctionEntry.findUniqueOrThrow({ where: { id: fx.team1Entry.id } });
     expect(entry.captainAuctionPlayerId).toBeNull();
 
-    await expect(assignTeamCaptain(fx.auction.id, fx.team1Entry.id, null)).resolves.toBeUndefined();
+    await expect(assignTeamCaptain(fx.auction.id, fx.team1Entry.id, null, fx.admin.id)).resolves.toBeUndefined();
   });
 
   it("is blocked once the league is read-only", async () => {
     const fx = await buildCaptainFixture();
     await updateLeagueSettings(fx.league.id, { endDate: PAST });
 
-    await expect(assignTeamCaptain(fx.auction.id, fx.team1Entry.id, fx.apA.id)).rejects.toThrow(
+    await expect(assignTeamCaptain(fx.auction.id, fx.team1Entry.id, fx.apA.id, fx.admin.id)).rejects.toThrow(
       /read-only/
     );
   });
 
   it("is reflected in getAuctionState's isCaptain flag for exactly the assigned player", async () => {
     const fx = await buildCaptainFixture();
-    await assignTeamCaptain(fx.auction.id, fx.team1Entry.id, fx.apA.id);
+    await assignTeamCaptain(fx.auction.id, fx.team1Entry.id, fx.apA.id, fx.admin.id);
 
     const state = await getAuctionState(fx.auction.id);
     const players = state!.players;

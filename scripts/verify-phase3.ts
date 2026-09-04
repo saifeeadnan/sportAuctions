@@ -39,7 +39,7 @@ async function main() {
   });
   console.log(`Created auction ${auction.id}`);
 
-  await openPreAuction(auction.id);
+  await openPreAuction(auction.id, admin.id);
   console.log("Opened pre-auction");
 
   const entries = await prisma.teamAuctionEntry.findMany({
@@ -68,12 +68,12 @@ async function main() {
   const e2 = entryByTeamName.get("Team 2")!;
   const e3 = entryByTeamName.get("Team 3")!;
 
-  await submitDraft(e1.id, [apByPlayerName.get(uniqueA)!.id, apByPlayerName.get(contested)!.id]);
-  await submitDraft(e2.id, [apByPlayerName.get(uniqueB)!.id, apByPlayerName.get(contested)!.id]);
-  await submitDraft(e3.id, [apByPlayerName.get(uniqueC)!.id]);
+  await submitDraft(e1.id, [apByPlayerName.get(uniqueA)!.id, apByPlayerName.get(contested)!.id], admin.id);
+  await submitDraft(e2.id, [apByPlayerName.get(uniqueB)!.id, apByPlayerName.get(contested)!.id], admin.id);
+  await submitDraft(e3.id, [apByPlayerName.get(uniqueC)!.id], admin.id);
   console.log("Submitted drafts for all 3 teams (Team1 & Team2 both drafted the contested player)");
 
-  await lockPreAuction(auction.id, false);
+  await lockPreAuction(auction.id, false, admin.id);
   console.log("Locked pre-auction and resolved overlaps");
 
   const finalAuctionPlayers = await prisma.auctionPlayer.findMany({

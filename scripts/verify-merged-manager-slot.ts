@@ -40,7 +40,7 @@ async function main() {
     })),
   });
 
-  await openPreAuction(auction.id);
+  await openPreAuction(auction.id, admin.id);
 
   const entry1 = await prisma.teamAuctionEntry.findFirstOrThrow({
     where: { auctionId: auction.id, teamId: team1.id },
@@ -70,9 +70,9 @@ async function main() {
   const viratAp = await prisma.auctionPlayer.findFirstOrThrow({
     where: { auctionId: auction.id, playerId: virat.id },
   });
-  await submitDraft(entry1.id, [viratAp.id]);
+  await submitDraft(entry1.id, [viratAp.id], team1.managerId!);
 
-  await lockPreAuction(auction.id, true);
+  await lockPreAuction(auction.id, true, admin.id);
 
   const finalEntry1 = await prisma.teamAuctionEntry.findUniqueOrThrow({ where: { id: entry1.id } });
   assert(finalEntry1.slotsFilled === 1, `After resolution, Team 1 has exactly 1 slot filled (the self pick), got ${finalEntry1.slotsFilled}`);

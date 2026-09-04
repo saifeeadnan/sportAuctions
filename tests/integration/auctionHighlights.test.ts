@@ -59,9 +59,9 @@ async function buildHighlightsFixture(options?: { setValueRatings?: boolean }) {
     ],
   });
 
-  await openPreAuction(auction.id);
-  await lockPreAuction(auction.id, true);
-  await startBidding(auction.id);
+  await openPreAuction(auction.id, fx.admin.id);
+  await lockPreAuction(auction.id, true, fx.admin.id);
+  await startBidding(auction.id, fx.admin.id);
 
   const team1Entry = await prisma.teamAuctionEntry.findFirstOrThrow({
     where: { auctionId: auction.id, team: { name: "Team 1" } },
@@ -87,12 +87,12 @@ async function buildHighlightsFixture(options?: { setValueRatings?: boolean }) {
   // slowing the test down with a real sleep.
   await prisma.auctionPlayer.update({ where: { id: starAP.id }, data: { bidCooldownUntil: null } });
   await placeBid(auction.id, starAP.id, team1Entry.id, 500);
-  await recordSale(auction.id, starAP.id, team1Entry.id, 500);
-  await adminAssignPlayer(auction.id, valueAP.id, team1Entry.id, 100);
-  await adminAssignPlayer(auction.id, averageAP.id, team2Entry.id, 50);
+  await recordSale(auction.id, starAP.id, team1Entry.id, 500, fx.admin.id);
+  await adminAssignPlayer(auction.id, valueAP.id, team1Entry.id, 100, fx.admin.id);
+  await adminAssignPlayer(auction.id, averageAP.id, team2Entry.id, 50, fx.admin.id);
   // "Unsold Player" is deliberately left unassigned — concludeAuction flips it to UNSOLD.
 
-  await concludeAuction(auction.id);
+  await concludeAuction(auction.id, fx.admin.id);
 
   return { auction, adminId: fx.admin.id, team1Entry, team2Entry, starAP, valueAP, averageAP };
 }
@@ -112,9 +112,9 @@ describe("getOrCreateHighlightsToken", () => {
       categories: [{ name: "Regular", basePrice: 100 }],
       playerAssignments: fx.players.map((p) => ({ playerId: p.id, categoryName: "Regular" })),
     });
-    await openPreAuction(auction.id);
-    await lockPreAuction(auction.id, true);
-    await startBidding(auction.id);
+    await openPreAuction(auction.id, fx.admin.id);
+    await lockPreAuction(auction.id, true, fx.admin.id);
+    await startBidding(auction.id, fx.admin.id);
 
     await expect(getOrCreateHighlightsToken(auction.id)).rejects.toThrow(
       /only be created once the auction has concluded/
@@ -193,9 +193,9 @@ describe("getAuctionHighlights", () => {
   });
 
   it("lists every assigned captain, one per team, sorted by team name", async () => {
-    const { auction, team1Entry, team2Entry, starAP, averageAP } = await buildHighlightsFixture();
-    await assignTeamCaptain(auction.id, team1Entry.id, starAP.id);
-    await assignTeamCaptain(auction.id, team2Entry.id, averageAP.id);
+    const { auction, team1Entry, team2Entry, starAP, averageAP, adminId } = await buildHighlightsFixture();
+    await assignTeamCaptain(auction.id, team1Entry.id, starAP.id, adminId);
+    await assignTeamCaptain(auction.id, team2Entry.id, averageAP.id, adminId);
     const token = await getOrCreateHighlightsToken(auction.id);
 
     const highlights = await getAuctionHighlights(token);

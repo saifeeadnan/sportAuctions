@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { ValidationError } from "@/lib/errors";
 import { assertLeagueNotReadOnly } from "@/lib/services/league.service";
+import { writeAuditLog } from "@/lib/services/auditLog.service";
 
 export type CreateTournamentInput = {
   name: string;
@@ -117,7 +118,7 @@ export type CreateTeamInput = {
   managerOccupiesSlot: boolean;
 };
 
-export async function createTeam(input: CreateTeamInput) {
+export async function createTeam(input: CreateTeamInput, actorUserId: string) {
   if (!input.name.trim()) throw new ValidationError("Team name is required");
 
   const tournament = await prisma.tournament.findUnique({
@@ -147,17 +148,27 @@ export async function createTeam(input: CreateTeamInput) {
   });
   if (existing) throw new ValidationError("A team with this name already exists in this tournament");
 
-  return prisma.team.create({
-    data: {
-      tournamentId: input.tournamentId,
-      name: input.name.trim(),
-      managerId: input.managerId,
-      managerOccupiesSlot: input.managerOccupiesSlot,
-    },
+  return prisma.$transaction(async (tx) => {
+    const created = await tx.team.create({
+      data: {
+        tournamentId: input.tournamentId,
+        name: input.name.trim(),
+        managerId: input.managerId,
+        managerOccupiesSlot: input.managerOccupiesSlot,
+      },
+    });
+    await writeAuditLog(tx, {
+      entityType: "Team",
+      entityId: created.id,
+      action: "TEAM_CREATED",
+      actorUserId,
+      after: { name: created.name, managerId: input.managerId ?? null },
+    });
+    return created;
   });
 }
 
-export async function deleteTeam(teamId: string) {
+export async function deleteTeam(teamId: string, actorUserId: string) {
   const team = await prisma.team.findUnique({
     where: { id: teamId },
     include: { _count: { select: { entries: true } }, tournament: { include: { league: true } } },
@@ -171,7 +182,16 @@ export async function deleteTeam(teamId: string) {
     );
   }
 
-  await prisma.team.delete({ where: { id: teamId } });
+  await prisma.$transaction(async (tx) => {
+    await writeAuditLog(tx, {
+      entityType: "Team",
+      entityId: teamId,
+      action: "TEAM_DELETED",
+      actorUserId,
+      before: { name: team.name },
+    });
+    await tx.team.delete({ where: { id: teamId } });
+  });
 }
 
 export async function deleteTournament(tournamentId: string) {

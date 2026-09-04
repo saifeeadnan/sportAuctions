@@ -31,7 +31,7 @@ describe("manager self-pick merges with the manager fee slot", () => {
       })),
     });
 
-    await openPreAuction(auction.id);
+    await openPreAuction(auction.id, fixture.admin.id);
 
     const entry1 = await prisma.teamAuctionEntry.findFirstOrThrow({
       where: { auctionId: auction.id, teamId: fixture.teams[0].id },
@@ -52,8 +52,8 @@ describe("manager self-pick merges with the manager fee slot", () => {
     const selfPickAp = await prisma.auctionPlayer.findFirstOrThrow({
       where: { auctionId: auction.id, player: { name: "Self Match Player" } },
     });
-    await submitDraft(entry1.id, [selfPickAp.id]);
-    await lockPreAuction(auction.id, true);
+    await submitDraft(entry1.id, [selfPickAp.id], fixture.teams[0].managerId!);
+    await lockPreAuction(auction.id, true, fixture.admin.id);
 
     const finalEntry1 = await prisma.teamAuctionEntry.findUniqueOrThrow({ where: { id: entry1.id } });
     expect(finalEntry1.slotsFilled).toBe(1);

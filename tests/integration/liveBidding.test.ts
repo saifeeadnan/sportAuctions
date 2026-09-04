@@ -27,33 +27,33 @@ async function createLiveAuction(playerNames: string[], teamNames: string[]) {
     categories: [{ name: "Regular", basePrice: 200 }],
     playerAssignments: fixture.players.map((p) => ({ playerId: p.id, categoryName: "Regular" })),
   });
-  await openPreAuction(auction.id);
-  await lockPreAuction(auction.id, true);
-  await startBidding(auction.id);
+  await openPreAuction(auction.id, fixture.admin.id);
+  await lockPreAuction(auction.id, true, fixture.admin.id);
+  await startBidding(auction.id, fixture.admin.id);
   return { ...fixture, auction };
 }
 
 describe("recordSale minimum-price enforcement", () => {
   it("rejects a sale below the category base price and leaves the player on the clock", async () => {
-    const { auction, teams } = await createLiveAuction(["Player A"], ["Team 1"]);
+    const { auction, teams, admin } = await createLiveAuction(["Player A"], ["Team 1"]);
     const [team1] = await getEntries(auction.id, teams);
     const target = await getAvailablePlayer(auction.id);
 
     await selectNextPlayer(auction.id, target.id);
 
-    await expect(recordSale(auction.id, target.id, team1.id, 150)).rejects.toThrow(/base price/);
+    await expect(recordSale(auction.id, target.id, team1.id, 150, admin.id)).rejects.toThrow(/base price/);
 
     const stillOnClock = await getPlayerById(target.id);
     expect(stillOnClock.status).toBe("IN_BIDDING");
   });
 
   it("accepts a sale at exactly the category base price", async () => {
-    const { auction, teams } = await createLiveAuction(["Player A"], ["Team 1"]);
+    const { auction, teams, admin } = await createLiveAuction(["Player A"], ["Team 1"]);
     const [team1] = await getEntries(auction.id, teams);
     const target = await getAvailablePlayer(auction.id);
 
     await selectNextPlayer(auction.id, target.id);
-    const result = await recordSale(auction.id, target.id, team1.id, 200);
+    const result = await recordSale(auction.id, target.id, team1.id, 200, admin.id);
 
     expect(result.player.status).toBe("SOLD");
     expect(String(result.player.soldPrice)).toBe("200");
@@ -62,19 +62,19 @@ describe("recordSale minimum-price enforcement", () => {
 
 describe("unsold re-offer", () => {
   it("allows an UNSOLD player back on the clock, and blocks it again once actually SOLD", async () => {
-    const { auction, teams } = await createLiveAuction(["Player A"], ["Team 1"]);
+    const { auction, teams, admin } = await createLiveAuction(["Player A"], ["Team 1"]);
     const [team1] = await getEntries(auction.id, teams);
     const target = await getAvailablePlayer(auction.id);
 
     await selectNextPlayer(auction.id, target.id);
-    await markUnsold(auction.id, target.id);
+    await markUnsold(auction.id, target.id, admin.id);
     expect((await getPlayerById(target.id)).status).toBe("UNSOLD");
 
     // Re-offer: UNSOLD -> IN_BIDDING is allowed.
     await selectNextPlayer(auction.id, target.id);
     expect((await getPlayerById(target.id)).status).toBe("IN_BIDDING");
 
-    const result = await recordSale(auction.id, target.id, team1.id, 220);
+    const result = await recordSale(auction.id, target.id, team1.id, 220, admin.id);
     expect(result.player.status).toBe("SOLD");
     expect(result.player.soldVia).toBe("LIVE_BID");
     expect(String(result.player.soldPrice)).toBe("220");
@@ -86,15 +86,15 @@ describe("unsold re-offer", () => {
 
 describe("sold player ordering", () => {
   it("keeps soldAt populated so a team's sold column can be sorted most-recent-first", async () => {
-    const { auction, teams } = await createLiveAuction(
+    const { auction, teams, admin } = await createLiveAuction(
       ["Player A", "Player B", "Player C"],
       ["Team 1", "Team 2"]
     );
     const [team1, team2] = await getEntries(auction.id, teams);
 
-    await sell(auction.id, "Player A", team1.id, 200);
-    await sell(auction.id, "Player B", team2.id, 200);
-    await sell(auction.id, "Player C", team1.id, 250);
+    await sell(auction.id, "Player A", team1.id, 200, admin.id);
+    await sell(auction.id, "Player B", team2.id, 200, admin.id);
+    await sell(auction.id, "Player C", team1.id, 250, admin.id);
 
     const state = await getAuctionState(auction.id);
     const team1Sold = state!.players
@@ -108,20 +108,20 @@ describe("sold player ordering", () => {
 
 describe("recordSale force override", () => {
   it("allows an admin to force a sale below the category base price", async () => {
-    const { auction, teams } = await createLiveAuction(["Player A"], ["Team 1"]);
+    const { auction, teams, admin } = await createLiveAuction(["Player A"], ["Team 1"]);
     const [team1] = await getEntries(auction.id, teams);
     const target = await getAvailablePlayer(auction.id);
 
     await selectNextPlayer(auction.id, target.id);
-    await expect(recordSale(auction.id, target.id, team1.id, 100)).rejects.toThrow(/base price/);
+    await expect(recordSale(auction.id, target.id, team1.id, 100, admin.id)).rejects.toThrow(/base price/);
 
-    const result = await recordSale(auction.id, target.id, team1.id, 100, { force: true });
+    const result = await recordSale(auction.id, target.id, team1.id, 100, admin.id, { force: true });
     expect(result.player.status).toBe("SOLD");
     expect(String(result.player.soldPrice)).toBe("100");
   });
 
   it("allows an admin to force a sale that would leave the team unable to fill its remaining slots", async () => {
-    const { auction, teams } = await createLiveAuction(["Player A"], ["Team 1"]);
+    const { auction, teams, admin } = await createLiveAuction(["Player A"], ["Team 1"]);
     const [team1] = await getEntries(auction.id, teams);
     const target = await getAvailablePlayer(auction.id);
 
@@ -129,26 +129,26 @@ describe("recordSale force override", () => {
     // 2000 - 50 manager fee = 1950. Selling at 1500 would leave only 450,
     // short of the 600 (3 remaining slots x 200 reserve unit) required.
     await selectNextPlayer(auction.id, target.id);
-    await expect(recordSale(auction.id, target.id, team1.id, 1500)).rejects.toThrow(/must keep at least/);
+    await expect(recordSale(auction.id, target.id, team1.id, 1500, admin.id)).rejects.toThrow(/must keep at least/);
 
-    const result = await recordSale(auction.id, target.id, team1.id, 1500, { force: true });
+    const result = await recordSale(auction.id, target.id, team1.id, 1500, admin.id, { force: true });
     expect(result.player.status).toBe("SOLD");
     expect(String(result.entry.budgetRemaining)).toBe("450");
   });
 
   it("still refuses a price beyond the team's total remaining budget, even forced", async () => {
-    const { auction, teams } = await createLiveAuction(["Player A"], ["Team 1"]);
+    const { auction, teams, admin } = await createLiveAuction(["Player A"], ["Team 1"]);
     const [team1] = await getEntries(auction.id, teams);
     const target = await getAvailablePlayer(auction.id);
 
     await selectNextPlayer(auction.id, target.id);
     await expect(
-      recordSale(auction.id, target.id, team1.id, 2500, { force: true })
+      recordSale(auction.id, target.id, team1.id, 2500, admin.id, { force: true })
     ).rejects.toThrow(/does not have enough budget remaining/);
   });
 
   it("still refuses a sale to a team whose squad is already full, even forced", async () => {
-    const { auction, teams } = await createLiveAuction(
+    const { auction, teams, admin } = await createLiveAuction(
       ["Player 1", "Player 2", "Player 3", "Player 4", "Player 5"],
       ["Team 1"]
     );
@@ -159,13 +159,13 @@ describe("recordSale force override", () => {
     for (let i = 0; i < 4; i++) {
       const p = await getAvailablePlayer(auction.id);
       await selectNextPlayer(auction.id, p.id);
-      await recordSale(auction.id, p.id, team1.id, 200);
+      await recordSale(auction.id, p.id, team1.id, 200, admin.id);
     }
 
     const last = await getAvailablePlayer(auction.id);
     await selectNextPlayer(auction.id, last.id);
     await expect(
-      recordSale(auction.id, last.id, team1.id, 200, { force: true })
+      recordSale(auction.id, last.id, team1.id, 200, admin.id, { force: true })
     ).rejects.toThrow(/already filled its squad/);
   });
 });
@@ -195,43 +195,43 @@ describe("bid count in auction state", () => {
 
 describe("updateCategoryBidIncrement — locked only while a player is on the clock", () => {
   it("allows editing during live bidding when no player is currently on the clock", async () => {
-    const { auction } = await createLiveAuction(["Player A"], ["Team 1"]);
+    const { auction, admin } = await createLiveAuction(["Player A"], ["Team 1"]);
     const category = await prisma.auctionCategory.findFirstOrThrow({ where: { auctionId: auction.id } });
 
-    const updated = await updateCategoryBidIncrement(category.id, 25);
+    const updated = await updateCategoryBidIncrement(category.id, 25, admin.id);
     expect(String(updated.bidIncrement)).toBe("25");
   });
 
   it("rejects editing while a player is on the clock", async () => {
-    const { auction } = await createLiveAuction(["Player A"], ["Team 1"]);
+    const { auction, admin } = await createLiveAuction(["Player A"], ["Team 1"]);
     const category = await prisma.auctionCategory.findFirstOrThrow({ where: { auctionId: auction.id } });
     const target = await getAvailablePlayer(auction.id);
     await selectNextPlayer(auction.id, target.id);
 
-    await expect(updateCategoryBidIncrement(category.id, 25)).rejects.toThrow(/on the clock/);
+    await expect(updateCategoryBidIncrement(category.id, 25, admin.id)).rejects.toThrow(/on the clock/);
   });
 
   it("allows editing again once the on-clock player is sold", async () => {
-    const { auction, teams } = await createLiveAuction(["Player A"], ["Team 1"]);
+    const { auction, teams, admin } = await createLiveAuction(["Player A"], ["Team 1"]);
     const [team1] = await getEntries(auction.id, teams);
     const category = await prisma.auctionCategory.findFirstOrThrow({ where: { auctionId: auction.id } });
     const target = await getAvailablePlayer(auction.id);
     await selectNextPlayer(auction.id, target.id);
-    await recordSale(auction.id, target.id, team1.id, 200);
+    await recordSale(auction.id, target.id, team1.id, 200, admin.id);
 
-    const updated = await updateCategoryBidIncrement(category.id, 25);
+    const updated = await updateCategoryBidIncrement(category.id, 25, admin.id);
     expect(String(updated.bidIncrement)).toBe("25");
   });
 });
 
 // --- shared test-local helpers -------------------------------------------
 
-async function sell(auctionId: string, playerName: string, teamEntryId: string, price: number) {
+async function sell(auctionId: string, playerName: string, teamEntryId: string, price: number, actorUserId: string) {
   const ap = await prisma.auctionPlayer.findFirstOrThrow({
     where: { auctionId, player: { name: playerName }, status: "AVAILABLE" },
   });
   await selectNextPlayer(auctionId, ap.id);
-  await recordSale(auctionId, ap.id, teamEntryId, price);
+  await recordSale(auctionId, ap.id, teamEntryId, price, actorUserId);
   // Ensures distinct soldAt timestamps to sort by, same as the original script.
   await new Promise((r) => setTimeout(r, 5));
 }

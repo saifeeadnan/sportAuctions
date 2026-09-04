@@ -21,8 +21,9 @@ async function main() {
   const auction = await prisma.auction.findFirstOrThrow({
     where: { name: "Phase3 Verify Auction" },
   });
+  const admin = await prisma.user.findFirstOrThrow({ where: { isSiteAdmin: true } });
 
-  await startBidding(auction.id);
+  await startBidding(auction.id, admin.id);
   console.log("Started bidding");
 
   const contested = await prisma.auctionPlayer.findFirstOrThrow({
@@ -59,7 +60,7 @@ async function main() {
   // Team1 has budgetRemaining=1450, slotsFilled=2, slotsTotal=5 -> 3 slots remain after this pick would be 2.
   // reserveUnit = min(category basePrice) = 100. Need budgetAfter >= 2*100=200. Bid 1300 leaves 150 remaining -> violates (150 < 200).
   try {
-    await recordSale(auction.id, contested.id, team1Entry.id, 1300);
+    await recordSale(auction.id, contested.id, team1Entry.id, 1300, admin.id);
     throw new Error("Expected recordSale to reject a bid that violates the reserve rule");
   } catch (e) {
     assert(
@@ -70,7 +71,7 @@ async function main() {
 
   // A valid bid: must be >= the Icon category base price (500) and within the reserve
   // rule (600 leaves 850 remaining, need >= 2*100=200 -> ok).
-  const result = await recordSale(auction.id, contested.id, team1Entry.id, 600);
+  const result = await recordSale(auction.id, contested.id, team1Entry.id, 600, admin.id);
   assert(result.player.status === "SOLD" && result.player.soldVia === "LIVE_BID", "Contested player sold via live bid");
   assert(String(result.entry.budgetRemaining) === "850", `Team 1 budgetRemaining is 850 after winning bid, got ${result.entry.budgetRemaining}`);
   assert(result.entry.slotsFilled === 3, `Team 1 slotsFilled is 3, got ${result.entry.slotsFilled}`);
@@ -81,12 +82,12 @@ async function main() {
     include: { player: true },
   });
   await selectNextPlayer(auction.id, nextPlayer.id);
-  await markUnsold(auction.id, nextPlayer.id);
+  await markUnsold(auction.id, nextPlayer.id, admin.id);
   const unsoldCheck = await prisma.auctionPlayer.findUniqueOrThrow({ where: { id: nextPlayer.id } });
   assert(unsoldCheck.status === "UNSOLD", `${nextPlayer.player.name} marked UNSOLD`);
 
   // Conclude the auction; remaining players should become unsold, entries FINAL
-  await concludeAuction(auction.id);
+  await concludeAuction(auction.id, admin.id);
   const finalAuction = await prisma.auction.findUniqueOrThrow({ where: { id: auction.id } });
   assert(finalAuction.status === "COMPLETED", "Auction status is COMPLETED");
 

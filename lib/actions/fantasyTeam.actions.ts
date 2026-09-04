@@ -52,9 +52,13 @@ export async function updateFantasyLockDateAction(
   fantasyLockDate: string | null
 ): Promise<ActionResult> {
   return toActionResult(async () => {
-    const { leagueIds } = await requireAdminOrLeagueAdmin();
+    const { session, leagueIds } = await requireAdminOrLeagueAdmin();
     await loadScopedAuction(auctionId, leagueIds);
-    await updateFantasyLockDate(auctionId, fantasyLockDate ? new Date(fantasyLockDate) : null);
+    await updateFantasyLockDate(
+      auctionId,
+      fantasyLockDate ? new Date(fantasyLockDate) : null,
+      session.user.id
+    );
     revalidatePath(`/admin/auctions/${auctionId}/fantasy-teams`);
     revalidatePath(`/viewer/auctions/${auctionId}/fantasy`);
   });
@@ -70,9 +74,9 @@ export async function updateFantasySettingsAction(
   }
 ): Promise<ActionResult> {
   return toActionResult(async () => {
-    const { leagueIds } = await requireAdminOrLeagueAdmin();
+    const { session, leagueIds } = await requireAdminOrLeagueAdmin();
     await loadScopedAuction(auctionId, leagueIds);
-    await updateFantasySettings(auctionId, input);
+    await updateFantasySettings(auctionId, input, session.user.id);
     revalidatePath(`/admin/auctions/${auctionId}/fantasy-teams`);
     revalidatePath(`/viewer/auctions/${auctionId}/fantasy`);
   });

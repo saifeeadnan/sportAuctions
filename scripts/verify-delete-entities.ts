@@ -29,7 +29,7 @@ async function main() {
     endDate: new Date("2026-10-05"),
     createdById: admin.id,
   });
-  await createTeam({ tournamentId: tournament.id, name: "T1", managerOccupiesSlot: false });
+  await createTeam({ tournamentId: tournament.id, name: "T1", managerOccupiesSlot: false }, admin.id);
 
   const players = await prisma.player.findMany({ where: { rosterId: roster.id }, take: 3 });
   const auction = await createAuction({
@@ -42,9 +42,9 @@ async function main() {
   });
 
   // Cannot delete tournament while an auction under it is BIDDING.
-  await openPreAuction(auction.id);
-  await lockPreAuction(auction.id, true);
-  await startBidding(auction.id);
+  await openPreAuction(auction.id, admin.id);
+  await lockPreAuction(auction.id, true, admin.id);
+  await startBidding(auction.id, admin.id);
 
   try {
     await deleteTournament(tournament.id);
@@ -58,7 +58,7 @@ async function main() {
 
   // Auction deletion should also be blocked while BIDDING.
   try {
-    await deleteAuction(auction.id);
+    await deleteAuction(auction.id, admin.id);
     throw new Error("Expected deleteAuction to reject a BIDDING auction");
   } catch (e) {
     assert(
@@ -71,7 +71,7 @@ async function main() {
   // just directly set status back to CREATED-equivalent by deleting after forcing COMPLETED via prisma for test purposes.
   await prisma.auction.update({ where: { id: auction.id }, data: { status: "COMPLETED" } });
 
-  await deleteAuction(auction.id);
+  await deleteAuction(auction.id, admin.id);
   const auctionGone = await prisma.auction.findUnique({ where: { id: auction.id } });
   assert(auctionGone === null, "Auction deleted successfully once no longer BIDDING");
 

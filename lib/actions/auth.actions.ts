@@ -14,6 +14,12 @@ import {
   deleteMembership,
   setMembershipActive,
   findPersonByIdentifier,
+  changePassword,
+  updateUserProfile,
+  resetUserPassword,
+  adminUpdateProfile,
+  adminCreateUser,
+  adminAddExistingPersonToLeague,
 } from "@/lib/services/user.service";
 import { assertLeagueNotReadOnly } from "@/lib/services/league.service";
 
@@ -28,7 +34,7 @@ export async function registerUserAction(
   formData: FormData
 ): Promise<ActionResult> {
   const result = await toActionResult(async () => {
-    const { leagueIds: callerLeagueIds } = await requireAdminOrLeagueAdmin();
+    const { session, leagueIds: callerLeagueIds } = await requireAdminOrLeagueAdmin();
 
     const loginId = String(formData.get("loginId") ?? "").trim().toLowerCase();
     const name = String(formData.get("name") ?? "").trim();
@@ -73,37 +79,18 @@ export async function registerUserAction(
 
     const passwordHash = await bcrypt.hash(password, 10);
 
-    if (role === "ADMIN") {
-      await prisma.user.create({
-        data: {
-          loginId,
-          name,
-          passwordHash,
-          isSiteAdmin: true,
-          isActive: true,
-        },
-      });
-    } else {
-      await prisma.user.create({
-        data: {
-          loginId,
-          name,
-          passwordHash,
-          isActive: true,
-          memberships: {
-            create: {
-              leagueId: targetLeagueId!,
-              role,
-              // Admin-added memberships start active immediately — unlike a
-              // self-registered signup, no separate approval step needed.
-              isActive: true,
-              managerBasePrice:
-                role === "TEAM_MANAGER" && managerBasePrice ? Number(managerBasePrice) : null,
-            },
-          },
-        },
-      });
-    }
+    await adminCreateUser(
+      {
+        loginId,
+        name,
+        passwordHash,
+        role,
+        isSiteAdmin: role === "ADMIN",
+        targetLeagueId,
+        managerBasePrice: role === "TEAM_MANAGER" && managerBasePrice ? Number(managerBasePrice) : null,
+      },
+      session.user.id
+    );
 
     revalidatePath("/");
   });
@@ -120,7 +107,7 @@ export async function addExistingPersonAction(
   formData: FormData
 ): Promise<ActionResult> {
   const result = await toActionResult(async () => {
-    const { leagueIds: callerLeagueIds } = await requireAdminOrLeagueAdmin();
+    const { session, leagueIds: callerLeagueIds } = await requireAdminOrLeagueAdmin();
 
     const identifier = String(formData.get("identifier") ?? "").trim();
     const role = String(formData.get("role") ?? "") as Role;
@@ -150,9 +137,7 @@ export async function addExistingPersonAction(
       throw new ValidationError(`"${person.name}" is already registered for this league`);
     }
 
-    await prisma.leagueMembership.create({
-      data: { userId: person.id, leagueId: targetLeagueId, role, isActive: true },
-    });
+    await adminAddExistingPersonToLeague(person.id, targetLeagueId, role, session.user.id);
 
     revalidatePath("/admin/users");
   });
@@ -197,16 +182,7 @@ export async function changePasswordAction(formData: FormData) {
   const confirmPassword = String(formData.get("confirmPassword") ?? "");
 
   try {
-    if (!currentPassword || !newPassword) throw new ValidationError("missing-fields");
-    if (newPassword.length < 8) throw new ValidationError("short");
-    if (newPassword !== confirmPassword) throw new ValidationError("mismatch");
-
-    const user = await prisma.user.findUniqueOrThrow({ where: { id: session.user.id } });
-    const valid = await bcrypt.compare(currentPassword, user.passwordHash);
-    if (!valid) throw new ValidationError("wrong-current");
-
-    const passwordHash = await bcrypt.hash(newPassword, 10);
-    await prisma.user.update({ where: { id: session.user.id }, data: { passwordHash } });
+    await changePassword(session.user.id, currentPassword, newPassword, confirmPassword);
   } catch (error) {
     const code = error instanceof ValidationError ? error.message : "system";
     redirect(`/profile?error=${code}`);
@@ -223,23 +199,7 @@ export async function updateProfileAction(formData: FormData) {
   const phone = String(formData.get("phone") ?? "").trim();
 
   try {
-    if (email) {
-      const existing = await prisma.user.findFirst({
-        where: { email: { equals: email, mode: "insensitive" }, NOT: { id: session.user.id } },
-      });
-      if (existing) throw new ValidationError("email-taken");
-    }
-    if (phone) {
-      const existing = await prisma.user.findFirst({
-        where: { phone, NOT: { id: session.user.id } },
-      });
-      if (existing) throw new ValidationError("phone-taken");
-    }
-
-    await prisma.user.update({
-      where: { id: session.user.id },
-      data: { email: email || null, phone: phone || null },
-    });
+    await updateUserProfile(session.user.id, { email, phone });
   } catch (error) {
     const code = error instanceof ValidationError ? error.message : "system";
     redirect(`/profile?profileError=${code}`);
@@ -255,18 +215,13 @@ export async function resetUserPasswordAction(
   formData: FormData
 ): Promise<ActionResult> {
   return toActionResult(async () => {
-    const { leagueIds } = await requireAdminOrLeagueAdmin();
+    const { session, leagueIds } = await requireAdminOrLeagueAdmin();
     if (leagueIds !== null) {
       throw new AuthError("Only a site Admin can reset a user's password");
     }
     const newPassword = String(formData.get("newPassword") ?? "");
-    if (newPassword.length < 8) throw new ValidationError("Password must be at least 8 characters");
 
-    const target = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } });
-    if (!target) throw new ValidationError("User not found");
-
-    const passwordHash = await bcrypt.hash(newPassword, 10);
-    await prisma.user.update({ where: { id: userId }, data: { passwordHash } });
+    await resetUserPassword(userId, newPassword, session.user.id);
     revalidatePath("/admin/users");
   });
 }
@@ -281,7 +236,7 @@ export async function adminUpdateProfileAction(
   formData: FormData
 ): Promise<ActionResult> {
   return toActionResult(async () => {
-    const { leagueIds } = await requireAdminOrLeagueAdmin();
+    const { session, leagueIds } = await requireAdminOrLeagueAdmin();
     const email = String(formData.get("email") ?? "").trim().toLowerCase();
     const phone = String(formData.get("phone") ?? "").trim();
 
@@ -299,23 +254,7 @@ export async function adminUpdateProfileAction(
       }
     }
 
-    if (email) {
-      const existing = await prisma.user.findFirst({
-        where: { email: { equals: email, mode: "insensitive" }, NOT: { id: userId } },
-      });
-      if (existing) throw new ValidationError("That email is already in use by another account");
-    }
-    if (phone) {
-      const existing = await prisma.user.findFirst({
-        where: { phone, NOT: { id: userId } },
-      });
-      if (existing) throw new ValidationError("That phone number is already in use by another account");
-    }
-
-    await prisma.user.update({
-      where: { id: userId },
-      data: { email: email || null, phone: phone || null },
-    });
+    await adminUpdateProfile(userId, { email, phone }, session.user.id);
     revalidatePath("/admin/users");
   });
 }

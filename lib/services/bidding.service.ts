@@ -8,6 +8,7 @@ import {
 } from "@/lib/errors";
 import { computeReserveUnit } from "@/lib/services/budget.service";
 import { assertAuctionLeagueNotReadOnly } from "@/lib/services/league.service";
+import { writeAuditLog, type AuditAction } from "@/lib/services/auditLog.service";
 import { emitAuctionEvent } from "@/server/ws/broadcaster";
 
 export async function selectNextPlayer(auctionId: string, auctionPlayerId: string) {
@@ -76,6 +77,8 @@ async function allocatePlayerToTeam(
   teamAuctionEntryId: string,
   price: number,
   soldVia: $Enums.SoldVia,
+  actorUserId: string,
+  auditAction: AuditAction,
   options: {
     /** Admin override for a live sale: skips the below-base-price and
      * budget-reserve-for-remaining-slots checks (the two a human might
@@ -133,8 +136,8 @@ async function allocatePlayerToTeam(
   }
 
   const soldAt = new Date();
-  const [updatedPlayer, updatedEntry] = await prisma.$transaction([
-    prisma.auctionPlayer.update({
+  const [updatedPlayer, updatedEntry] = await prisma.$transaction(async (tx) => {
+    const player = await tx.auctionPlayer.update({
       where: { id: auctionPlayerId },
       data: {
         status: "SOLD",
@@ -148,16 +151,29 @@ async function allocatePlayerToTeam(
         lotTimerDeadline: null,
       },
       include: { player: true },
-    }),
-    prisma.teamAuctionEntry.update({
+    });
+    const updatedTeamEntry = await tx.teamAuctionEntry.update({
       where: { id: teamAuctionEntryId },
       data: {
         budgetRemaining: budgetAfterPick,
         slotsFilled: { increment: 1 },
       },
       include: { team: true },
-    }),
-  ]);
+    });
+    await writeAuditLog(tx, {
+      entityType: "AuctionPlayer",
+      entityId: auctionPlayerId,
+      auctionId,
+      action: auditAction,
+      actorUserId,
+      after: {
+        playerName: player.player.name,
+        teamName: updatedTeamEntry.team.name,
+        price: priceDecimal.toString(),
+      },
+    });
+    return [player, updatedTeamEntry] as const;
+  });
 
   emitAuctionEvent(auctionId, "player:sold", {
     auctionPlayerId: updatedPlayer.id,
@@ -183,6 +199,7 @@ export async function recordSale(
   auctionPlayerId: string,
   winningTeamAuctionEntryId: string,
   price: number,
+  actorUserId: string,
   options: { force?: boolean } = {}
 ) {
   const auctionPlayer = await prisma.auctionPlayer.findUnique({ where: { id: auctionPlayerId } });
@@ -200,7 +217,16 @@ export async function recordSale(
     );
   }
 
-  return allocatePlayerToTeam(auctionId, auctionPlayerId, winningTeamAuctionEntryId, price, "LIVE_BID", options);
+  return allocatePlayerToTeam(
+    auctionId,
+    auctionPlayerId,
+    winningTeamAuctionEntryId,
+    price,
+    "LIVE_BID",
+    actorUserId,
+    "PLAYER_SOLD",
+    options
+  );
 }
 
 /**
@@ -213,7 +239,8 @@ export async function adminAssignPlayer(
   auctionId: string,
   auctionPlayerId: string,
   teamAuctionEntryId: string,
-  price: number
+  price: number,
+  actorUserId: string
 ) {
   const auction = await prisma.auction.findUnique({ where: { id: auctionId } });
   if (!auction) throw new ValidationError("Auction not found");
@@ -234,7 +261,15 @@ export async function adminAssignPlayer(
     );
   }
 
-  return allocatePlayerToTeam(auctionId, auctionPlayerId, teamAuctionEntryId, price, "ADMIN_ASSIGNED");
+  return allocatePlayerToTeam(
+    auctionId,
+    auctionPlayerId,
+    teamAuctionEntryId,
+    price,
+    "ADMIN_ASSIGNED",
+    actorUserId,
+    "PLAYER_ASSIGNED_BY_ADMIN"
+  );
 }
 
 /**
@@ -355,7 +390,7 @@ export async function placeBid(
   return bid;
 }
 
-export async function markUnsold(auctionId: string, auctionPlayerId: string) {
+export async function markUnsold(auctionId: string, auctionPlayerId: string, actorUserId: string) {
   await assertAuctionLeagueNotReadOnly(auctionId);
 
   const [auction, auctionPlayer] = await Promise.all([
@@ -391,10 +426,21 @@ export async function markUnsold(auctionId: string, auctionPlayerId: string) {
     discountFields = { discountedBasePrice: discounted, reAuctionDiscountUsed: true };
   }
 
-  const updated = await prisma.auctionPlayer.update({
-    where: { id: auctionPlayerId },
-    data: { status: "UNSOLD", lotTimerDeadline: null, ...discountFields },
-    include: { player: true, category: true },
+  const updated = await prisma.$transaction(async (tx) => {
+    const player = await tx.auctionPlayer.update({
+      where: { id: auctionPlayerId },
+      data: { status: "UNSOLD", lotTimerDeadline: null, ...discountFields },
+      include: { player: true, category: true },
+    });
+    await writeAuditLog(tx, {
+      entityType: "AuctionPlayer",
+      entityId: auctionPlayerId,
+      auctionId,
+      action: "PLAYER_MARKED_UNSOLD",
+      actorUserId,
+      after: { playerName: player.player.name },
+    });
+    return player;
   });
 
   emitAuctionEvent(auctionId, "player:unsold", {
@@ -411,7 +457,7 @@ export async function markUnsold(auctionId: string, auctionPlayerId: string) {
  * assignment, or pre-auction draft) — returning the player to the pool as
  * AVAILABLE and refunding the team's budget and slot.
  */
-export async function removePlayerFromTeam(auctionId: string, auctionPlayerId: string) {
+export async function removePlayerFromTeam(auctionId: string, auctionPlayerId: string, actorUserId: string) {
   await assertAuctionLeagueNotReadOnly(auctionId);
 
   const auction = await prisma.auction.findUnique({ where: { id: auctionId } });
@@ -441,21 +487,30 @@ export async function removePlayerFromTeam(auctionId: string, auctionPlayerId: s
   });
   const refund = auctionPlayer.soldPrice ?? new Prisma.Decimal(0);
 
-  const [updatedPlayer, updatedEntry] = await prisma.$transaction([
-    prisma.auctionPlayer.update({
+  const [updatedPlayer, updatedEntry] = await prisma.$transaction(async (tx) => {
+    const player = await tx.auctionPlayer.update({
       where: { id: auctionPlayerId },
       data: { status: "AVAILABLE", soldVia: null, soldToEntryId: null, soldPrice: null, soldAt: null },
       include: { player: true },
-    }),
-    prisma.teamAuctionEntry.update({
+    });
+    const updatedTeamEntry = await tx.teamAuctionEntry.update({
       where: { id: entry.id },
       data: {
         budgetRemaining: new Prisma.Decimal(entry.budgetRemaining).plus(refund),
         slotsFilled: { decrement: 1 },
       },
       include: { team: true },
-    }),
-  ]);
+    });
+    await writeAuditLog(tx, {
+      entityType: "AuctionPlayer",
+      entityId: auctionPlayerId,
+      auctionId,
+      action: "PLAYER_ALLOCATION_REMOVED",
+      actorUserId,
+      before: { playerName: player.player.name, teamName: updatedTeamEntry.team.name, price: refund.toString() },
+    });
+    return [player, updatedTeamEntry] as const;
+  });
 
   emitAuctionEvent(auctionId, "player:removed", {
     auctionPlayerId: updatedPlayer.id,
@@ -537,7 +592,7 @@ async function resolveIncomingAuctionPlayer(
  * leftover player in, so a completed auction's player statuses stay
  * consistent.
  */
-export async function removePlayerPostAuction(auctionId: string, auctionPlayerId: string) {
+export async function removePlayerPostAuction(auctionId: string, auctionPlayerId: string, actorUserId: string) {
   await assertAuctionLeagueNotReadOnly(auctionId);
 
   const auction = await prisma.auction.findUnique({ where: { id: auctionId } });
@@ -562,13 +617,13 @@ export async function removePlayerPostAuction(auctionId: string, auctionPlayerId
   });
   const refund = auctionPlayer.soldPrice ?? new Prisma.Decimal(0);
 
-  const [updatedPlayer, updatedEntry] = await prisma.$transaction([
-    prisma.auctionPlayer.update({
+  const [updatedPlayer, updatedEntry] = await prisma.$transaction(async (tx) => {
+    const player = await tx.auctionPlayer.update({
       where: { id: auctionPlayerId },
       data: { status: "UNSOLD", soldVia: null, soldToEntryId: null, soldPrice: null, soldAt: null },
       include: { player: true },
-    }),
-    prisma.teamAuctionEntry.update({
+    });
+    const updatedTeamEntry = await tx.teamAuctionEntry.update({
       where: { id: entry.id },
       data: {
         budgetRemaining: new Prisma.Decimal(entry.budgetRemaining).plus(refund),
@@ -579,8 +634,17 @@ export async function removePlayerPostAuction(auctionId: string, auctionPlayerId
         ...(entry.captainAuctionPlayerId === auctionPlayerId ? { captainAuctionPlayerId: null } : {}),
       },
       include: { team: true },
-    }),
-  ]);
+    });
+    await writeAuditLog(tx, {
+      entityType: "AuctionPlayer",
+      entityId: auctionPlayerId,
+      auctionId,
+      action: "PLAYER_REMOVED_POST_AUCTION",
+      actorUserId,
+      before: { playerName: player.player.name, teamName: updatedTeamEntry.team.name, price: refund.toString() },
+    });
+    return [player, updatedTeamEntry] as const;
+  });
 
   return { player: updatedPlayer, entry: updatedEntry };
 }
@@ -595,7 +659,8 @@ export async function addPlayerPostAuction(
   teamAuctionEntryId: string,
   playerId: string,
   categoryId: string,
-  price: number
+  price: number,
+  actorUserId: string
 ) {
   await assertAuctionLeagueNotReadOnly(auctionId);
   if (price <= 0) throw new ValidationError("Price must be greater than 0");
@@ -653,6 +718,19 @@ export async function addPlayerPostAuction(
       include: { team: true },
     });
 
+    await writeAuditLog(tx, {
+      entityType: "AuctionPlayer",
+      entityId: auctionPlayerId,
+      auctionId,
+      action: "PLAYER_ADDED_POST_AUCTION",
+      actorUserId,
+      after: {
+        playerName: updatedPlayer.player.name,
+        teamName: updatedEntry.team.name,
+        price: priceDecimal.toString(),
+      },
+    });
+
     return { player: updatedPlayer, entry: updatedEntry };
   });
 }
@@ -668,7 +746,8 @@ export async function replacePlayerPostAuction(
   outgoingAuctionPlayerId: string,
   incomingPlayerId: string,
   incomingCategoryId: string,
-  price: number
+  price: number,
+  actorUserId: string
 ) {
   await assertAuctionLeagueNotReadOnly(auctionId);
   if (price <= 0) throw new ValidationError("Price must be greater than 0");
@@ -751,11 +830,22 @@ export async function replacePlayerPostAuction(
       include: { team: true },
     });
 
+    await writeAuditLog(tx, {
+      entityType: "TeamAuctionEntry",
+      entityId: entryId,
+      auctionId,
+      action: "PLAYER_REPLACED_POST_AUCTION",
+      actorUserId,
+      before: { playerName: updatedOutgoing.player.name },
+      after: { playerName: updatedIncoming.player.name, price: priceDecimal.toString() },
+      note: `Replaced on "${updatedEntry.team.name}"`,
+    });
+
     return { outgoing: updatedOutgoing, incoming: updatedIncoming, entry: updatedEntry };
   });
 }
 
-export async function concludeAuction(auctionId: string) {
+export async function concludeAuction(auctionId: string, actorUserId: string) {
   await assertAuctionLeagueNotReadOnly(auctionId);
 
   const auction = await prisma.auction.findUnique({ where: { id: auctionId } });
@@ -765,7 +855,7 @@ export async function concludeAuction(auctionId: string) {
   }
 
   const updated = await prisma.$transaction(async (tx) => {
-    await tx.auctionPlayer.updateMany({
+    const leftover = await tx.auctionPlayer.updateMany({
       where: { auctionId, status: { in: ["AVAILABLE", "IN_PRE_AUCTION_POOL", "IN_BIDDING"] } },
       data: { status: "UNSOLD" },
     });
@@ -773,10 +863,21 @@ export async function concludeAuction(auctionId: string) {
       where: { auctionId },
       data: { status: "FINAL" },
     });
-    return tx.auction.update({
+    const updatedAuction = await tx.auction.update({
       where: { id: auctionId },
       data: { status: "COMPLETED", completedAt: new Date() },
     });
+    await writeAuditLog(tx, {
+      entityType: "Auction",
+      entityId: auctionId,
+      auctionId,
+      action: "AUCTION_CONCLUDED",
+      actorUserId,
+      before: { status: "BIDDING" },
+      after: { status: "COMPLETED" },
+      note: `${leftover.count} leftover player(s) marked UNSOLD`,
+    });
+    return updatedAuction;
   });
 
   emitAuctionEvent(auctionId, "auction:completed", { auctionId });

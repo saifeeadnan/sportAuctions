@@ -32,16 +32,16 @@ async function main() {
     playerAssignments: players.map((p) => ({ playerId: p.id, categoryName: "Regular" })),
   });
 
-  await openPreAuction(auction.id);
-  await lockPreAuction(auction.id, true);
-  await startBidding(auction.id);
+  await openPreAuction(auction.id, admin.id);
+  await lockPreAuction(auction.id, true, admin.id);
+  await startBidding(auction.id, admin.id);
 
   const team1 = await prisma.teamAuctionEntry.findFirstOrThrow({ where: { auctionId: auction.id, team: { name: "Team 1" } } });
   const target = await prisma.auctionPlayer.findFirstOrThrow({ where: { auctionId: auction.id, status: "AVAILABLE" }, include: { player: true } });
 
   // Round 1: put on clock, mark unsold.
   await selectNextPlayer(auction.id, target.id);
-  await markUnsold(auction.id, target.id);
+  await markUnsold(auction.id, target.id, admin.id);
 
   let refreshed = await prisma.auctionPlayer.findUniqueOrThrow({ where: { id: target.id } });
   assert(refreshed.status === "UNSOLD", `${target.player.name} is UNSOLD after first pass`);
@@ -52,7 +52,7 @@ async function main() {
   assert(refreshed.status === "IN_BIDDING", `${target.player.name} can be put back on the clock from UNSOLD`);
 
   // This time, sell it.
-  const result = await recordSale(auction.id, target.id, team1.id, 120);
+  const result = await recordSale(auction.id, target.id, team1.id, 120, admin.id);
   assert(result.player.status === "SOLD" && result.player.soldVia === "LIVE_BID", `${target.player.name} sold on re-offer`);
   assert(String(result.player.soldPrice) === "120", "Sold at the re-offer bid price (120)");
 

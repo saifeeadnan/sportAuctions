@@ -30,7 +30,7 @@ async function main() {
     endDate: new Date("2026-09-05"),
     createdById: admin.id,
   });
-  await createTeam({ tournamentId: tournament.id, name: "Team A", managerOccupiesSlot: false });
+  await createTeam({ tournamentId: tournament.id, name: "Team A", managerOccupiesSlot: false }, admin.id);
 
   // Simulate the NewAuctionForm's client-side pre-fill logic in plain code:
   // categories created = ["Icon", "Regular"]; players auto-assigned to their defaultCategory

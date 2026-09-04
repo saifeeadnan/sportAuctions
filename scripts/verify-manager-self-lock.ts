@@ -38,7 +38,7 @@ async function main() {
 
   // Simulate the manager submitting a draft WITHOUT including themselves
   // (e.g. bypassing the disabled checkbox by calling the action directly).
-  await submitDraft(entry.id, [otherPlayer.id]);
+  await submitDraft(entry.id, [otherPlayer.id], warriors.managerId!);
 
   const submissions = await prisma.preAuctionSubmission.findMany({
     where: { teamAuctionEntryId: entry.id },
@@ -53,7 +53,7 @@ async function main() {
   assert(submittedIds.length === 2, `Exactly 2 picks recorded (self + 1 other), got ${submittedIds.length}`);
 
   // Now simulate trying to submit an EMPTY list (fully "unselecting" everyone) -> self must still remain.
-  await submitDraft(entry.id, []);
+  await submitDraft(entry.id, [], warriors.managerId!);
   const submissions2 = await prisma.preAuctionSubmission.findMany({
     where: { teamAuctionEntryId: entry.id },
   });

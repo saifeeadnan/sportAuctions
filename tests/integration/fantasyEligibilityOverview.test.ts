@@ -37,16 +37,16 @@ async function buildEligibleFixture() {
     playerAssignments: fx.players.map((p) => ({ playerId: p.id, categoryName: "Regular" })),
   });
 
-  await openPreAuction(auction.id);
-  await lockPreAuction(auction.id, true);
-  await startBidding(auction.id);
+  await openPreAuction(auction.id, fx.admin.id);
+  await lockPreAuction(auction.id, true, fx.admin.id);
+  await startBidding(auction.id, fx.admin.id);
 
   const team1Entry = await prisma.teamAuctionEntry.findFirstOrThrow({ where: { auctionId: auction.id } });
   const selfAuctionPlayer = await prisma.auctionPlayer.findFirstOrThrow({
     where: { auctionId: auction.id, playerId: selfPlayer.id },
   });
-  await adminAssignPlayer(auction.id, selfAuctionPlayer.id, team1Entry.id, 100);
-  await concludeAuction(auction.id);
+  await adminAssignPlayer(auction.id, selfAuctionPlayer.id, team1Entry.id, 100, fx.admin.id);
+  await concludeAuction(auction.id, fx.admin.id);
   // isFantasyEditingLocked compares against the tournament's startDate, which
   // createFixtureTournament sets to "now" — push it into the future so
   // submitFantasyTeam's own edit-window check doesn't fire in these tests.

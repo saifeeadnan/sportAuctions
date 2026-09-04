@@ -42,7 +42,7 @@ describe("startBiddingDirect — happy path", () => {
     });
     const auction = await createSkipConfiguredAuction(fixture);
 
-    const updated = await startBiddingDirect(auction.id);
+    const updated = await startBiddingDirect(auction.id, fixture.admin.id);
     expect(updated.status).toBe("BIDDING");
     expect(updated.startedAt).not.toBeNull();
 
@@ -77,7 +77,7 @@ describe("startBiddingDirect — guards", () => {
     });
     const auction = await createSkipConfiguredAuction(fixture, { skipPreAuctionDraft: false });
 
-    await expect(startBiddingDirect(auction.id)).rejects.toThrow(/open pre-auction instead/i);
+    await expect(startBiddingDirect(auction.id, fixture.admin.id)).rejects.toThrow(/open pre-auction instead/i);
   });
 
   it("rejects when status isn't CREATED (already started once)", async () => {
@@ -87,9 +87,9 @@ describe("startBiddingDirect — guards", () => {
       squadSize: 5,
     });
     const auction = await createSkipConfiguredAuction(fixture);
-    await startBiddingDirect(auction.id);
+    await startBiddingDirect(auction.id, fixture.admin.id);
 
-    await expect(startBiddingDirect(auction.id)).rejects.toThrow(/Cannot start bidding directly/);
+    await expect(startBiddingDirect(auction.id, fixture.admin.id)).rejects.toThrow(/Cannot start bidding directly/);
   });
 
   it("throws InsufficientBudgetError when a non-self-matched manager's fee exceeds the team budget", async () => {
@@ -102,7 +102,7 @@ describe("startBiddingDirect — guards", () => {
     // that always leaves the entry in deficit for a non-self-matched team.
     const auction = await createSkipConfiguredAuction(fixture, { teamBudget: 10 });
 
-    await expect(startBiddingDirect(auction.id)).rejects.toThrow(/exceeds the auction's team budget/);
+    await expect(startBiddingDirect(auction.id, fixture.admin.id)).rejects.toThrow(/exceeds the auction's team budget/);
   });
 });
 
@@ -114,12 +114,12 @@ describe("startBiddingDirect — reset and resume", () => {
       squadSize: 5,
     });
     const auction = await createSkipConfiguredAuction(fixture);
-    await startBiddingDirect(auction.id);
+    await startBiddingDirect(auction.id, fixture.admin.id);
 
     const entriesBeforeReset = await prisma.teamAuctionEntry.findMany({ where: { auctionId: auction.id } });
     const entryIdsBeforeReset = entriesBeforeReset.map((e) => e.id).sort();
 
-    await resetAuctionToPreBidding(auction.id);
+    await resetAuctionToPreBidding(auction.id, fixture.admin.id);
 
     const resetAuction = await prisma.auction.findUniqueOrThrow({ where: { id: auction.id } });
     expect(resetAuction.status).toBe("PRE_AUCTION_LOCKED");
@@ -127,7 +127,7 @@ describe("startBiddingDirect — reset and resume", () => {
     expect(entriesAfterReset.every((e) => e.status === "ALLOCATED_PRE_AUCTION")).toBe(true);
 
     // The *regular* startBidding (not startBiddingDirect) resumes it.
-    const resumed = await startBidding(auction.id);
+    const resumed = await startBidding(auction.id, fixture.admin.id);
     expect(resumed.status).toBe("BIDDING");
 
     const entriesAfterResume = await prisma.teamAuctionEntry.findMany({ where: { auctionId: auction.id } });

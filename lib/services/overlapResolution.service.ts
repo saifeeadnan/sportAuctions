@@ -1,4 +1,3 @@
-import { prisma } from "@/lib/prisma";
 import { Prisma } from "@/app/generated/prisma/client";
 import { ValidationError } from "@/lib/errors";
 
@@ -8,17 +7,24 @@ export type ResolveOverlapsResult = {
   warnings: string[];
 };
 
-export async function resolveOverlaps(auctionId: string): Promise<ResolveOverlapsResult> {
-  const auction = await prisma.auction.findUnique({ where: { id: auctionId } });
+/** Always takes an explicit transaction client — this is only ever called
+ * from lockPreAuction, which wraps its own update + this call + its audit
+ * log write in one outer transaction, same pattern bidding.service.ts's
+ * resolveIncomingAuctionPlayer already uses for the same reason. */
+export async function resolveOverlaps(
+  tx: Prisma.TransactionClient,
+  auctionId: string
+): Promise<ResolveOverlapsResult> {
+  const auction = await tx.auction.findUnique({ where: { id: auctionId } });
   if (!auction) throw new ValidationError("Auction not found");
 
   const [auctionPlayers, entries, submissions] = await Promise.all([
-    prisma.auctionPlayer.findMany({
+    tx.auctionPlayer.findMany({
       where: { auctionId, status: "AVAILABLE" },
       include: { category: true },
     }),
-    prisma.teamAuctionEntry.findMany({ where: { auctionId }, include: { team: true } }),
-    prisma.preAuctionSubmission.findMany({
+    tx.teamAuctionEntry.findMany({ where: { auctionId }, include: { team: true } }),
+    tx.preAuctionSubmission.findMany({
       where: { teamAuctionEntry: { auctionId } },
     }),
   ]);
@@ -70,38 +76,36 @@ export async function resolveOverlaps(auctionId: string): Promise<ResolveOverlap
     allocations.push({ auctionPlayerId: ap.id, entryId, price: basePrice });
   }
 
-  await prisma.$transaction(async (tx) => {
-    for (const alloc of allocations) {
-      await tx.auctionPlayer.update({
-        where: { id: alloc.auctionPlayerId },
-        data: {
-          status: "SOLD",
-          soldVia: "PRE_AUCTION_DRAFT",
-          soldToEntryId: alloc.entryId,
-          soldPrice: alloc.price,
-          soldAt: new Date(),
-        },
-      });
-    }
+  for (const alloc of allocations) {
+    await tx.auctionPlayer.update({
+      where: { id: alloc.auctionPlayerId },
+      data: {
+        status: "SOLD",
+        soldVia: "PRE_AUCTION_DRAFT",
+        soldToEntryId: alloc.entryId,
+        soldPrice: alloc.price,
+        soldAt: new Date(),
+      },
+    });
+  }
 
-    if (pooled.length > 0) {
-      await tx.auctionPlayer.updateMany({
-        where: { id: { in: pooled } },
-        data: { status: "IN_PRE_AUCTION_POOL" },
-      });
-    }
+  if (pooled.length > 0) {
+    await tx.auctionPlayer.updateMany({
+      where: { id: { in: pooled } },
+      data: { status: "IN_PRE_AUCTION_POOL" },
+    });
+  }
 
-    for (const [entryId, state] of entryState.entries()) {
-      await tx.teamAuctionEntry.update({
-        where: { id: entryId },
-        data: {
-          budgetRemaining: state.budgetRemaining,
-          slotsFilled: state.slotsFilled,
-          status: "ALLOCATED_PRE_AUCTION",
-        },
-      });
-    }
-  });
+  for (const [entryId, state] of entryState.entries()) {
+    await tx.teamAuctionEntry.update({
+      where: { id: entryId },
+      data: {
+        budgetRemaining: state.budgetRemaining,
+        slotsFilled: state.slotsFilled,
+        status: "ALLOCATED_PRE_AUCTION",
+      },
+    });
+  }
 
   return { autoAllocated: allocations.length, sentToPool: pooled.length, warnings };
 }

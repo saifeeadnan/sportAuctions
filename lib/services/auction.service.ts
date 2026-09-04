@@ -11,6 +11,7 @@ import { assertLeagueNotReadOnly, assertAuctionLeagueNotReadOnly } from "@/lib/s
 import { resolveOverlaps } from "@/lib/services/overlapResolution.service";
 import { findManagerSelfAuctionPlayerId } from "@/lib/services/preAuctionDraft.service";
 import { getAuctionState } from "@/lib/services/auctionState.service";
+import { writeAuditLog } from "@/lib/services/auditLog.service";
 import { emitAuctionEvent } from "@/server/ws/broadcaster";
 import { type AuctionType, IMPLEMENTED_AUCTION_TYPES, AUCTION_TYPE_LABELS } from "@/lib/auctionTypes";
 import {
@@ -194,6 +195,21 @@ export async function createAuction(input: CreateAuctionInput) {
       })),
     });
 
+    await writeAuditLog(tx, {
+      entityType: "Auction",
+      entityId: auction.id,
+      auctionId: auction.id,
+      action: "AUCTION_CREATED",
+      actorUserId: input.createdById,
+      after: {
+        name: auction.name,
+        teamBudget: auction.teamBudget.toString(),
+        auctionType,
+        categoryCount: input.categories.length,
+        playerCount: input.playerAssignments.length,
+      },
+    });
+
     return auction;
   });
 }
@@ -206,7 +222,12 @@ export async function createAuction(input: CreateAuctionInput) {
  * refreshed. Always joins as AVAILABLE, same as every player createAuction
  * itself creates.
  */
-export async function addPlayerToAuction(auctionId: string, playerId: string, categoryId: string) {
+export async function addPlayerToAuction(
+  auctionId: string,
+  playerId: string,
+  categoryId: string,
+  actorUserId: string
+) {
   await assertAuctionLeagueNotReadOnly(auctionId);
 
   const auction = await prisma.auction.findUnique({
@@ -234,8 +255,19 @@ export async function addPlayerToAuction(auctionId: string, playerId: string, ca
   });
   if (existing) throw new ValidationError("This player is already in the auction's pool");
 
-  return prisma.auctionPlayer.create({
-    data: { auctionId, playerId, categoryId },
+  return prisma.$transaction(async (tx) => {
+    const created = await tx.auctionPlayer.create({
+      data: { auctionId, playerId, categoryId },
+    });
+    await writeAuditLog(tx, {
+      entityType: "AuctionPlayer",
+      entityId: created.id,
+      auctionId,
+      action: "AUCTION_PLAYER_ADDED",
+      actorUserId,
+      after: { playerName: player.name, categoryName: category.name },
+    });
+    return created;
   });
 }
 
@@ -252,11 +284,15 @@ export async function addPlayerToAuction(auctionId: string, playerId: string, ca
 export async function updateAuctionPlayerCategory(
   auctionId: string,
   auctionPlayerId: string,
-  categoryId: string
+  categoryId: string,
+  actorUserId: string
 ) {
   await assertAuctionLeagueNotReadOnly(auctionId);
 
-  const auctionPlayer = await prisma.auctionPlayer.findUnique({ where: { id: auctionPlayerId } });
+  const auctionPlayer = await prisma.auctionPlayer.findUnique({
+    where: { id: auctionPlayerId },
+    include: { category: true },
+  });
   if (!auctionPlayer || auctionPlayer.auctionId !== auctionId) {
     throw new ValidationError("Player not found in this auction");
   }
@@ -271,13 +307,29 @@ export async function updateAuctionPlayerCategory(
     throw new ValidationError("Category does not belong to this auction");
   }
 
-  return prisma.auctionPlayer.update({
-    where: { id: auctionPlayerId },
-    data: { categoryId },
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.auctionPlayer.update({
+      where: { id: auctionPlayerId },
+      data: { categoryId },
+    });
+    await writeAuditLog(tx, {
+      entityType: "AuctionPlayer",
+      entityId: auctionPlayerId,
+      auctionId,
+      action: "AUCTION_PLAYER_CATEGORY_CHANGED",
+      actorUserId,
+      before: { categoryName: auctionPlayer.category.name },
+      after: { categoryName: category.name },
+    });
+    return updated;
   });
 }
 
-export async function updateCategoryBidIncrement(categoryId: string, bidIncrement: number | null) {
+export async function updateCategoryBidIncrement(
+  categoryId: string,
+  bidIncrement: number | null,
+  actorUserId: string
+) {
   if (bidIncrement != null && bidIncrement <= 0) {
     throw new ValidationError("Bid increment must be greater than 0");
   }
@@ -302,9 +354,21 @@ export async function updateCategoryBidIncrement(categoryId: string, bidIncremen
     );
   }
 
-  return prisma.auctionCategory.update({
-    where: { id: categoryId },
-    data: { bidIncrement },
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.auctionCategory.update({
+      where: { id: categoryId },
+      data: { bidIncrement },
+    });
+    await writeAuditLog(tx, {
+      entityType: "AuctionCategory",
+      entityId: categoryId,
+      auctionId: category.auctionId,
+      action: "CATEGORY_BID_INCREMENT_CHANGED",
+      actorUserId,
+      before: { bidIncrement: category.bidIncrement?.toString() ?? null },
+      after: { bidIncrement: bidIncrement?.toString() ?? null },
+    });
+    return updated;
   });
 }
 
@@ -380,7 +444,7 @@ async function planTeamAuctionEntries(auction: AuctionForEntryPlanning): Promise
   });
 }
 
-export async function openPreAuction(auctionId: string) {
+export async function openPreAuction(auctionId: string, actorUserId: string) {
   const auction = await prisma.auction.findUnique({
     where: { id: auctionId },
     include: { tournament: { include: { teams: true } } },
@@ -401,10 +465,20 @@ export async function openPreAuction(auctionId: string) {
       });
     }
 
-    return tx.auction.update({
+    const updated = await tx.auction.update({
       where: { id: auctionId },
       data: { status: "PRE_AUCTION_OPEN" },
     });
+    await writeAuditLog(tx, {
+      entityType: "Auction",
+      entityId: auctionId,
+      auctionId,
+      action: "PRE_AUCTION_OPENED",
+      actorUserId,
+      before: { status: auction.status },
+      after: { status: "PRE_AUCTION_OPEN" },
+    });
+    return updated;
   });
 }
 
@@ -423,7 +497,7 @@ export async function openPreAuction(auctionId: string) {
  * changes there. startBiddingDirect is only ever used for the *first*
  * CREATED -> BIDDING transition.
  */
-export async function startBiddingDirect(auctionId: string) {
+export async function startBiddingDirect(auctionId: string, actorUserId: string) {
   const auction = await prisma.auction.findUnique({
     where: { id: auctionId },
     include: { tournament: { include: { teams: true } } },
@@ -449,14 +523,24 @@ export async function startBiddingDirect(auctionId: string) {
       });
     }
 
-    return tx.auction.update({
+    const updated = await tx.auction.update({
       where: { id: auctionId },
       data: { status: "BIDDING", startedAt: new Date() },
     });
+    await writeAuditLog(tx, {
+      entityType: "Auction",
+      entityId: auctionId,
+      auctionId,
+      action: "BIDDING_STARTED_DIRECT",
+      actorUserId,
+      before: { status: auction.status },
+      after: { status: "BIDDING" },
+    });
+    return updated;
   });
 }
 
-export async function lockPreAuction(auctionId: string, force = false) {
+export async function lockPreAuction(auctionId: string, force: boolean, actorUserId: string) {
   const auction = await prisma.auction.findUnique({
     where: { id: auctionId },
     include: { entries: { include: { team: true } } },
@@ -477,15 +561,30 @@ export async function lockPreAuction(auctionId: string, force = false) {
     }
   }
 
-  await prisma.auction.update({
-    where: { id: auctionId },
-    data: { status: "PRE_AUCTION_LOCKED" },
-  });
+  await prisma.$transaction(async (tx) => {
+    await tx.auction.update({
+      where: { id: auctionId },
+      data: { status: "PRE_AUCTION_LOCKED" },
+    });
 
-  await resolveOverlaps(auctionId);
+    const result = await resolveOverlaps(tx, auctionId);
+
+    if (actorUserId) {
+      await writeAuditLog(tx, {
+        entityType: "Auction",
+        entityId: auctionId,
+        auctionId,
+        action: "PRE_AUCTION_LOCKED",
+        actorUserId,
+        before: { status: "PRE_AUCTION_OPEN" },
+        after: { status: "PRE_AUCTION_LOCKED" },
+        note: `Auto-resolved ${result.autoAllocated} overlapping pick(s), ${result.sentToPool} sent to the live pool`,
+      });
+    }
+  });
 }
 
-export async function startBidding(auctionId: string) {
+export async function startBidding(auctionId: string, actorUserId: string) {
   const auction = await prisma.auction.findUnique({ where: { id: auctionId } });
   if (!auction) throw new ValidationError("Auction not found");
   if (auction.status !== "PRE_AUCTION_LOCKED") {
@@ -497,10 +596,20 @@ export async function startBidding(auctionId: string) {
       where: { auctionId },
       data: { status: "AUCTION_LIVE" },
     });
-    return tx.auction.update({
+    const updated = await tx.auction.update({
       where: { id: auctionId },
       data: { status: "BIDDING", startedAt: new Date() },
     });
+    await writeAuditLog(tx, {
+      entityType: "Auction",
+      entityId: auctionId,
+      auctionId,
+      action: "BIDDING_STARTED",
+      actorUserId,
+      before: { status: "PRE_AUCTION_LOCKED" },
+      after: { status: "BIDDING" },
+    });
+    return updated;
   });
 }
 
@@ -511,7 +620,7 @@ export async function startBidding(auctionId: string) {
  * unsold is restored to its pre-bidding status. Pre-auction draft allocations and
  * admin-assigned players are untouched — those happened before bidding started.
  */
-export async function resetAuctionToPreBidding(auctionId: string) {
+export async function resetAuctionToPreBidding(auctionId: string, actorUserId: string) {
   await assertAuctionLeagueNotReadOnly(auctionId);
 
   const auction = await prisma.auction.findUnique({ where: { id: auctionId } });
@@ -611,6 +720,17 @@ export async function resetAuctionToPreBidding(auctionId: string) {
       where: { id: auctionId },
       data: { status: "PRE_AUCTION_LOCKED", startedAt: null },
     });
+
+    await writeAuditLog(tx, {
+      entityType: "Auction",
+      entityId: auctionId,
+      auctionId,
+      action: "AUCTION_RESET_TO_PRE_BIDDING",
+      actorUserId,
+      before: { status: "BIDDING" },
+      after: { status: "PRE_AUCTION_LOCKED" },
+      note: `Unwound ${refundByEntry.size} team(s)' live-bid sales`,
+    });
   });
 
   const freshState = await getAuctionState(auctionId);
@@ -635,7 +755,8 @@ export async function resetAuctionToPreBidding(auctionId: string) {
  */
 export async function updateAuctionTeamSettings(
   auctionId: string,
-  input: { newTeamBudget?: number; newSquadSize?: number }
+  input: { newTeamBudget?: number; newSquadSize?: number },
+  actorUserId: string
 ) {
   await assertAuctionLeagueNotReadOnly(auctionId);
 
@@ -719,6 +840,25 @@ export async function updateAuctionTeamSettings(
     if (input.newTeamBudget != null) {
       await tx.auction.update({ where: { id: auctionId }, data: { teamBudget: input.newTeamBudget } });
     }
+    const before: Record<string, string | number> = {};
+    const after: Record<string, string | number> = {};
+    if (input.newTeamBudget != null) {
+      before.teamBudget = auction.teamBudget.toString();
+      after.teamBudget = input.newTeamBudget.toString();
+    }
+    if (input.newSquadSize != null) {
+      before.slotsTotal = auction.entries[0]?.slotsTotal ?? 0;
+      after.slotsTotal = input.newSquadSize;
+    }
+    await writeAuditLog(tx, {
+      entityType: "Auction",
+      entityId: auctionId,
+      auctionId,
+      action: "TEAM_SETTINGS_UPDATED",
+      actorUserId,
+      before,
+      after,
+    });
   });
 
   for (const p of plan) {
@@ -743,7 +883,8 @@ export async function updateAuctionTeamSettings(
  */
 export async function updateOnClockDisplaySettings(
   auctionId: string,
-  input: { onClockTemplate?: OnClockTemplate; onClockVisibleFields?: OnClockFieldKey[] }
+  input: { onClockTemplate?: OnClockTemplate; onClockVisibleFields?: OnClockFieldKey[] },
+  actorUserId: string
 ) {
   await assertAuctionLeagueNotReadOnly(auctionId);
 
@@ -755,16 +896,34 @@ export async function updateOnClockDisplaySettings(
   const auction = await prisma.auction.findUnique({ where: { id: auctionId } });
   if (!auction) throw new ValidationError("Auction not found");
 
-  return prisma.auction.update({
-    where: { id: auctionId },
-    data: {
-      onClockTemplate: input.onClockTemplate ?? undefined,
-      onClockVisibleFields: input.onClockVisibleFields ?? undefined,
-    },
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.auction.update({
+      where: { id: auctionId },
+      data: {
+        onClockTemplate: input.onClockTemplate ?? undefined,
+        onClockVisibleFields: input.onClockVisibleFields ?? undefined,
+      },
+    });
+    await writeAuditLog(tx, {
+      entityType: "Auction",
+      entityId: auctionId,
+      auctionId,
+      action: "ON_CLOCK_SETTINGS_UPDATED",
+      actorUserId,
+      before: {
+        onClockTemplate: auction.onClockTemplate,
+        onClockVisibleFields: auction.onClockVisibleFields,
+      },
+      after: {
+        onClockTemplate: updated.onClockTemplate,
+        onClockVisibleFields: updated.onClockVisibleFields,
+      },
+    });
+    return updated;
   });
 }
 
-export async function deleteAuction(auctionId: string) {
+export async function deleteAuction(auctionId: string, actorUserId: string) {
   const auction = await prisma.auction.findUnique({ where: { id: auctionId } });
   if (!auction) throw new ValidationError("Auction not found");
   if (auction.status === "BIDDING") {
@@ -773,7 +932,24 @@ export async function deleteAuction(auctionId: string) {
     );
   }
 
-  await prisma.auction.delete({ where: { id: auctionId } });
+  await prisma.$transaction(async (tx) => {
+    // Written before the delete even though there's no FK dependency either
+    // way — entityId/auctionId are deliberately bare strings precisely so
+    // this row survives the auction it describes being deleted.
+    await writeAuditLog(tx, {
+      entityType: "Auction",
+      entityId: auctionId,
+      auctionId,
+      action: "AUCTION_DELETED",
+      actorUserId,
+      before: {
+        name: auction.name,
+        status: auction.status,
+        teamBudget: auction.teamBudget.toString(),
+      },
+    });
+    await tx.auction.delete({ where: { id: auctionId } });
+  });
 }
 
 /** Auctions a viewer/manager can watch — live or already finished.

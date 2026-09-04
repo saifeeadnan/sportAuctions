@@ -13,12 +13,18 @@ const assert = (cond: boolean, msg: string) => {
   console.log(`OK: ${msg}`);
 };
 
-async function sell(auctionId: string, playerName: string, teamEntryId: string, price: number) {
+async function sell(
+  auctionId: string,
+  playerName: string,
+  teamEntryId: string,
+  price: number,
+  actorUserId: string
+) {
   const ap = await prisma.auctionPlayer.findFirstOrThrow({
     where: { auctionId, player: { name: playerName }, status: "AVAILABLE" },
   });
   await selectNextPlayer(auctionId, ap.id);
-  await recordSale(auctionId, ap.id, teamEntryId, price);
+  await recordSale(auctionId, ap.id, teamEntryId, price, actorUserId);
   await new Promise((r) => setTimeout(r, 20)); // ensure distinct soldAt ordering
 }
 
@@ -42,18 +48,18 @@ async function main() {
     playerAssignments: players.map((p) => ({ playerId: p.id, categoryName: "Regular" })),
   });
 
-  await openPreAuction(auction.id);
-  await lockPreAuction(auction.id, true);
-  await startBidding(auction.id);
+  await openPreAuction(auction.id, admin.id);
+  await lockPreAuction(auction.id, true, admin.id);
+  await startBidding(auction.id, admin.id);
 
   const team1 = await prisma.teamAuctionEntry.findFirstOrThrow({ where: { auctionId: auction.id, team: { name: "Team 1" } } });
   const team2 = await prisma.teamAuctionEntry.findFirstOrThrow({ where: { auctionId: auction.id, team: { name: "Team 2" } } });
 
   // Sell to Team 1 first (Axar Patel), then Team 2 (Hardik Pandya), then Team 1 again (Ishan Kishan).
   // Team 1's column, most-recent-first, should be: Ishan Kishan, then Axar Patel.
-  await sell(auction.id, "Axar Patel", team1.id, 100);
-  await sell(auction.id, "Hardik Pandya", team2.id, 100);
-  await sell(auction.id, "Ishan Kishan", team1.id, 150);
+  await sell(auction.id, "Axar Patel", team1.id, 100, admin.id);
+  await sell(auction.id, "Hardik Pandya", team2.id, 100, admin.id);
+  await sell(auction.id, "Ishan Kishan", team1.id, 150, admin.id);
 
   const state = await getAuctionState(auction.id);
   if (!state) throw new Error("state not found");

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { ValidationError, InvalidStateTransitionError } from "@/lib/errors";
 import { assertAuctionLeagueNotReadOnly } from "@/lib/services/league.service";
+import { writeAuditLog } from "@/lib/services/auditLog.service";
 
 function assertCompleted(auction: { status: string }) {
   if (auction.status !== "COMPLETED") {
@@ -19,7 +20,8 @@ function assertCompleted(auction: { status: string }) {
 export async function assignTeamCaptain(
   auctionId: string,
   teamAuctionEntryId: string,
-  auctionPlayerId: string | null
+  auctionPlayerId: string | null,
+  actorUserId: string
 ): Promise<void> {
   await assertAuctionLeagueNotReadOnly(auctionId);
 
@@ -32,18 +34,41 @@ export async function assignTeamCaptain(
     throw new ValidationError("Team entry not found in this auction");
   }
 
+  let newCaptainName: string | null = null;
   if (auctionPlayerId != null) {
-    const auctionPlayer = await prisma.auctionPlayer.findUnique({ where: { id: auctionPlayerId } });
+    const auctionPlayer = await prisma.auctionPlayer.findUnique({
+      where: { id: auctionPlayerId },
+      include: { player: true },
+    });
     if (!auctionPlayer || auctionPlayer.auctionId !== auctionId) {
       throw new ValidationError("Player not found in this auction");
     }
     if (auctionPlayer.soldToEntryId !== entry.id) {
       throw new ValidationError("This player was not won by this team in this auction");
     }
+    newCaptainName = auctionPlayer.player.name;
   }
 
-  await prisma.teamAuctionEntry.update({
-    where: { id: teamAuctionEntryId },
-    data: { captainAuctionPlayerId: auctionPlayerId },
+  const previousCaptain = entry.captainAuctionPlayerId
+    ? await prisma.auctionPlayer.findUnique({
+        where: { id: entry.captainAuctionPlayerId },
+        include: { player: true },
+      })
+    : null;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.teamAuctionEntry.update({
+      where: { id: teamAuctionEntryId },
+      data: { captainAuctionPlayerId: auctionPlayerId },
+    });
+    await writeAuditLog(tx, {
+      entityType: "TeamAuctionEntry",
+      entityId: teamAuctionEntryId,
+      auctionId,
+      action: auctionPlayerId != null ? "TEAM_CAPTAIN_ASSIGNED" : "TEAM_CAPTAIN_CLEARED",
+      actorUserId,
+      before: { captainName: previousCaptain?.player.name ?? null },
+      after: { captainName: newCaptainName },
+    });
   });
 }

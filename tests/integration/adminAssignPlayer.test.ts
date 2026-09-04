@@ -33,17 +33,17 @@ async function setup() {
 
 describe("adminAssignPlayer", () => {
   it("is rejected before pre-auction has opened", async () => {
-    const { auction } = await setup();
+    const { auction, admin } = await setup();
     const anyPlayer = await prisma.auctionPlayer.findFirstOrThrow({ where: { auctionId: auction.id } });
 
-    await expect(adminAssignPlayer(auction.id, anyPlayer.id, "nonexistent-entry", 100)).rejects.toThrow(
-      /Open pre-auction/
-    );
+    await expect(
+      adminAssignPlayer(auction.id, anyPlayer.id, "nonexistent-entry", 100, admin.id)
+    ).rejects.toThrow(/Open pre-auction/);
   });
 
   it("enforces the category base price, marks the player SOLD via ADMIN_ASSIGNED, and updates budget/slots", async () => {
-    const { auction, teams } = await setup();
-    await openPreAuction(auction.id);
+    const { auction, teams, admin } = await setup();
+    await openPreAuction(auction.id, admin.id);
 
     const team1Entry = await prisma.teamAuctionEntry.findFirstOrThrow({
       where: { auctionId: auction.id, teamId: teams[0].id },
@@ -52,11 +52,11 @@ describe("adminAssignPlayer", () => {
       where: { auctionId: auction.id, category: { name: "Icon" } },
     });
 
-    await expect(adminAssignPlayer(auction.id, iconPlayer.id, team1Entry.id, 200)).rejects.toThrow(
+    await expect(adminAssignPlayer(auction.id, iconPlayer.id, team1Entry.id, 200, admin.id)).rejects.toThrow(
       /base price/
     );
 
-    const result = await adminAssignPlayer(auction.id, iconPlayer.id, team1Entry.id, 300);
+    const result = await adminAssignPlayer(auction.id, iconPlayer.id, team1Entry.id, 300, admin.id);
     expect(result.player.status).toBe("SOLD");
     expect(result.player.soldVia).toBe("ADMIN_ASSIGNED");
     // 2000 (budget) - 50 (manager fee) - 300 (this assignment) = 1650
@@ -66,8 +66,8 @@ describe("adminAssignPlayer", () => {
   });
 
   it("rejects re-assigning a player that's already SOLD, and excludes it from the AVAILABLE pool", async () => {
-    const { auction, teams } = await setup();
-    await openPreAuction(auction.id);
+    const { auction, teams, admin } = await setup();
+    await openPreAuction(auction.id, admin.id);
 
     const team1Entry = await prisma.teamAuctionEntry.findFirstOrThrow({
       where: { auctionId: auction.id, teamId: teams[0].id },
@@ -79,9 +79,9 @@ describe("adminAssignPlayer", () => {
       where: { auctionId: auction.id, category: { name: "Icon" } },
     });
 
-    await adminAssignPlayer(auction.id, iconPlayer.id, team1Entry.id, 300);
+    await adminAssignPlayer(auction.id, iconPlayer.id, team1Entry.id, 300, admin.id);
 
-    await expect(adminAssignPlayer(auction.id, iconPlayer.id, team2Entry.id, 300)).rejects.toThrow(
+    await expect(adminAssignPlayer(auction.id, iconPlayer.id, team2Entry.id, 300, admin.id)).rejects.toThrow(
       /cannot be directly assigned/
     );
 

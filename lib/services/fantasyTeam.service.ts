@@ -8,6 +8,7 @@ import {
 } from "@/lib/errors";
 import { computeTeamStrength, type RatedPlayer } from "@/lib/teamStrength";
 import { assertAuctionLeagueNotReadOnly } from "@/lib/services/league.service";
+import { writeAuditLog } from "@/lib/services/auditLog.service";
 
 type PrismaClientOrTx = typeof prisma | Prisma.TransactionClient;
 
@@ -408,7 +409,11 @@ export function isFantasyEditingLocked(auction: {
  * decides when this auction's fantasy picks finalize. Editable any time,
  * not write-once — unlike auction settings locked in at creation, there's
  * no cross-cutting cascade to worry about here, just a date comparison. */
-export async function updateFantasyLockDate(auctionId: string, fantasyLockDate: Date | null) {
+export async function updateFantasyLockDate(
+  auctionId: string,
+  fantasyLockDate: Date | null,
+  actorUserId: string
+) {
   if (fantasyLockDate != null && Number.isNaN(fantasyLockDate.getTime())) {
     throw new ValidationError("Invalid date");
   }
@@ -416,7 +421,19 @@ export async function updateFantasyLockDate(auctionId: string, fantasyLockDate: 
   const auction = await prisma.auction.findUnique({ where: { id: auctionId } });
   if (!auction) throw new ValidationError("Auction not found");
 
-  return prisma.auction.update({ where: { id: auctionId }, data: { fantasyLockDate } });
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.auction.update({ where: { id: auctionId }, data: { fantasyLockDate } });
+    await writeAuditLog(tx, {
+      entityType: "Auction",
+      entityId: auctionId,
+      auctionId,
+      action: "FANTASY_LOCK_DATE_CHANGED",
+      actorUserId,
+      before: { fantasyLockDate: auction.fantasyLockDate?.toISOString() ?? null },
+      after: { fantasyLockDate: fantasyLockDate?.toISOString() ?? null },
+    });
+    return updated;
+  });
 }
 
 /** Recomputes and overwrites every FantasyTeamPlayer.price in this auction
@@ -475,7 +492,8 @@ export async function updateFantasySettings(
     selfPickRequired?: boolean;
     maxTeamsPerUser?: number;
     managersAllowed?: boolean;
-  }
+  },
+  actorUserId: string
 ) {
   await assertAuctionLeagueNotReadOnly(auctionId);
   const auction = await prisma.auction.findUnique({ where: { id: auctionId } });
@@ -501,14 +519,33 @@ export async function updateFantasySettings(
   // last happened to resubmit.
   const pricingModelChanged =
     input.pricingModel !== undefined && input.pricingModel !== auction.fantasyPricingModel;
-  if (pricingModelChanged) {
-    return prisma.$transaction(async (tx) => {
-      const updated = await tx.auction.update({ where: { id: auctionId }, data });
+
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.auction.update({ where: { id: auctionId }, data });
+    if (pricingModelChanged) {
       await repriceFantasyTeamPlayers(auctionId, tx);
-      return updated;
+    }
+    await writeAuditLog(tx, {
+      entityType: "Auction",
+      entityId: auctionId,
+      auctionId,
+      action: "FANTASY_SETTINGS_UPDATED",
+      actorUserId,
+      before: {
+        pricingModel: auction.fantasyPricingModel,
+        selfPickRequired: auction.fantasySelfPickRequired,
+        maxTeamsPerUser: auction.fantasyMaxTeamsPerUser,
+        managersAllowed: auction.fantasyManagersAllowed,
+      },
+      after: {
+        pricingModel: data.fantasyPricingModel,
+        selfPickRequired: data.fantasySelfPickRequired,
+        maxTeamsPerUser: data.fantasyMaxTeamsPerUser,
+        managersAllowed: data.fantasyManagersAllowed,
+      },
     });
-  }
-  return prisma.auction.update({ where: { id: auctionId }, data });
+    return updated;
+  });
 }
 
 /**

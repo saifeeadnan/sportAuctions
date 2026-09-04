@@ -99,9 +99,9 @@ export async function updateTournamentDatesAction(
 
 export async function deleteTeamAction(teamId: string): Promise<ActionResult> {
   return toActionResult(async () => {
-    const { leagueIds } = await requireAdminOrLeagueAdmin();
+    const { session, leagueIds } = await requireAdminOrLeagueAdmin();
     const team = await loadScopedTeam(teamId, leagueIds);
-    await deleteTeam(teamId);
+    await deleteTeam(teamId, session.user.id);
     revalidatePath(`/admin/tournaments/${team.tournamentId}`);
   });
 }

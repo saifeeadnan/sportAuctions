@@ -7,6 +7,7 @@ import {
   InvalidStateTransitionError,
 } from "@/lib/errors";
 import { remainingSlots } from "@/lib/services/budget.service";
+import { writeAuditLog } from "@/lib/services/auditLog.service";
 
 /** The auction pool player matching a manager's own login ID, if the manager is also on the roster. */
 export async function findManagerSelfAuctionPlayerId(
@@ -30,7 +31,11 @@ export async function findManagerSelfAuctionPlayerId(
   return match?.id ?? null;
 }
 
-export async function submitDraft(teamAuctionEntryId: string, auctionPlayerIds: string[]) {
+export async function submitDraft(
+  teamAuctionEntryId: string,
+  auctionPlayerIds: string[],
+  actorUserId: string
+) {
   const entry = await prisma.teamAuctionEntry.findUnique({
     where: { id: teamAuctionEntryId },
     include: { team: true },
@@ -89,6 +94,11 @@ export async function submitDraft(teamAuctionEntryId: string, auctionPlayerIds: 
   }
 
   await prisma.$transaction(async (tx) => {
+    const existing = await tx.preAuctionSubmission.findMany({
+      where: { teamAuctionEntryId },
+      select: { auctionPlayerId: true },
+    });
+
     await tx.preAuctionSubmission.deleteMany({ where: { teamAuctionEntryId } });
     if (idsArray.length > 0) {
       await tx.preAuctionSubmission.createMany({
@@ -99,10 +109,24 @@ export async function submitDraft(teamAuctionEntryId: string, auctionPlayerIds: 
       where: { id: teamAuctionEntryId },
       data: { status: "PRE_AUCTION_SUBMITTED" },
     });
+
+    await writeAuditLog(tx, {
+      entityType: "TeamAuctionEntry",
+      entityId: teamAuctionEntryId,
+      auctionId: entry.auctionId,
+      action: "DRAFT_SUBMITTED",
+      actorUserId,
+      before: { auctionPlayerIds: existing.map((s) => s.auctionPlayerId) },
+      after: { auctionPlayerIds: idsArray },
+    });
   });
 }
 
-export async function removeDraftPick(teamAuctionEntryId: string, auctionPlayerId: string) {
+export async function removeDraftPick(
+  teamAuctionEntryId: string,
+  auctionPlayerId: string,
+  actorUserId: string
+) {
   const entry = await prisma.teamAuctionEntry.findUnique({
     where: { id: teamAuctionEntryId },
   });
@@ -114,10 +138,20 @@ export async function removeDraftPick(teamAuctionEntryId: string, auctionPlayerI
     );
   }
 
-  const { count } = await prisma.preAuctionSubmission.deleteMany({
-    where: { teamAuctionEntryId, auctionPlayerId },
+  await prisma.$transaction(async (tx) => {
+    const { count } = await tx.preAuctionSubmission.deleteMany({
+      where: { teamAuctionEntryId, auctionPlayerId },
+    });
+    if (count === 0) {
+      throw new ValidationError("Draft pick not found for this team");
+    }
+    await writeAuditLog(tx, {
+      entityType: "TeamAuctionEntry",
+      entityId: teamAuctionEntryId,
+      auctionId: entry.auctionId,
+      action: "DRAFT_PICK_REMOVED_BY_ADMIN",
+      actorUserId,
+      before: { auctionPlayerId },
+    });
   });
-  if (count === 0) {
-    throw new ValidationError("Draft pick not found for this team");
-  }
 }

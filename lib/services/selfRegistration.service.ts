@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { ValidationError } from "@/lib/errors";
+import { writeAuditLog } from "@/lib/services/auditLog.service";
 
 export type RegisterSelfInput = {
   leagueId: string;
@@ -64,16 +65,27 @@ export async function registerSelf(input: RegisterSelfInput) {
 
   const passwordHash = await bcrypt.hash(input.password, 10);
 
-  return prisma.user.create({
-    data: {
-      loginId,
-      name: player.name,
-      passwordHash,
-      isActive: false,
-      memberships: {
-        create: { leagueId: league.id, role: "VIEWER", isActive: false },
+  return prisma.$transaction(async (tx) => {
+    const user = await tx.user.create({
+      data: {
+        loginId,
+        name: player.name,
+        passwordHash,
+        isActive: false,
+        memberships: {
+          create: { leagueId: league.id, role: "VIEWER", isActive: false },
+        },
       },
-    },
+    });
+    await writeAuditLog(tx, {
+      entityType: "User",
+      entityId: user.id,
+      action: "USER_REGISTERED",
+      actorUserId: user.id,
+      after: { loginId, leagueName: league.name },
+      note: "Self-registered",
+    });
+    return user;
   });
 }
 
@@ -117,7 +129,18 @@ export async function joinLeagueWithExistingLogin(input: JoinLeagueWithExistingL
   });
   if (!player) throw new ValidationError("player-not-found");
 
-  return prisma.leagueMembership.create({
-    data: { userId: user.id, leagueId: league.id, role: "VIEWER", isActive: false },
+  return prisma.$transaction(async (tx) => {
+    const membership = await tx.leagueMembership.create({
+      data: { userId: user.id, leagueId: league.id, role: "VIEWER", isActive: false },
+    });
+    await writeAuditLog(tx, {
+      entityType: "LeagueMembership",
+      entityId: membership.id,
+      action: "MEMBERSHIP_ADDED",
+      actorUserId: user.id,
+      after: { role: "VIEWER", leagueName: league.name },
+      note: "Self-joined via existing login",
+    });
+    return membership;
   });
 }

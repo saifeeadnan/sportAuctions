@@ -34,10 +34,14 @@ describe("updateOnClockDisplaySettings — happy path", () => {
     });
     const auction = await createTestAuction(fixture);
 
-    await updateOnClockDisplaySettings(auction.id, {
-      onClockTemplate: "STATS_TABLE",
-      onClockVisibleFields: ["position", "age", "rating"],
-    });
+    await updateOnClockDisplaySettings(
+      auction.id,
+      {
+        onClockTemplate: "STATS_TABLE",
+        onClockVisibleFields: ["position", "age", "rating"],
+      },
+      fixture.admin.id
+    );
 
     const updated = await prisma.auction.findUniqueOrThrow({ where: { id: auction.id } });
     expect(updated.onClockTemplate).toBe("STATS_TABLE");
@@ -51,11 +55,11 @@ describe("updateOnClockDisplaySettings — happy path", () => {
       squadSize: 5,
     });
     const auction = await createTestAuction(fixture);
-    await openPreAuction(auction.id);
-    await lockPreAuction(auction.id, true);
-    await startBidding(auction.id);
+    await openPreAuction(auction.id, fixture.admin.id);
+    await lockPreAuction(auction.id, true, fixture.admin.id);
+    await startBidding(auction.id, fixture.admin.id);
 
-    await updateOnClockDisplaySettings(auction.id, { onClockTemplate: "PHOTO_FOCUS" });
+    await updateOnClockDisplaySettings(auction.id, { onClockTemplate: "PHOTO_FOCUS" }, fixture.admin.id);
 
     const updated = await prisma.auction.findUniqueOrThrow({ where: { id: auction.id } });
     expect(updated.status).toBe("BIDDING");
@@ -70,12 +74,12 @@ describe("updateOnClockDisplaySettings — happy path", () => {
     });
     const auction = await createTestAuction(fixture);
 
-    await updateOnClockDisplaySettings(auction.id, { onClockVisibleFields: ["age"] });
+    await updateOnClockDisplaySettings(auction.id, { onClockVisibleFields: ["age"] }, fixture.admin.id);
     let updated = await prisma.auction.findUniqueOrThrow({ where: { id: auction.id } });
     expect(updated.onClockTemplate).toBe("CLASSIC");
     expect(updated.onClockVisibleFields).toEqual(["age"]);
 
-    await updateOnClockDisplaySettings(auction.id, { onClockTemplate: "PHOTO_FOCUS" });
+    await updateOnClockDisplaySettings(auction.id, { onClockTemplate: "PHOTO_FOCUS" }, fixture.admin.id);
     updated = await prisma.auction.findUniqueOrThrow({ where: { id: auction.id } });
     expect(updated.onClockTemplate).toBe("PHOTO_FOCUS");
     expect(updated.onClockVisibleFields).toEqual(["age"]);
@@ -92,7 +96,7 @@ describe("updateOnClockDisplaySettings — validation", () => {
     const auction = await createTestAuction(fixture);
 
     await expect(
-      updateOnClockDisplaySettings(auction.id, { onClockTemplate: "NOT_A_TEMPLATE" as never })
+      updateOnClockDisplaySettings(auction.id, { onClockTemplate: "NOT_A_TEMPLATE" as never }, fixture.admin.id)
     ).rejects.toThrow(/Unknown on-the-clock template/);
   });
 
@@ -105,7 +109,7 @@ describe("updateOnClockDisplaySettings — validation", () => {
     const auction = await createTestAuction(fixture);
 
     await expect(
-      updateOnClockDisplaySettings(auction.id, { onClockVisibleFields: ["notAField"] as never })
+      updateOnClockDisplaySettings(auction.id, { onClockVisibleFields: ["notAField"] as never }, fixture.admin.id)
     ).rejects.toThrow(/Unknown display field\(s\): notAField/);
   });
 
@@ -117,7 +121,7 @@ describe("updateOnClockDisplaySettings — validation", () => {
     });
     const auction = await createTestAuction(fixture);
 
-    await expect(updateOnClockDisplaySettings(auction.id, {})).rejects.toThrow(
+    await expect(updateOnClockDisplaySettings(auction.id, {}, fixture.admin.id)).rejects.toThrow(
       /template and\/or visible fields/
     );
   });
@@ -134,7 +138,7 @@ describe("updateOnClockDisplaySettings — read-only league", () => {
     await updateLeagueSettings(fixture.league.id, { endDate: new Date(Date.now() - 24 * 60 * 60 * 1000) });
 
     await expect(
-      updateOnClockDisplaySettings(auction.id, { onClockTemplate: "PHOTO_FOCUS" })
+      updateOnClockDisplaySettings(auction.id, { onClockTemplate: "PHOTO_FOCUS" }, fixture.admin.id)
     ).rejects.toThrow(/read-only/);
   });
 });

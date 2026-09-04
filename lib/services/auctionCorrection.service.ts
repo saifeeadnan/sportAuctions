@@ -3,6 +3,7 @@ import { Prisma } from "@/app/generated/prisma/client";
 import { ValidationError, InvalidStateTransitionError } from "@/lib/errors";
 import { assertAuctionLeagueNotReadOnly } from "@/lib/services/league.service";
 import { repriceFantasyTeamPlayers } from "@/lib/services/fantasyTeam.service";
+import { writeAuditLog } from "@/lib/services/auditLog.service";
 
 function assertCompleted(auction: { status: string }) {
   if (auction.status !== "COMPLETED") {
@@ -131,27 +132,25 @@ export async function correctSoldPrice(
     // everything from scratch is the only way to stay correct in both cases.
     await repriceFantasyTeamPlayers(auctionId, tx);
 
-    await tx.auctionCorrectionLog.create({
-      data: {
-        auctionId,
-        adminUserId,
-        correctionType: "SOLD_PRICE",
-        targetId: auctionPlayerId,
-        oldValue: auctionPlayer.soldPrice!,
-        newValue: newPriceDecimal,
-      },
+    await writeAuditLog(tx, {
+      entityType: "AuctionPlayer",
+      entityId: auctionPlayerId,
+      auctionId,
+      action: "SOLD_PRICE_CORRECTED",
+      actorUserId: adminUserId,
+      before: { soldPrice: auctionPlayer.soldPrice!.toString() },
+      after: { soldPrice: newPriceDecimal.toString() },
     });
     if (newTeamBudget != null) {
-      await tx.auctionCorrectionLog.create({
-        data: {
-          auctionId,
-          adminUserId,
-          correctionType: "TEAM_BUDGET",
-          targetId: null,
-          oldValue: auction.teamBudget,
-          newValue: newTeamBudget,
-          note: `Raised to accommodate sold-price correction on ${auctionPlayer.player.name}`,
-        },
+      await writeAuditLog(tx, {
+        entityType: "Auction",
+        entityId: auctionId,
+        auctionId,
+        action: "TEAM_BUDGET_CORRECTED",
+        actorUserId: adminUserId,
+        before: { teamBudget: auction.teamBudget.toString() },
+        after: { teamBudget: newTeamBudget.toString() },
+        note: `Raised to accommodate sold-price correction on ${auctionPlayer.player.name}`,
       });
     }
   });
@@ -206,15 +205,14 @@ export async function correctCategoryBasePrice(
     // reprice stays correct and cheap either way.
     await repriceFantasyTeamPlayers(auctionId, tx);
 
-    await tx.auctionCorrectionLog.create({
-      data: {
-        auctionId,
-        adminUserId,
-        correctionType: "CATEGORY_BASE_PRICE",
-        targetId: categoryId,
-        oldValue: category.basePrice,
-        newValue: newBasePriceDecimal,
-      },
+    await writeAuditLog(tx, {
+      entityType: "AuctionCategory",
+      entityId: categoryId,
+      auctionId,
+      action: "CATEGORY_BASE_PRICE_CORRECTED",
+      actorUserId: adminUserId,
+      before: { basePrice: category.basePrice.toString() },
+      after: { basePrice: newBasePriceDecimal.toString() },
     });
   });
 }
@@ -264,15 +262,14 @@ export async function correctTeamBudget(auctionId: string, newTeamBudget: number
       });
     }
     await tx.auction.update({ where: { id: auctionId }, data: { teamBudget: newTeamBudgetDecimal } });
-    await tx.auctionCorrectionLog.create({
-      data: {
-        auctionId,
-        adminUserId,
-        correctionType: "TEAM_BUDGET",
-        targetId: null,
-        oldValue: auction.teamBudget,
-        newValue: newTeamBudgetDecimal,
-      },
+    await writeAuditLog(tx, {
+      entityType: "Auction",
+      entityId: auctionId,
+      auctionId,
+      action: "TEAM_BUDGET_CORRECTED",
+      actorUserId: adminUserId,
+      before: { teamBudget: auction.teamBudget.toString() },
+      after: { teamBudget: newTeamBudgetDecimal.toString() },
     });
   });
 }

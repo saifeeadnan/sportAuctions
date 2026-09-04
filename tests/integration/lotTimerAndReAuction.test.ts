@@ -33,9 +33,9 @@ async function createLiveAuction(
     playerAssignments: fixture.players.map((p) => ({ playerId: p.id, categoryName: "Regular" })),
     ...overrides,
   });
-  await openPreAuction(auction.id);
-  await lockPreAuction(auction.id, true);
-  await startBidding(auction.id);
+  await openPreAuction(auction.id, fixture.admin.id);
+  await lockPreAuction(auction.id, true, fixture.admin.id);
+  await startBidding(auction.id, fixture.admin.id);
   return { ...fixture, auction };
 }
 
@@ -90,7 +90,7 @@ describe("lot timer — set/reset mechanics", () => {
   });
 
   it("recordSale and markUnsold both clear the deadline", async () => {
-    const { auction, teams } = await createLiveAuction(["Player A", "Player B"], ["Team 1"], {
+    const { auction, teams, admin } = await createLiveAuction(["Player A", "Player B"], ["Team 1"], {
       lotTimerSeconds: 20,
     });
     const team1 = await prisma.teamAuctionEntry.findFirstOrThrow({
@@ -99,19 +99,19 @@ describe("lot timer — set/reset mechanics", () => {
 
     const apA = await getPlayer(auction.id, "Player A");
     await selectNextPlayer(auction.id, apA.id);
-    await recordSale(auction.id, apA.id, team1.id, 200);
+    await recordSale(auction.id, apA.id, team1.id, 200, admin.id);
     const soldA = await prisma.auctionPlayer.findUniqueOrThrow({ where: { id: apA.id } });
     expect(soldA.lotTimerDeadline).toBeNull();
 
     const apB = await getPlayer(auction.id, "Player B");
     await selectNextPlayer(auction.id, apB.id);
-    await markUnsold(auction.id, apB.id);
+    await markUnsold(auction.id, apB.id, admin.id);
     const unsoldB = await prisma.auctionPlayer.findUniqueOrThrow({ where: { id: apB.id } });
     expect(unsoldB.lotTimerDeadline).toBeNull();
   });
 
   it("resetAuctionToPreBidding clears the deadline in both the LIVE_BID and UNSOLD branches", async () => {
-    const { auction, teams } = await createLiveAuction(["Player A", "Player B"], ["Team 1"], {
+    const { auction, teams, admin } = await createLiveAuction(["Player A", "Player B"], ["Team 1"], {
       lotTimerSeconds: 20,
     });
     const team1 = await prisma.teamAuctionEntry.findFirstOrThrow({
@@ -120,13 +120,13 @@ describe("lot timer — set/reset mechanics", () => {
 
     const apA = await getPlayer(auction.id, "Player A"); // will be SOLD (LIVE_BID branch)
     await selectNextPlayer(auction.id, apA.id);
-    await recordSale(auction.id, apA.id, team1.id, 200);
+    await recordSale(auction.id, apA.id, team1.id, 200, admin.id);
 
     const apB = await getPlayer(auction.id, "Player B"); // will stay UNSOLD (UNSOLD branch)
     await selectNextPlayer(auction.id, apB.id);
-    await markUnsold(auction.id, apB.id);
+    await markUnsold(auction.id, apB.id, admin.id);
 
-    await resetAuctionToPreBidding(auction.id);
+    await resetAuctionToPreBidding(auction.id, admin.id);
 
     const resetA = await prisma.auctionPlayer.findUniqueOrThrow({ where: { id: apA.id } });
     const resetB = await prisma.auctionPlayer.findUniqueOrThrow({ where: { id: apB.id } });
@@ -137,14 +137,14 @@ describe("lot timer — set/reset mechanics", () => {
 
 describe("discounted re-auction — computation", () => {
   it("computes the discount on the first unsold pass and sets the used-flag", async () => {
-    const { auction } = await createLiveAuction(["Player A"], ["Team 1"], {
+    const { auction, admin } = await createLiveAuction(["Player A"], ["Team 1"], {
       reAuctionEnabled: true,
       reAuctionDiscountPercent: 25,
     });
     const ap = await getPlayer(auction.id, "Player A");
 
     await selectNextPlayer(auction.id, ap.id);
-    await markUnsold(auction.id, ap.id);
+    await markUnsold(auction.id, ap.id, admin.id);
 
     const updated = await prisma.auctionPlayer.findUniqueOrThrow({ where: { id: ap.id } });
     // base price 200, 25% off -> 150
@@ -153,22 +153,22 @@ describe("discounted re-auction — computation", () => {
   });
 
   it("does not discount further on a second or third unsold pass", async () => {
-    const { auction } = await createLiveAuction(["Player A"], ["Team 1"], {
+    const { auction, admin } = await createLiveAuction(["Player A"], ["Team 1"], {
       reAuctionEnabled: true,
       reAuctionDiscountPercent: 25,
     });
     const ap = await getPlayer(auction.id, "Player A");
 
     await selectNextPlayer(auction.id, ap.id);
-    await markUnsold(auction.id, ap.id);
+    await markUnsold(auction.id, ap.id, admin.id);
     const afterFirst = await prisma.auctionPlayer.findUniqueOrThrow({ where: { id: ap.id } });
 
     await selectNextPlayer(auction.id, ap.id);
-    await markUnsold(auction.id, ap.id);
+    await markUnsold(auction.id, ap.id, admin.id);
     const afterSecond = await prisma.auctionPlayer.findUniqueOrThrow({ where: { id: ap.id } });
 
     await selectNextPlayer(auction.id, ap.id);
-    await markUnsold(auction.id, ap.id);
+    await markUnsold(auction.id, ap.id, admin.id);
     const afterThird = await prisma.auctionPlayer.findUniqueOrThrow({ where: { id: ap.id } });
 
     expect(String(afterFirst.discountedBasePrice)).toBe("150");
@@ -177,11 +177,11 @@ describe("discounted re-auction — computation", () => {
   });
 
   it("does not discount when the auction's re-auction switch is off", async () => {
-    const { auction } = await createLiveAuction(["Player A"], ["Team 1"]);
+    const { auction, admin } = await createLiveAuction(["Player A"], ["Team 1"]);
     const ap = await getPlayer(auction.id, "Player A");
 
     await selectNextPlayer(auction.id, ap.id);
-    await markUnsold(auction.id, ap.id);
+    await markUnsold(auction.id, ap.id, admin.id);
 
     const updated = await prisma.auctionPlayer.findUniqueOrThrow({ where: { id: ap.id } });
     expect(updated.discountedBasePrice).toBeNull();
@@ -189,7 +189,7 @@ describe("discounted re-auction — computation", () => {
   });
 
   it("resetAuctionToPreBidding clears the discount in both the LIVE_BID and UNSOLD branches", async () => {
-    const { auction, teams } = await createLiveAuction(["Player A", "Player B"], ["Team 1"], {
+    const { auction, teams, admin } = await createLiveAuction(["Player A", "Player B"], ["Team 1"], {
       reAuctionEnabled: true,
       reAuctionDiscountPercent: 25,
     });
@@ -200,21 +200,21 @@ describe("discounted re-auction — computation", () => {
     // Player A: unsold -> discounted -> re-offered -> SOLD, all within this session.
     const apA = await getPlayer(auction.id, "Player A");
     await selectNextPlayer(auction.id, apA.id);
-    await markUnsold(auction.id, apA.id);
+    await markUnsold(auction.id, apA.id, admin.id);
     await selectNextPlayer(auction.id, apA.id);
-    await recordSale(auction.id, apA.id, team1.id, 150);
+    await recordSale(auction.id, apA.id, team1.id, 150, admin.id);
 
     // Player B: unsold -> discounted, left unsold.
     const apB = await getPlayer(auction.id, "Player B");
     await selectNextPlayer(auction.id, apB.id);
-    await markUnsold(auction.id, apB.id);
+    await markUnsold(auction.id, apB.id, admin.id);
 
     const beforeResetA = await prisma.auctionPlayer.findUniqueOrThrow({ where: { id: apA.id } });
     expect(beforeResetA.soldVia).toBe("LIVE_BID");
     const beforeResetB = await prisma.auctionPlayer.findUniqueOrThrow({ where: { id: apB.id } });
     expect(String(beforeResetB.discountedBasePrice)).toBe("150");
 
-    await resetAuctionToPreBidding(auction.id);
+    await resetAuctionToPreBidding(auction.id, admin.id);
 
     const resetA = await prisma.auctionPlayer.findUniqueOrThrow({ where: { id: apA.id } });
     const resetB = await prisma.auctionPlayer.findUniqueOrThrow({ where: { id: apB.id } });
@@ -227,7 +227,7 @@ describe("discounted re-auction — computation", () => {
 
 describe("discounted re-auction — enforced as the new price floor", () => {
   it("accepts a bid between the discounted floor and the original base price", async () => {
-    const { auction, teams } = await createLiveAuction(["Player A"], ["Team 1"], {
+    const { auction, teams, admin } = await createLiveAuction(["Player A"], ["Team 1"], {
       reAuctionEnabled: true,
       reAuctionDiscountPercent: 25,
     });
@@ -237,7 +237,7 @@ describe("discounted re-auction — enforced as the new price floor", () => {
     const ap = await getPlayer(auction.id, "Player A");
 
     await selectNextPlayer(auction.id, ap.id);
-    await markUnsold(auction.id, ap.id); // discounted to 150
+    await markUnsold(auction.id, ap.id, admin.id); // discounted to 150
     await selectNextPlayer(auction.id, ap.id);
 
     // 160 sits strictly between the discounted floor (150) and the original
@@ -248,7 +248,7 @@ describe("discounted re-auction — enforced as the new price floor", () => {
   });
 
   it("rejects a bid below the discounted floor", async () => {
-    const { auction, teams } = await createLiveAuction(["Player A"], ["Team 1"], {
+    const { auction, teams, admin } = await createLiveAuction(["Player A"], ["Team 1"], {
       reAuctionEnabled: true,
       reAuctionDiscountPercent: 25,
     });
@@ -258,7 +258,7 @@ describe("discounted re-auction — enforced as the new price floor", () => {
     const ap = await getPlayer(auction.id, "Player A");
 
     await selectNextPlayer(auction.id, ap.id);
-    await markUnsold(auction.id, ap.id); // discounted to 150
+    await markUnsold(auction.id, ap.id, admin.id); // discounted to 150
     await selectNextPlayer(auction.id, ap.id);
 
     await expect(placeBid(auction.id, ap.id, team1.id, 100)).rejects.toThrow(/at least the base price/);
@@ -267,14 +267,14 @@ describe("discounted re-auction — enforced as the new price floor", () => {
 
 describe("getAuctionState — discount is per-player", () => {
   it("surfaces the discounted price only for the affected player, unchanged for its category-mates", async () => {
-    const { auction } = await createLiveAuction(["Player A", "Player B"], ["Team 1"], {
+    const { auction, admin } = await createLiveAuction(["Player A", "Player B"], ["Team 1"], {
       reAuctionEnabled: true,
       reAuctionDiscountPercent: 25,
     });
     const apA = await getPlayer(auction.id, "Player A");
 
     await selectNextPlayer(auction.id, apA.id);
-    await markUnsold(auction.id, apA.id);
+    await markUnsold(auction.id, apA.id, admin.id);
 
     const state = await getAuctionState(auction.id);
     const stateA = state!.players.find((p) => p.name === "Player A")!;
@@ -351,14 +351,14 @@ describe("createAuction — validation", () => {
 
 describe("backward compatibility — both features left off", () => {
   it("an unsold player still re-offers at the exact same, undiscounted price (today's existing behavior)", async () => {
-    const { auction, teams } = await createLiveAuction(["Player A"], ["Team 1"]);
+    const { auction, teams, admin } = await createLiveAuction(["Player A"], ["Team 1"]);
     const team1 = await prisma.teamAuctionEntry.findFirstOrThrow({
       where: { auctionId: auction.id, teamId: teams[0].id },
     });
     const ap = await getPlayer(auction.id, "Player A");
 
     await selectNextPlayer(auction.id, ap.id);
-    await markUnsold(auction.id, ap.id);
+    await markUnsold(auction.id, ap.id, admin.id);
 
     let refreshed = await prisma.auctionPlayer.findUniqueOrThrow({ where: { id: ap.id } });
     expect(refreshed.status).toBe("UNSOLD");
@@ -368,7 +368,7 @@ describe("backward compatibility — both features left off", () => {
     refreshed = await prisma.auctionPlayer.findUniqueOrThrow({ where: { id: ap.id } });
     expect(refreshed.status).toBe("IN_BIDDING");
 
-    const result = await recordSale(auction.id, ap.id, team1.id, 200);
+    const result = await recordSale(auction.id, ap.id, team1.id, 200, admin.id);
     expect(result.player.status).toBe("SOLD");
     expect(String(result.player.soldPrice)).toBe("200");
 

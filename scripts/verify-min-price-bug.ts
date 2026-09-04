@@ -32,9 +32,9 @@ async function main() {
     playerAssignments: players.map((p) => ({ playerId: p.id, categoryName: "Regular" })),
   });
 
-  await openPreAuction(auction.id);
-  await lockPreAuction(auction.id, true);
-  await startBidding(auction.id);
+  await openPreAuction(auction.id, admin.id);
+  await lockPreAuction(auction.id, true, admin.id);
+  await startBidding(auction.id, admin.id);
 
   const team1 = await prisma.teamAuctionEntry.findFirstOrThrow({ where: { auctionId: auction.id, team: { name: "Team 1" } } });
   const target = await prisma.auctionPlayer.findFirstOrThrow({ where: { auctionId: auction.id, status: "AVAILABLE" } });
@@ -43,7 +43,7 @@ async function main() {
 
   // Below base price (200) -> must be rejected
   try {
-    await recordSale(auction.id, target.id, team1.id, 150);
+    await recordSale(auction.id, target.id, team1.id, 150, admin.id);
     throw new Error("Expected recordSale to reject a bid below the category base price");
   } catch (e) {
     assert(
@@ -56,7 +56,7 @@ async function main() {
   assert(stillAvailable.status === "IN_BIDDING", "Player remains on the clock after rejected below-base bid (not sold)");
 
   // Exactly at base price -> must be accepted
-  const result = await recordSale(auction.id, target.id, team1.id, 200);
+  const result = await recordSale(auction.id, target.id, team1.id, 200, admin.id);
   assert(result.player.status === "SOLD" && String(result.player.soldPrice) === "200", "Bid exactly at base price (200) is accepted");
 
   console.log("\nAll min-price assertions passed.");

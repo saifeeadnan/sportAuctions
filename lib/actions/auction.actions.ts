@@ -45,9 +45,9 @@ export async function openPreAuctionAction(
   _formData?: FormData
 ): Promise<ActionResult> {
   return toActionResult(async () => {
-    const { leagueIds } = await requireAdminOrLeagueAdmin();
+    const { session, leagueIds } = await requireAdminOrLeagueAdmin();
     await loadScopedAuction(auctionId, leagueIds);
-    await openPreAuction(auctionId);
+    await openPreAuction(auctionId, session.user.id);
     revalidatePath(`/admin/auctions/${auctionId}`);
   });
 }
@@ -63,9 +63,9 @@ export async function lockPreAuctionAction(
   _formData?: FormData
 ): Promise<ActionResult> {
   const result = await toActionResult(async () => {
-    const { leagueIds } = await requireAdminOrLeagueAdmin();
+    const { session, leagueIds } = await requireAdminOrLeagueAdmin();
     await loadScopedAuction(auctionId, leagueIds);
-    await lockPreAuction(auctionId, force);
+    await lockPreAuction(auctionId, force, session.user.id);
     revalidatePath(`/admin/auctions/${auctionId}`);
   });
   if (result.error) return result;
@@ -80,7 +80,7 @@ export async function startBiddingAction(
   return toActionResult(async () => {
     const session = await requireRole("ADMIN", "AUCTIONEER", "LEAGUE_ADMIN");
     await loadScopedAuction(auctionId, allLeagueIds(session));
-    await startBidding(auctionId);
+    await startBidding(auctionId, session.user.id);
     revalidatePath(`/admin/auctions/${auctionId}`);
     revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
   });
@@ -94,7 +94,7 @@ export async function startBiddingDirectAction(
   return toActionResult(async () => {
     const session = await requireRole("ADMIN", "AUCTIONEER", "LEAGUE_ADMIN");
     await loadScopedAuction(auctionId, allLeagueIds(session));
-    await startBiddingDirect(auctionId);
+    await startBiddingDirect(auctionId, session.user.id);
     revalidatePath(`/admin/auctions/${auctionId}`);
     revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
   });
@@ -104,7 +104,7 @@ export async function resetAuctionAction(auctionId: string): Promise<ActionResul
   return toActionResult(async () => {
     const session = await requireRole("ADMIN", "AUCTIONEER", "LEAGUE_ADMIN");
     await loadScopedAuction(auctionId, allLeagueIds(session));
-    await resetAuctionToPreBidding(auctionId);
+    await resetAuctionToPreBidding(auctionId, session.user.id);
     revalidatePath(`/admin/auctions/${auctionId}`);
     revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
   });
@@ -116,9 +116,9 @@ export async function addPlayerToAuctionAction(
   categoryId: string
 ): Promise<ActionResult> {
   return toActionResult(async () => {
-    const { leagueIds } = await requireAdminOrLeagueAdmin();
+    const { session, leagueIds } = await requireAdminOrLeagueAdmin();
     await loadScopedAuction(auctionId, leagueIds);
-    await addPlayerToAuction(auctionId, playerId, categoryId);
+    await addPlayerToAuction(auctionId, playerId, categoryId, session.user.id);
     revalidatePath(`/admin/auctions/${auctionId}`);
     revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
   });
@@ -130,9 +130,9 @@ export async function updateAuctionPlayerCategoryAction(
   categoryId: string
 ): Promise<ActionResult> {
   return toActionResult(async () => {
-    const { leagueIds } = await requireAdminOrLeagueAdmin();
+    const { session, leagueIds } = await requireAdminOrLeagueAdmin();
     await loadScopedAuction(auctionId, leagueIds);
-    await updateAuctionPlayerCategory(auctionId, auctionPlayerId, categoryId);
+    await updateAuctionPlayerCategory(auctionId, auctionPlayerId, categoryId, session.user.id);
     revalidatePath(`/admin/auctions/${auctionId}`);
     revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
   });
@@ -144,9 +144,9 @@ export async function updateCategoryBidIncrementAction(
   bidIncrement: number | null
 ): Promise<ActionResult> {
   return toActionResult(async () => {
-    const { leagueIds } = await requireAdminOrLeagueAdmin();
+    const { session, leagueIds } = await requireAdminOrLeagueAdmin();
     await loadScopedAuction(auctionId, leagueIds);
-    await updateCategoryBidIncrement(categoryId, bidIncrement);
+    await updateCategoryBidIncrement(categoryId, bidIncrement, session.user.id);
     revalidatePath(`/admin/auctions/${auctionId}`);
   });
 }
@@ -156,9 +156,9 @@ export async function updateAuctionTeamSettingsAction(
   input: { newTeamBudget?: number; newSquadSize?: number }
 ): Promise<ActionResult> {
   return toActionResult(async () => {
-    const { leagueIds } = await requireAdminOrLeagueAdmin();
+    const { session, leagueIds } = await requireAdminOrLeagueAdmin();
     await loadScopedAuction(auctionId, leagueIds);
-    await updateAuctionTeamSettings(auctionId, input);
+    await updateAuctionTeamSettings(auctionId, input, session.user.id);
     revalidatePath(`/admin/auctions/${auctionId}`);
     revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
   });
@@ -169,9 +169,9 @@ export async function updateOnClockDisplaySettingsAction(
   input: { onClockTemplate?: OnClockTemplate; onClockVisibleFields?: OnClockFieldKey[] }
 ): Promise<ActionResult> {
   return toActionResult(async () => {
-    const { leagueIds } = await requireAdminOrLeagueAdmin();
+    const { session, leagueIds } = await requireAdminOrLeagueAdmin();
     await loadScopedAuction(auctionId, leagueIds);
-    await updateOnClockDisplaySettings(auctionId, input);
+    await updateOnClockDisplaySettings(auctionId, input, session.user.id);
     revalidatePath(`/admin/auctions/${auctionId}`);
     revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
   });
@@ -179,9 +179,9 @@ export async function updateOnClockDisplaySettingsAction(
 
 export async function deleteAuctionAction(auctionId: string): Promise<ActionResult> {
   return toActionResult(async () => {
-    const { leagueIds } = await requireAdminOrLeagueAdmin();
+    const { session, leagueIds } = await requireAdminOrLeagueAdmin();
     const auction = await loadScopedAuction(auctionId, leagueIds);
-    await deleteAuction(auctionId);
+    await deleteAuction(auctionId, session.user.id);
     revalidatePath(`/admin/tournaments/${auction.tournamentId}`);
   });
 }
@@ -201,7 +201,7 @@ export async function submitDraftAction(
       throw new ValidationError("You do not manage this team");
     }
 
-    await submitDraft(teamAuctionEntryId, auctionPlayerIds);
+    await submitDraft(teamAuctionEntryId, auctionPlayerIds, session.user.id);
     revalidatePath(`/manager/teams/${teamAuctionEntryId}/draft`);
   });
 }
@@ -212,9 +212,9 @@ export async function adminRemoveDraftPickAction(
   auctionPlayerId: string
 ): Promise<ActionResult> {
   return toActionResult(async () => {
-    const { leagueIds } = await requireAdminOrLeagueAdmin();
+    const { session, leagueIds } = await requireAdminOrLeagueAdmin();
     await loadScopedAuction(auctionId, leagueIds);
-    await removeDraftPick(teamAuctionEntryId, auctionPlayerId);
+    await removeDraftPick(teamAuctionEntryId, auctionPlayerId, session.user.id);
     revalidatePath(`/admin/auctions/${auctionId}/teams/${teamAuctionEntryId}`);
   });
 }

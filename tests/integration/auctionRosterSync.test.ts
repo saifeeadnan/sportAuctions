@@ -43,24 +43,24 @@ describe("addPlayerToAuction", () => {
   }
 
   it("joins a roster player who wasn't in the auction's original pool, as Available", async () => {
-    const { auction, addedLater, regular } = await setup();
+    const { auction, addedLater, regular, admin } = await setup();
 
-    const created = await addPlayerToAuction(auction.id, addedLater.id, regular.id);
+    const created = await addPlayerToAuction(auction.id, addedLater.id, regular.id, admin.id);
     expect(created.status).toBe("AVAILABLE");
     expect(created.playerId).toBe(addedLater.id);
   });
 
   it("rejects adding the same player twice", async () => {
-    const { auction, addedLater, regular } = await setup();
-    await addPlayerToAuction(auction.id, addedLater.id, regular.id);
+    const { auction, addedLater, regular, admin } = await setup();
+    await addPlayerToAuction(auction.id, addedLater.id, regular.id, admin.id);
 
-    await expect(addPlayerToAuction(auction.id, addedLater.id, regular.id)).rejects.toThrow(
+    await expect(addPlayerToAuction(auction.id, addedLater.id, regular.id, admin.id)).rejects.toThrow(
       /already in the auction/
     );
   });
 
   it("rejects a player who doesn't belong to this tournament's roster", async () => {
-    const { auction, regular } = await setup();
+    const { auction, regular, admin } = await setup();
     const otherFixture = await createAuctionReadyFixture({
       playerNames: ["Outsider"],
       teamNames: ["Team 1"],
@@ -68,7 +68,7 @@ describe("addPlayerToAuction", () => {
     });
     const outsider = otherFixture.players[0];
 
-    await expect(addPlayerToAuction(auction.id, outsider.id, regular.id)).rejects.toThrow(
+    await expect(addPlayerToAuction(auction.id, outsider.id, regular.id, admin.id)).rejects.toThrow(
       /roster/
     );
   });
@@ -99,28 +99,28 @@ describe("updateAuctionPlayerCategory", () => {
   }
 
   it("moves a not-yet-sold player to a different category of the same auction", async () => {
-    const { auctionPlayer, icon } = await setup();
+    const { auctionPlayer, icon, admin } = await setup();
 
-    const updated = await updateAuctionPlayerCategory(auctionPlayer.auctionId, auctionPlayer.id, icon.id);
+    const updated = await updateAuctionPlayerCategory(auctionPlayer.auctionId, auctionPlayer.id, icon.id, admin.id);
     expect(updated.categoryId).toBe(icon.id);
   });
 
   it("rejects moving a player once they're on the clock or sold", async () => {
-    const { auctionPlayer, icon } = await setup();
+    const { auctionPlayer, icon, admin } = await setup();
     await prisma.auctionPlayer.update({ where: { id: auctionPlayer.id }, data: { status: "IN_BIDDING" } });
 
     await expect(
-      updateAuctionPlayerCategory(auctionPlayer.auctionId, auctionPlayer.id, icon.id)
+      updateAuctionPlayerCategory(auctionPlayer.auctionId, auctionPlayer.id, icon.id, admin.id)
     ).rejects.toThrow(/status is IN_BIDDING/);
 
     await prisma.auctionPlayer.update({ where: { id: auctionPlayer.id }, data: { status: "SOLD" } });
     await expect(
-      updateAuctionPlayerCategory(auctionPlayer.auctionId, auctionPlayer.id, icon.id)
+      updateAuctionPlayerCategory(auctionPlayer.auctionId, auctionPlayer.id, icon.id, admin.id)
     ).rejects.toThrow(/status is SOLD/);
   });
 
   it("rejects a category that belongs to a different auction", async () => {
-    const { auctionPlayer } = await setup();
+    const { auctionPlayer, admin } = await setup();
     const otherFixture = await createAuctionReadyFixture({
       playerNames: ["Other Player"],
       teamNames: ["Team 1"],
@@ -139,7 +139,7 @@ describe("updateAuctionPlayerCategory", () => {
     });
 
     await expect(
-      updateAuctionPlayerCategory(auctionPlayer.auctionId, auctionPlayer.id, otherCategory.id)
+      updateAuctionPlayerCategory(auctionPlayer.auctionId, auctionPlayer.id, otherCategory.id, admin.id)
     ).rejects.toThrow(/does not belong to this auction/);
   });
 });

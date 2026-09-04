@@ -37,7 +37,7 @@ async function main() {
   const anyPlayer = await prisma.auctionPlayer.findFirstOrThrow({ where: { auctionId: auction.id } });
   const team1Pre = await prisma.team.findFirstOrThrow({ where: { tournamentId: tournament.id, name: "Team 1" } });
   try {
-    await adminAssignPlayer(auction.id, anyPlayer.id, "nonexistent-entry", 100);
+    await adminAssignPlayer(auction.id, anyPlayer.id, "nonexistent-entry", 100, admin.id);
     throw new Error("Expected adminAssignPlayer to reject before pre-auction opens");
   } catch (e) {
     assert(
@@ -46,7 +46,7 @@ async function main() {
     );
   }
 
-  await openPreAuction(auction.id);
+  await openPreAuction(auction.id, admin.id);
 
   const team1Entry = await prisma.teamAuctionEntry.findFirstOrThrow({
     where: { auctionId: auction.id, teamId: team1Pre.id },
@@ -62,7 +62,7 @@ async function main() {
 
   // Below base price -> rejected.
   try {
-    await adminAssignPlayer(auction.id, iconPlayer.id, team1Entry.id, 200);
+    await adminAssignPlayer(auction.id, iconPlayer.id, team1Entry.id, 200, admin.id);
     throw new Error("Expected adminAssignPlayer to reject a price below the category base price");
   } catch (e) {
     assert(
@@ -72,14 +72,14 @@ async function main() {
   }
 
   // Valid assignment at exactly the base price.
-  const result = await adminAssignPlayer(auction.id, iconPlayer.id, team1Entry.id, 300);
+  const result = await adminAssignPlayer(auction.id, iconPlayer.id, team1Entry.id, 300, admin.id);
   assert(result.player.status === "SOLD" && result.player.soldVia === "ADMIN_ASSIGNED", "Player marked SOLD via ADMIN_ASSIGNED");
   assert(String(result.entry.budgetRemaining) === "1650", `Team 1 budgetRemaining is 2000 - 50 (manager) - 300 = 1650, got ${result.entry.budgetRemaining}`);
   assert(result.entry.slotsFilled === 2, `Team 1 slotsFilled is 2 (manager + assigned player), got ${result.entry.slotsFilled}`);
 
   // Already-SOLD player cannot be assigned again.
   try {
-    await adminAssignPlayer(auction.id, iconPlayer.id, team2Entry.id, 300);
+    await adminAssignPlayer(auction.id, iconPlayer.id, team2Entry.id, 300, admin.id);
     throw new Error("Expected adminAssignPlayer to reject an already-SOLD player");
   } catch (e) {
     assert(
