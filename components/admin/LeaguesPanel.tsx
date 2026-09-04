@@ -96,7 +96,7 @@ export async function LeaguesPanel() {
                     <img
                       src={`/api/leagues/${league.id}/logo`}
                       alt={`${league.name} logo`}
-                      className="h-6 w-6 rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-0.5 shrink-0"
+                      className="h-[34px] w-[34px] rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-0.5 shrink-0"
                     />
                   ) : null}
                   {league.name}{" "}
