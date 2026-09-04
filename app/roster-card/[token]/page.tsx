@@ -21,8 +21,8 @@ export async function generateMetadata({
   if (!card) notFound();
 
   const count = card.players.length;
-  const title = `${card.teamName} — ${card.auctionName}`;
-  const description = `${card.tournamentName} · ${count} player${count === 1 ? "" : "s"}`;
+  const title = `${card.teamName} — ${card.tournamentName}`;
+  const description = `${count} player${count === 1 ? "" : "s"}`;
   return {
     title,
     description,
@@ -95,9 +95,7 @@ export default async function RosterCardPage({
               >
                 {card.teamName}
               </h1>
-              <p className="text-sm text-white/50">
-                {card.tournamentName} &middot; {card.auctionName}
-              </p>
+              <p className="text-sm text-white/50">{card.tournamentName}</p>
             </div>
           </div>
 

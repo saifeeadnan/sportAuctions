@@ -135,7 +135,7 @@ describe("getSharedRosterCard", () => {
     expect(card!.teamName).toBe("Team 1");
     expect(card!.tournamentId).toBe(fx.tournament.id);
     expect(card!.tournamentName).toBe(fx.tournament.name);
-    expect(card!.auctionName).toBe("Roster Auction");
+    expect(card!).not.toHaveProperty("auctionName");
     expect(card!.hasTeamImage).toBe(false);
 
     expect(card!.players.map((p) => p.playerName)).toEqual([

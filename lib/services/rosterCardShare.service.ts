@@ -53,7 +53,6 @@ export type SharedRosterCardData = {
   hasTeamImage: boolean;
   tournamentId: string;
   tournamentName: string;
-  auctionName: string;
   /** Captain first (if assigned), then alphabetical — same order as the
    * downloadable PNG card. Deliberately carries no price: this is a public
    * page. */
@@ -79,7 +78,7 @@ export async function getSharedRosterCard(token: string): Promise<SharedRosterCa
       // sponsorImage is selected by id only — never its (up to 5 MB) bytes.
       team: { select: { id: true, name: true, sponsorImage: { select: { id: true } } } },
       auction: {
-        select: { name: true, status: true, tournament: { select: { id: true, name: true } } },
+        select: { status: true, tournament: { select: { id: true, name: true } } },
       },
       playersWon: {
         select: {
@@ -107,7 +106,6 @@ export async function getSharedRosterCard(token: string): Promise<SharedRosterCa
     hasTeamImage: entry.team.sponsorImage != null,
     tournamentId: entry.auction.tournament.id,
     tournamentName: entry.auction.tournament.name,
-    auctionName: entry.auction.name,
     players: ordered.map((ap) => ({
       id: ap.id,
       playerName: ap.player.name,
