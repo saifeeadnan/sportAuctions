@@ -41,28 +41,30 @@ export function ActiveLeagueBanner({
     fixedLeague ?? (leagues && selectedLeagueId ? leagues.find((l) => l.id === selectedLeagueId) : null);
 
   return (
-    <div className="mb-4 flex flex-col gap-1">
-      <div className="flex items-center gap-2 text-sm">
-        {league?.logo && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={`/api/leagues/${league.id}/logo`}
-            alt={`${league.name} logo`}
-            className="h-10 w-10 rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-1"
-          />
-        )}
-        <span className="font-medium">{league ? league.name : "All leagues"}</span>
-        {league && isReadOnly(league) && <Badge variant="warning">Read-only</Badge>}
-      </div>
-      {league && (
-        <p className="text-xs text-black/60 dark:text-white/60">
-          Start: {league.startDate ? formatCalendarDate(league.startDate) : "—"} &middot; End:{" "}
-          {league.endDate ? formatCalendarDate(league.endDate) : "—"} &middot; Max tournaments:{" "}
-          {league.maxTournaments ?? "Unlimited"} &middot; Max teams/tournament:{" "}
-          {league.maxTeamsPerTournament ?? "Unlimited"} &middot; Max sponsors/tournament:{" "}
-          {league.maxSponsorsPerTournament ?? "Unlimited"}
-        </p>
+    <div className="mb-4 flex items-start gap-3">
+      {league?.logo && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={`/api/leagues/${league.id}/logo`}
+          alt={`${league.name} logo`}
+          className="h-16 w-16 rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-1 shrink-0"
+        />
       )}
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-2 text-sm">
+          <span className="font-medium">{league ? league.name : "All leagues"}</span>
+          {league && isReadOnly(league) && <Badge variant="warning">Read-only</Badge>}
+        </div>
+        {league && (
+          <p className="text-xs text-black/60 dark:text-white/60">
+            Start: {league.startDate ? formatCalendarDate(league.startDate) : "—"} &middot; End:{" "}
+            {league.endDate ? formatCalendarDate(league.endDate) : "—"} &middot; Max tournaments:{" "}
+            {league.maxTournaments ?? "Unlimited"} &middot; Max teams/tournament:{" "}
+            {league.maxTeamsPerTournament ?? "Unlimited"} &middot; Max sponsors/tournament:{" "}
+            {league.maxSponsorsPerTournament ?? "Unlimited"}
+          </p>
+        )}
+      </div>
     </div>
   );
 }

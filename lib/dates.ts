@@ -16,7 +16,6 @@ export function toDateInputValue(date: Date | string): string {
 export function formatCalendarDate(date: Date | string): string {
   return new Date(date).toLocaleDateString("en-US", {
     timeZone: "UTC",
-    weekday: "short",
     year: "numeric",
     month: "short",
     day: "numeric",
