@@ -11,7 +11,8 @@ export type AuditEntityType =
   | "PreAuctionSubmission"
   | "Team"
   | "User"
-  | "LeagueMembership";
+  | "LeagueMembership"
+  | "FantasyPointsUpload";
 
 /** Every audited business action, as a semantic label — never a raw CRUD
  * verb. One entry per mutation actually hooked up; see the audit-log plan
@@ -67,7 +68,9 @@ export type AuditAction =
   | "RIVAL_ESTIMATE_REMOVED"
   | "ANALYTICS_ENABLED"
   | "ANALYTICS_DISABLED"
-  | "ROSTER_CARD_LINK_CREATED";
+  | "ROSTER_CARD_LINK_CREATED"
+  | "FANTASY_POINTS_UPLOADED"
+  | "FANTASY_POINTS_UPLOAD_DELETED";
 
 /**
  * Writes one audit row. Always takes an explicit transaction client — never

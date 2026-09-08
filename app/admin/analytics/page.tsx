@@ -5,6 +5,7 @@ import {
   getSponsorClickSummary,
 } from "@/lib/services/analytics.service";
 import { TablePagination } from "@/components/admin/TablePagination";
+import { formatDateTime } from "@/lib/dates";
 import { card } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 
@@ -16,18 +17,6 @@ function formatDuration(ms: number) {
   const minutes = totalMinutes % 60;
   if (hours === 0) return `${minutes}m`;
   return `${hours}h ${minutes}m`;
-}
-
-// "America/New_York" (not a fixed "EST" offset) so this stays correct across
-// the EST/EDT daylight-saving switch instead of drifting an hour off twice a year.
-function formatEastern(date: Date) {
-  return (
-    date.toLocaleString("en-US", {
-      timeZone: "America/New_York",
-      dateStyle: "medium",
-      timeStyle: "short",
-    }) + " ET"
-  );
 }
 
 function parsePage(value: string | undefined) {
@@ -98,7 +87,7 @@ export default async function AdminAnalyticsPage({
                       <td className="py-2 pr-4 text-black/60 dark:text-white/60">
                         {event.user.league?.name ?? "—"}
                       </td>
-                      <td className="py-2 pr-4 whitespace-nowrap">{formatEastern(event.loginAt)}</td>
+                      <td className="py-2 pr-4 whitespace-nowrap">{formatDateTime(event.loginAt)}</td>
                       <td className="py-2 pr-4 text-black/50 dark:text-white/50">{event.ipAddress ?? "—"}</td>
                     </tr>
                   ))}

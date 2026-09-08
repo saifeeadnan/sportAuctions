@@ -21,3 +21,25 @@ export function formatCalendarDate(date: Date | string): string {
     day: "numeric",
   });
 }
+
+/**
+ * A real instant (a points upload, a login) rather than a calendar date — so
+ * unlike formatCalendarDate this is NOT UTC-pinned. Rendered in Eastern time
+ * ("America/New_York", not a fixed "EST" offset, so it stays right across the
+ * EST/EDT switch) with an explicit "ET" suffix — the admin analytics page's
+ * long-standing convention. Component options rather than dateStyle/timeStyle
+ * so Hermes (the mobile app imports this file too) renders the same string
+ * as V8 does.
+ */
+export function formatDateTime(date: Date | string): string {
+  return (
+    new Date(date).toLocaleString("en-US", {
+      timeZone: "America/New_York",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    }) + " ET"
+  );
+}

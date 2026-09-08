@@ -127,6 +127,7 @@ model User {
   sponsorClicks      SponsorClickEvent[]
   auctionCorrections AuctionCorrectionLog[]
   auditLogs          AuditLog[]
+  pointsUploads      FantasyPointsUpload[]
 
   @@map("users")
 }
@@ -390,6 +391,7 @@ model Auction {
   entries        TeamAuctionEntry[]
   fantasyTeams   FantasyTeam[]
   correctionLogs AuctionCorrectionLog[]
+  pointsUploads  FantasyPointsUpload[]
 
   @@index([tournamentId])
   @@map("auctions")
@@ -510,11 +512,12 @@ model AuctionPlayer {
   // most one.
   captainOfEntry TeamAuctionEntry? @relation("TeamCaptain")
 
-  draftPicks   PreAuctionSubmission[]
-  fantasyPicks FantasyTeamPlayer[]
-  bids         Bid[]
-  preferences  AuctionPlayerPreference[]
-  predictions  AuctionPlayerPrediction[]
+  draftPicks          PreAuctionSubmission[]
+  fantasyPicks        FantasyTeamPlayer[]
+  bids                Bid[]
+  preferences         AuctionPlayerPreference[]
+  predictions         AuctionPlayerPrediction[]
+  pointsUploadEntries FantasyPointsUploadEntry[]
 
   @@unique([auctionId, playerId])
   @@index([auctionId, status])
@@ -608,6 +611,45 @@ model TeamAuctionEntry {
   @@unique([teamId, auctionId])
   @@index([auctionId])
   @@map("team_auction_entries")
+}
+
+// One admin "player points" CSV upload — a timestamped, versioned snapshot.
+// Each upload carries CUMULATIVE points; players absent from the CSV keep
+// their previous value (the sparse-overwrite behavior the upload has always
+// had), so `entries` always holds the FULL effective state after the upload
+// was applied and every snapshot is self-contained. AuctionPlayer.points is a
+// cache of the newest upload, rebuilt in the same transaction on upload and
+// delete (see lib/services/fantasyPointsUpload.service.ts).
+model FantasyPointsUpload {
+  id           String   @id @default(cuid())
+  auctionId    String
+  auction      Auction  @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  uploadedAt   DateTime @default(now())
+  uploadedById String?
+  uploadedBy   User?    @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  // Optional admin-typed caption ("After match 3"); trimmed, <=80 chars, null when blank.
+  label        String?
+  fileName     String?
+  // CSV rows that matched a player and were applied — not the snapshot size.
+  rowCount     Int
+
+  entries FantasyPointsUploadEntry[]
+
+  @@index([auctionId, uploadedAt])
+  @@map("fantasy_points_uploads")
+}
+
+model FantasyPointsUploadEntry {
+  id              String              @id @default(cuid())
+  uploadId        String
+  upload          FantasyPointsUpload @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+  auctionPlayerId String
+  auctionPlayer   AuctionPlayer       @relation(fields: [auctionPlayerId], references: [id], onDelete: Cascade)
+  points          Decimal             @db.Decimal(10, 2)
+
+  @@unique([uploadId, auctionPlayerId])
+  @@index([auctionPlayerId])
+  @@map("fantasy_points_upload_entries")
 }
 
 model AuctionPlayerPreference {

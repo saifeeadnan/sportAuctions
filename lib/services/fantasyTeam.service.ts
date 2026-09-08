@@ -7,6 +7,7 @@ import {
   InvalidStateTransitionError,
 } from "@/lib/errors";
 import { computeTeamStrength, type RatedPlayer } from "@/lib/teamStrength";
+import { assignCompetitionRanks } from "@/lib/fantasyStandingsSort";
 import { assertAuctionLeagueNotReadOnly } from "@/lib/services/league.service";
 import { writeAuditLog } from "@/lib/services/auditLog.service";
 
@@ -260,32 +261,98 @@ function toRatedPlayer(player: {
  * Ranks every fantasy team submitted for an auction — by total points once the
  * admin has uploaded them, or by computed team strength in the meantime — so
  * both the admin overview and a viewer's own team page show the same standing.
+ *
+ * Ranks are competition-style (tied teams share a rank; see
+ * assignCompetitionRanks), and each team also carries its movement since the
+ * PREVIOUS points upload: `previousRank` is the team's rank re-computed from
+ * that upload's snapshot over the team's current picks, `rankDelta` is
+ * previous − current (positive = moved up), `pointsDelta` the points gained.
+ * All three are null when there's no previous upload to compare against, when
+ * points haven't been uploaded at all, or for a team submitted after the
+ * previous upload (it has no honest "before" — shown as "new" instead).
+ * Totals are summed as Decimals so two genuinely tied teams are never split
+ * (or falsely tied) by floating-point drift.
+ *
+ * `hasPoints` stays derived from AuctionPlayer.points rather than from the
+ * upload history so a database restored by scripts/restore-database.ts
+ * (which predates the history tables) still ranks by points; callers must
+ * tolerate `latestUpload` being null while `hasPoints` is true.
  */
 export async function getFantasyStandings(auctionId: string) {
-  const [fantasyTeams, pointsUploadedCount] = await Promise.all([
+  const [fantasyTeams, pointsUploadedCount, recentUploads] = await Promise.all([
     listFantasyTeamsForAuction(auctionId),
     prisma.auctionPlayer.count({ where: { auctionId, points: { not: null } } }),
+    prisma.fantasyPointsUpload.findMany({
+      where: { auctionId },
+      orderBy: [{ uploadedAt: "desc" }, { id: "desc" }],
+      take: 2,
+      select: { id: true, uploadedAt: true, label: true },
+    }),
   ]);
   const hasPoints = pointsUploadedCount > 0;
+  const latestUpload = recentUploads[0] ?? null;
+  const previousUpload = recentUploads[1] ?? null;
 
+  const previousPoints = new Map<string, Prisma.Decimal>();
+  if (hasPoints && previousUpload) {
+    const entries = await prisma.fantasyPointsUploadEntry.findMany({
+      where: { uploadId: previousUpload.id },
+      select: { auctionPlayerId: true, points: true },
+    });
+    for (const e of entries) previousPoints.set(e.auctionPlayerId, e.points);
+  }
+
+  const ZERO = new Prisma.Decimal(0);
   const unranked = fantasyTeams.map((team) => {
     const strength = computeTeamStrength(team.picks.map((p) => toRatedPlayer(p.auctionPlayer.player)));
     const totalSpend = team.picks.reduce((sum, p) => sum + Number(p.price), 0);
-    const totalPoints = team.picks.reduce(
-      (sum, p) => sum + (p.auctionPlayer.points != null ? Number(p.auctionPlayer.points) : 0),
-      0
+    const totalPointsDecimal = team.picks.reduce(
+      (sum, p) => sum.plus(p.auctionPlayer.points ?? ZERO),
+      ZERO
+    );
+    const previousTotalDecimal = team.picks.reduce(
+      (sum, p) => sum.plus(previousPoints.get(p.auctionPlayerId) ?? ZERO),
+      ZERO
     );
     const selfPick = team.picks.find(
       (p) => p.auctionPlayer.player.loginId?.toLowerCase() === team.user.loginId?.toLowerCase()
     );
-    return { team, strength, totalSpend, totalPoints, selfAuctionPlayerId: selfPick?.auctionPlayerId };
+    return {
+      team,
+      strength,
+      totalSpend,
+      totalPoints: totalPointsDecimal.toNumber(),
+      totalPointsDecimal,
+      previousTotalDecimal,
+      selfAuctionPlayerId: selfPick?.auctionPlayerId,
+    };
   });
 
-  const standings = unranked
-    .sort((a, b) => (hasPoints ? b.totalPoints - a.totalPoints : b.strength.teamStrength - a.strength.teamStrength))
-    .map((s, i) => ({ ...s, rank: i + 1 }));
+  const compareDecimal = (a: Prisma.Decimal, b: Prisma.Decimal) => a.comparedTo(b);
+  const ranked = hasPoints
+    ? assignCompetitionRanks(unranked, (s) => s.totalPointsDecimal, compareDecimal)
+    : assignCompetitionRanks(unranked, (s) => s.strength.teamStrength, (a, b) => a - b);
 
-  return { hasPoints, standings };
+  const previousRankByTeam = new Map<string, number>();
+  if (hasPoints && previousUpload) {
+    for (const s of assignCompetitionRanks(unranked, (s) => s.previousTotalDecimal, compareDecimal)) {
+      previousRankByTeam.set(s.team.id, s.rank);
+    }
+  }
+
+  const standings = ranked.map(({ totalPointsDecimal, previousTotalDecimal, ...s }) => {
+    const comparable =
+      hasPoints && previousUpload != null && s.team.createdAt <= previousUpload.uploadedAt;
+    const previousRank = comparable ? (previousRankByTeam.get(s.team.id) ?? null) : null;
+    return {
+      ...s,
+      previousRank,
+      rankDelta: previousRank != null ? previousRank - s.rank : null,
+      pointsDelta: comparable ? totalPointsDecimal.minus(previousTotalDecimal).toNumber() : null,
+    };
+  });
+
+  return { hasPoints, latestUpload, previousUpload, standings };
 }
 
 /** The N players picked by the most fantasy teams for this auction, grouped

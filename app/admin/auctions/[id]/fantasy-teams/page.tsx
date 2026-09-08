@@ -3,11 +3,13 @@ import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
 import { getFantasyStandings, getMostPickedPlayersByCategory } from "@/lib/services/fantasyTeam.service";
+import { listPointsUploads } from "@/lib/services/fantasyPointsUpload.service";
 import { resolveFantasySort, sortFantasyStandings, resolveFantasyPage } from "@/lib/fantasyStandingsSort";
 import { listTournamentSponsors } from "@/lib/services/tournamentSponsor.service";
 import { FantasyStandingsList } from "@/components/fantasy/FantasyStandingsList";
 import { MostPickedPlayersTable } from "@/components/fantasy/MostPickedPlayersTable";
 import { UploadPointsForm } from "@/components/admin/UploadPointsForm";
+import { PointsUploadHistory } from "@/components/admin/PointsUploadHistory";
 import { EditFantasyLockDateForm } from "@/components/admin/EditFantasyLockDateForm";
 import { EditFantasySettingsForm } from "@/components/admin/EditFantasySettingsForm";
 import { SponsorRibbon } from "@/components/tournament/SponsorRibbon";
@@ -32,13 +34,17 @@ export default async function FantasyTeamsPage({
   if (!auction) notFound();
   assertInScope(leagueIds, auction.tournament.leagueId);
 
-  const { hasPoints, standings: rankedStandings } = await getFantasyStandings(id);
+  const { hasPoints, standings: rankedStandings, latestUpload, previousUpload } =
+    await getFantasyStandings(id);
 
   const { sort: rawSort, dir: rawDir, page: rawPage, league: leagueParam } = await searchParams;
   const { sortKey, sortDir } = resolveFantasySort(rawSort, rawDir);
   const page = resolveFantasyPage(rawPage);
   const standings = sortFantasyStandings(rankedStandings, sortKey, sortDir);
-  const sponsors = await listTournamentSponsors(auction.tournament.id);
+  const [sponsors, uploads] = await Promise.all([
+    listTournamentSponsors(auction.tournament.id),
+    listPointsUploads(auction.id),
+  ]);
   const effectiveLockDate = auction.fantasyLockDate ?? auction.tournament.startDate;
 
   return (
@@ -76,6 +82,8 @@ export default async function FantasyTeamsPage({
         <UploadPointsForm auctionId={auction.id} />
       </details>
 
+      <PointsUploadHistory auctionId={auction.id} uploads={uploads} />
+
       {standings.length === 0 ? (
         <p className="text-black/60 dark:text-white/60">
           No fantasy teams have been submitted for this auction yet.
@@ -91,6 +99,8 @@ export default async function FantasyTeamsPage({
             page={page}
             showDeleteButton
             leagueParam={leagueParam}
+            latestUpload={latestUpload}
+            previousUpload={previousUpload}
           />
           <MostPickedPlayersTable categories={await getMostPickedPlayersByCategory(auction.id)} />
         </>

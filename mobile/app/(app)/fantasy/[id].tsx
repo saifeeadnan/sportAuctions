@@ -15,6 +15,7 @@ import { Collapsible } from "@/components/Collapsible";
 import { TeamStrengthSummary } from "@/components/TeamStrengthSummary";
 import { RosterRibbon } from "@/components/RosterRibbon";
 import { SponsorRibbon } from "@/components/SponsorRibbon";
+import { FantasyStandingsView } from "@/components/FantasyStandingsList";
 import { Radius, Spacing } from "@/constants/theme";
 import { useTheme } from "@/hooks/use-theme";
 
@@ -87,10 +88,13 @@ export default function FantasyBuilderScreen() {
     );
   }
   if (data.locked) {
+    // Picks are final — show the standings (with movement since the previous
+    // points upload) instead of the builder, mirroring the web viewer page.
     return (
-      <ThemedView style={styles.centered}>
-        <ThemedText themeColor="textSecondary">Fantasy submissions are closed for this auction.</ThemedText>
-      </ThemedView>
+      <FantasyStandingsView
+        auctionId={id}
+        breadcrumb={`${data.leagueName} / ${data.tournamentName} / ${data.auctionName}`}
+      />
     );
   }
 

@@ -13,6 +13,7 @@ import { resolveFantasySort, sortFantasyStandings, resolveFantasyPage } from "@/
 import { listTournamentSponsors } from "@/lib/services/tournamentSponsor.service";
 import { FantasyTeamsManager } from "@/components/viewer/FantasyTeamsManager";
 import { FantasyStandingsList } from "@/components/fantasy/FantasyStandingsList";
+import { RankMovement } from "@/components/fantasy/RankMovement";
 import { MostPickedPlayersTable } from "@/components/fantasy/MostPickedPlayersTable";
 import { SponsorRibbon } from "@/components/tournament/SponsorRibbon";
 import { SponsorSplash } from "@/components/tournament/SponsorSplash";
@@ -50,7 +51,8 @@ export default async function FantasyTeamPage({
   // card.
   let standingsSection: React.ReactNode = null;
   if (locked) {
-    const { hasPoints, standings: rankedStandings } = await getFantasyStandings(id);
+    const { hasPoints, standings: rankedStandings, latestUpload, previousUpload } =
+      await getFantasyStandings(id);
     const { sort: rawSort, dir: rawDir, page: rawPage } = await searchParams;
     const { sortKey, sortDir } = resolveFantasySort(rawSort, rawDir);
     const page = resolveFantasyPage(rawPage);
@@ -58,6 +60,7 @@ export default async function FantasyTeamPage({
     // A user can have more than one team, so this is every one of their
     // rows, not just the first match.
     const myStandings = rankedStandings.filter((s) => s.team.userId === session.user.id);
+    const showMovement = hasPoints && previousUpload != null;
     standingsSection =
       standings.length === 0 ? (
         <p className="text-black/60 dark:text-white/60">No fantasy teams were submitted.</p>
@@ -66,8 +69,20 @@ export default async function FantasyTeamPage({
           {myStandings.length > 0 && (
             <div className="text-sm font-medium flex flex-col gap-0.5">
               {myStandings.map((s) => (
-                <p key={s.team.id}>
-                  {s.team.name || "Your team"} — current rank: #{s.rank} of {standings.length}
+                <p key={s.team.id} className="flex items-center gap-2 flex-wrap">
+                  <span>
+                    {s.team.name || "Your team"} — current rank: #{s.rank} of {standings.length}
+                  </span>
+                  {showMovement && (
+                    <>
+                      <RankMovement delta={s.rankDelta} isNew={s.previousRank == null} />
+                      {s.previousRank != null && (
+                        <span className="font-normal text-black/50 dark:text-white/50">
+                          (was #{s.previousRank})
+                        </span>
+                      )}
+                    </>
+                  )}
                 </p>
               ))}
             </div>
@@ -80,6 +95,8 @@ export default async function FantasyTeamPage({
             sortDir={sortDir}
             page={page}
             highlightUserId={session.user.id}
+            latestUpload={latestUpload}
+            previousUpload={previousUpload}
           />
           <MostPickedPlayersTable categories={await getMostPickedPlayersByCategory(auction.id)} />
         </>

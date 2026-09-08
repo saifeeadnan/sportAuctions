@@ -57,6 +57,33 @@ export function fantasySortHref(key: FantasySortKey, sortKey: FantasySortKey, so
   return qs ? `?${qs}` : "?";
 }
 
+/**
+ * Competition ("1224") ranking: items are ordered by score descending —
+ * stably, so the caller's input order breaks ties for display (fantasy teams
+ * arrive in submission order) — and each item's rank is 1 + the number of
+ * items with a STRICTLY greater score, so tied items share a rank and the
+ * next distinct score skips ahead (1, 1, 3). Shared ranks are what keep the
+ * rank-movement arrows honest: two teams on equal points can never appear to
+ * overtake each other between uploads. `compare` is injected (rather than
+ * assuming numbers) so callers can rank exact Decimal totals without this
+ * module importing Prisma.
+ */
+export function assignCompetitionRanks<T, S>(
+  items: T[],
+  score: (item: T) => S,
+  compare: (a: S, b: S) => number
+): (T & { rank: number })[] {
+  const scored = items.map((item) => ({ item, score: score(item) }));
+  const sorted = [...scored].sort((a, b) => compare(b.score, a.score));
+  const ranked: (T & { rank: number })[] = [];
+  for (let i = 0; i < sorted.length; i++) {
+    const tiedWithPrevious = i > 0 && compare(sorted[i].score, sorted[i - 1].score) === 0;
+    const rank = tiedWithPrevious ? ranked[i - 1].rank : i + 1;
+    ranked.push({ ...sorted[i].item, rank });
+  }
+  return ranked;
+}
+
 export const FANTASY_STANDINGS_PAGE_SIZE = 15;
 
 /** Parses the raw `?page=` search param into a valid, defaulted page number. */

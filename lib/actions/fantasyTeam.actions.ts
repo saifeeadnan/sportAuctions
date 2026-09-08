@@ -11,6 +11,7 @@ import {
   updateFantasyLockDate,
   updateFantasySettings,
 } from "@/lib/services/fantasyTeam.service";
+import { deletePointsUpload } from "@/lib/services/fantasyPointsUpload.service";
 
 export async function submitFantasyTeamAction(
   auctionId: string,
@@ -91,5 +92,20 @@ export async function adminDeleteFantasyTeamAction(
     await loadScopedAuction(auctionId, leagueIds);
     await deleteFantasyTeam(fantasyTeamId);
     revalidatePath(`/admin/auctions/${auctionId}/fantasy-teams`);
+  });
+}
+
+/** Admin/League-Admin: remove one points upload; player points revert to
+ * whichever upload is newest afterwards (see deletePointsUpload). */
+export async function adminDeletePointsUploadAction(
+  auctionId: string,
+  uploadId: string
+): Promise<ActionResult> {
+  return toActionResult(async () => {
+    const { session, leagueIds } = await requireAdminOrLeagueAdmin();
+    await loadScopedAuction(auctionId, leagueIds);
+    await deletePointsUpload(auctionId, uploadId, session.user.id);
+    revalidatePath(`/admin/auctions/${auctionId}/fantasy-teams`);
+    revalidatePath(`/viewer/auctions/${auctionId}/fantasy`);
   });
 }

@@ -9,9 +9,13 @@ import {
 } from "@/lib/fantasyStandingsSort";
 import { DeleteFantasyTeamButton } from "@/components/admin/DeleteFantasyTeamButton";
 import { TablePagination } from "@/components/admin/TablePagination";
+import { RankMovement } from "@/components/fantasy/RankMovement";
 import { Badge } from "@/components/ui/Badge";
 import { withLeagueParam } from "@/lib/adminNav";
+import { formatDateTime } from "@/lib/dates";
 import { card } from "@/lib/ui";
+
+type UploadInfo = { uploadedAt: Date; label: string | null };
 
 /** A finalized team's roster, once picks can no longer change — just enough
  * to see who was picked and what it cost, no photos or position clutter. */
@@ -76,6 +80,8 @@ export function FantasyStandingsList({
   highlightUserId,
   showDeleteButton = false,
   leagueParam,
+  latestUpload = null,
+  previousUpload = null,
 }: {
   auctionId: string;
   standings: FantasyStanding[];
@@ -89,17 +95,34 @@ export function FantasyStandingsList({
   /** Admin-only sidebar league filter — undefined on the viewer's read-only
    * standings page, which has no such concept. */
   leagueParam?: string;
+  /** The newest points upload (what the standings reflect) and the one before
+   * it (what the ▲/▼ arrows compare against). Either may be null. */
+  latestUpload?: UploadInfo | null;
+  previousUpload?: UploadInfo | null;
 }) {
   const pageStart = (page - 1) * FANTASY_STANDINGS_PAGE_SIZE;
   const pagedStandings = standings.slice(pageStart, pageStart + FANTASY_STANDINGS_PAGE_SIZE);
+  const showMovement = hasPoints && previousUpload != null;
 
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <p className="text-xs text-black/50 dark:text-white/50">
-          {hasPoints
-            ? "Ranked by total points."
-            : "Points haven't been uploaded yet — ranked by team strength in the meantime."}
+          {hasPoints ? (
+            <>
+              Ranked by total points
+              {latestUpload && (
+                <>
+                  {" "}
+                  &middot; updated {formatDateTime(latestUpload.uploadedAt)}
+                  {latestUpload.label && <> &mdash; {latestUpload.label}</>}
+                </>
+              )}
+              {showMovement && <> &middot; arrows vs. {formatDateTime(previousUpload!.uploadedAt)}</>}.
+            </>
+          ) : (
+            "Points haven't been uploaded yet — ranked by team strength in the meantime."
+          )}
         </p>
         <div className="flex items-center gap-3 text-xs">
           <span className="text-black/50 dark:text-white/50">Sort:</span>
@@ -121,7 +144,8 @@ export function FantasyStandingsList({
       </div>
 
       <div className={card}>
-        {pagedStandings.map(({ team, totalSpend, totalPoints, selfAuctionPlayerId, rank }, i) => {
+        {pagedStandings.map(
+          ({ team, totalSpend, totalPoints, selfAuctionPlayerId, rank, previousRank, rankDelta }, i) => {
           const isYou = team.userId === highlightUserId;
           return (
             <details
@@ -134,7 +158,9 @@ export function FantasyStandingsList({
                 }`}
               >
                 <span className="flex items-center gap-2">
-                  #{rank} &middot; {team.name || team.user.name}
+                  #{rank}
+                  {showMovement && <RankMovement delta={rankDelta} isNew={previousRank == null} />}
+                  &middot; {team.name || team.user.name}
                   {team.name && (
                     <span className="text-black/40 dark:text-white/40 font-normal">
                       ({team.user.name})
@@ -168,7 +194,8 @@ export function FantasyStandingsList({
               </div>
             </details>
           );
-        })}
+          }
+        )}
       </div>
 
       <TablePagination

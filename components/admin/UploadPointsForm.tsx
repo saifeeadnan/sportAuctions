@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { formatDateTime } from "@/lib/dates";
 import { inputClass, buttonPrimary, buttonSecondary } from "@/lib/ui";
 
 type RowError = { rowNumber: number; message: string };
@@ -11,6 +12,9 @@ type PreviewResult = {
   sample: { name?: string; loginId?: string; points: number }[];
 };
 type CommitResult = {
+  /** Null when nothing matched — no snapshot was recorded. */
+  uploadId: string | null;
+  uploadedAt: string | null;
   updatedCount: number;
   unmatched: RowError[];
   parseErrorCount: number;
@@ -28,6 +32,7 @@ async function readErrorMessage(res: Response, fallback: string): Promise<string
 export function UploadPointsForm({ auctionId }: { auctionId: string }) {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
+  const [label, setLabel] = useState("");
   const [preview, setPreview] = useState<PreviewResult | null>(null);
   const [result, setResult] = useState<CommitResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -64,6 +69,7 @@ export function UploadPointsForm({ auctionId }: { auctionId: string }) {
       const formData = new FormData();
       formData.set("file", file);
       formData.set("mode", "commit");
+      formData.set("label", label);
       const res = await fetch(`/api/auctions/${auctionId}/points/upload`, {
         method: "POST",
         body: formData,
@@ -94,6 +100,17 @@ export function UploadPointsForm({ auctionId }: { auctionId: string }) {
               setResult(null);
             }}
             className={`text-sm ${inputClass}`}
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          Label (optional — e.g. &ldquo;After match 3&rdquo;)
+          <input
+            type="text"
+            maxLength={80}
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder="Shown in the upload history and on the standings"
+            className={inputClass}
           />
         </label>
         <button type="submit" disabled={loading || !file} className={`${buttonSecondary} self-start`}>
@@ -157,7 +174,9 @@ export function UploadPointsForm({ auctionId }: { auctionId: string }) {
       {result && (
         <div className="flex flex-col gap-2">
           <p className="text-sm text-emerald-600 dark:text-emerald-400">
-            Updated points for {result.updatedCount} player(s).
+            {result.uploadedAt
+              ? `Saved points upload at ${formatDateTime(result.uploadedAt)} — updated points for ${result.updatedCount} player(s).`
+              : "No rows matched a player in this auction — nothing was saved."}
           </p>
           {result.unmatched.length > 0 && (
             <>

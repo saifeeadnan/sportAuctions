@@ -1,5 +1,4 @@
 import Papa from "papaparse";
-import { prisma } from "@/lib/prisma";
 import { ValidationError } from "@/lib/errors";
 
 export type ParsedPointsRow = {
@@ -87,50 +86,5 @@ export function parsePointsFile(buffer: Buffer, filename: string): ParsePointsRe
   return rowsFromRecords(parsed.data);
 }
 
-/** Matches each row to a player in this auction's pool (by login ID first,
- * falling back to name, both case-insensitive) and writes their points.
- * Rows that don't match anyone are reported but don't block the rest. */
-export async function applyPointsToAuction(auctionId: string, rows: ParsedPointsRow[]) {
-  const auctionPlayers = await prisma.auctionPlayer.findMany({
-    where: { auctionId },
-    include: { player: true },
-  });
-
-  const byLoginId = new Map<string, (typeof auctionPlayers)[number]>();
-  const byName = new Map<string, (typeof auctionPlayers)[number]>();
-  for (const ap of auctionPlayers) {
-    if (ap.player.loginId) byLoginId.set(ap.player.loginId.toLowerCase(), ap);
-    byName.set(ap.player.name.toLowerCase(), ap);
-  }
-
-  const updates: { auctionPlayerId: string; points: number }[] = [];
-  const unmatched: RowError[] = [];
-
-  rows.forEach((row, index) => {
-    const rowNumber = index + 2;
-    const match =
-      (row.loginId && byLoginId.get(row.loginId.toLowerCase())) ||
-      (row.name && byName.get(row.name.toLowerCase()));
-    if (!match) {
-      unmatched.push({
-        rowNumber,
-        message: `No player found in this auction matching "${row.loginId || row.name}"`,
-      });
-      return;
-    }
-    updates.push({ auctionPlayerId: match.id, points: row.points });
-  });
-
-  if (updates.length > 0) {
-    await prisma.$transaction(
-      updates.map((u) =>
-        prisma.auctionPlayer.update({
-          where: { id: u.auctionPlayerId },
-          data: { points: u.points },
-        })
-      )
-    );
-  }
-
-  return { updatedCount: updates.length, unmatched };
-}
+// Applying parsed rows to an auction lives in fantasyPointsUpload.service.ts,
+// which records every upload as a versioned snapshot.
