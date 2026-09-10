@@ -17,7 +17,7 @@ import { RankMovement } from "@/components/fantasy/RankMovement";
 import { MostPickedPlayersTable } from "@/components/fantasy/MostPickedPlayersTable";
 import { SponsorRibbon } from "@/components/tournament/SponsorRibbon";
 import { SponsorSplash } from "@/components/tournament/SponsorSplash";
-import { formatCalendarDate } from "@/lib/dates";
+import { formatDateTime } from "@/lib/dates";
 
 export default async function FantasyTeamPage({
   params,
@@ -117,7 +117,7 @@ export default async function FantasyTeamPage({
             {" "}
             &middot; Editable until{" "}
             <span className="font-bold text-amber-600 dark:text-amber-400">
-              {formatCalendarDate(effectiveLockDate)}
+              {formatDateTime(effectiveLockDate)}
             </span>
             .
           </>

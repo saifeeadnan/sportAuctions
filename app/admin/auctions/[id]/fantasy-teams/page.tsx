@@ -13,7 +13,7 @@ import { PointsUploadHistory } from "@/components/admin/PointsUploadHistory";
 import { EditFantasyLockDateForm } from "@/components/admin/EditFantasyLockDateForm";
 import { EditFantasySettingsForm } from "@/components/admin/EditFantasySettingsForm";
 import { SponsorRibbon } from "@/components/tournament/SponsorRibbon";
-import { formatCalendarDate, toDateInputValue } from "@/lib/dates";
+import { formatDateTime, toZonedDateTimeInputValue, DEADLINE_TIME_ZONE } from "@/lib/dates";
 import { withLeagueParam } from "@/lib/adminNav";
 import { card } from "@/lib/ui";
 
@@ -57,13 +57,13 @@ export default async function FantasyTeamsPage({
         <span className="text-black/60 dark:text-white/60">
           Picks lock{" "}
           <span className="font-bold text-amber-600 dark:text-amber-400">
-            {formatCalendarDate(effectiveLockDate)}
+            {formatDateTime(effectiveLockDate)}
           </span>
           {auction.fantasyLockDate == null && " (tournament start date)"}
         </span>
         <EditFantasyLockDateForm
           auctionId={auction.id}
-          effectiveLockDate={toDateInputValue(effectiveLockDate)}
+          effectiveLockDate={toZonedDateTimeInputValue(effectiveLockDate, DEADLINE_TIME_ZONE)}
         />
       </div>
 

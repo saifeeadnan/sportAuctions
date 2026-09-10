@@ -4,7 +4,7 @@ import { useLocalSearchParams } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { apiFetch } from "@/services/apiClient";
-import { formatCalendarDate } from "@/lib/dates";
+import { formatDateTime } from "@/lib/dates";
 import type { RatedPlayer } from "@/lib/teamStrength";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
@@ -110,7 +110,7 @@ export default function FantasyBuilderScreen() {
         {data.leagueName} / {data.tournamentName} / {data.auctionName}
       </ThemedText>
       <ThemedText type="small" themeColor="textSecondary">
-        Editable until <ThemedText type="smallBold" themeColor="accent">{formatCalendarDate(data.lockDate)}</ThemedText>
+        Editable until <ThemedText type="smallBold" themeColor="accent">{formatDateTime(data.lockDate)}</ThemedText>
       </ThemedText>
 
       {data.teams.length > 0 && (

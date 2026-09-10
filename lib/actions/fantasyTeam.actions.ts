@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireRole, requireAdminOrLeagueAdmin, allLeagueIds } from "@/lib/auth/guards";
 import { loadScopedAuction } from "@/lib/auth/scope";
 import { toActionResult, type ActionResult } from "@/lib/actions/result";
+import { fromZonedDateTimeInputValue, DEADLINE_TIME_ZONE } from "@/lib/dates";
 import type { FantasyPricingModel } from "@/app/generated/prisma/client";
 import {
   submitFantasyTeam,
@@ -50,6 +51,9 @@ export async function deleteMyFantasyTeamAction(
 
 export async function updateFantasyLockDateAction(
   auctionId: string,
+  /** A "YYYY-MM-DDTHH:mm" string from the datetime-local input, meant as
+   * Eastern wall-clock time (see components/admin/EditFantasyLockDateForm.tsx)
+   * — converted here to the real UTC instant it represents. */
   fantasyLockDate: string | null
 ): Promise<ActionResult> {
   return toActionResult(async () => {
@@ -57,7 +61,7 @@ export async function updateFantasyLockDateAction(
     await loadScopedAuction(auctionId, leagueIds);
     await updateFantasyLockDate(
       auctionId,
-      fantasyLockDate ? new Date(fantasyLockDate) : null,
+      fantasyLockDate ? fromZonedDateTimeInputValue(fantasyLockDate, DEADLINE_TIME_ZONE) : null,
       session.user.id
     );
     revalidatePath(`/admin/auctions/${auctionId}/fantasy-teams`);

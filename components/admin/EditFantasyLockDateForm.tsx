@@ -7,9 +7,10 @@ import { inputClass, buttonPrimary, buttonSecondary } from "@/lib/ui";
 
 export function EditFantasyLockDateForm({
   auctionId,
-  /** Already-formatted "YYYY-MM-DD" (via lib/dates.ts's toDateInputValue) —
-   * the *effective* date (fantasyLockDate ?? tournament.startDate), so the
-   * field always shows what's actually in effect, override or default. */
+  /** Already-formatted "YYYY-MM-DDTHH:mm" in Eastern time (via
+   * lib/dates.ts's toZonedDateTimeInputValue) — the *effective* deadline
+   * (fantasyLockDate ?? tournament.startDate), so the field always shows
+   * what's actually in effect, override or default. */
   effectiveLockDate,
 }: {
   auctionId: string;
@@ -51,7 +52,7 @@ export function EditFantasyLockDateForm({
     <div className="flex flex-col gap-2">
       <div className="flex items-center gap-2 flex-wrap">
         <input
-          type="date"
+          type="datetime-local"
           value={value}
           onChange={(e) => setValue(e.target.value)}
           className={`${inputClass} py-1 text-xs`}
@@ -75,6 +76,7 @@ export function EditFantasyLockDateForm({
           Cancel
         </button>
       </div>
+      <p className="text-xs text-black/50 dark:text-white/50">Times are Eastern (ET).</p>
       {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
     </div>
   );
