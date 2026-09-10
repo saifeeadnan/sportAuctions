@@ -128,6 +128,9 @@ model User {
   auctionCorrections AuctionCorrectionLog[]
   auditLogs          AuditLog[]
   pointsUploads      FantasyPointsUpload[]
+  seedingWindowsCreated   PlayerSeedingWindow[]  @relation("SeedingWindowsCreated")
+  seedingWindowsFinalized PlayerSeedingWindow[]  @relation("SeedingWindowsFinalized")
+  seedSubmissions         PlayerSeedSubmission[]
 
   @@map("users")
 }
@@ -200,8 +203,9 @@ model PlayerRoster {
   league      League   @relation(fields: [leagueId], references: [id])
   createdAt   DateTime @default(now())
 
-  players     Player[]
-  tournaments Tournament[]
+  players       Player[]
+  tournaments   Tournament[]
+  seedingWindow PlayerSeedingWindow?
 
   @@index([leagueId])
   @@map("player_rosters")
@@ -225,12 +229,60 @@ model Player {
   bowlingRating   Decimal?     @db.Decimal(6, 2)
   fieldingRating  Decimal?     @db.Decimal(6, 2)
   priorStats      Json?
+  // Final peer seed, 1 = best — set only via finalizeSeeding once a
+  // roster's rating window has closed and an admin resolves ties. Separate
+  // from `rating` above (an admin-entered CSV value, not peer-sourced).
+  seed            Int?
   createdAt       DateTime     @default(now())
 
-  auctionPlayers AuctionPlayer[]
+  auctionPlayers  AuctionPlayer[]
+  seedSubmissions PlayerSeedSubmission[]
 
   @@index([rosterId])
   @@map("players")
+}
+
+
+// One rating window per roster. While open, members on the roster score every
+// other player 1 (best)..maxSeed; after it closes an admin turns the averages
+// into a unique final seed per player (Player.seed). raterUserId exists only
+// to enforce one-submission-per-rater and let a rater revise — it is never
+// surfaced to anyone, including the admin (see playerSeeding.service.ts).
+model PlayerSeedingWindow {
+  id            String       @id @default(cuid())
+  rosterId      String       @unique
+  roster        PlayerRoster @relation(fields: [rosterId], references: [id], onDelete: Cascade)
+  opensAt       DateTime
+  closesAt      DateTime
+  maxSeed       Int          @default(10)
+  createdById   String?
+  createdBy     User?        @relation("SeedingWindowsCreated", fields: [createdById], references: [id], onDelete: SetNull)
+  finalizedAt   DateTime?
+  finalizedById String?
+  finalizedBy   User?        @relation("SeedingWindowsFinalized", fields: [finalizedById], references: [id], onDelete: SetNull)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  submissions PlayerSeedSubmission[]
+
+  @@map("player_seeding_windows")
+}
+
+model PlayerSeedSubmission {
+  id          String              @id @default(cuid())
+  windowId    String
+  window      PlayerSeedingWindow @relation(fields: [windowId], references: [id], onDelete: Cascade)
+  raterUserId String
+  rater       User                @relation(fields: [raterUserId], references: [id], onDelete: Cascade)
+  playerId    String
+  player      Player              @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  seed        Int
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@unique([windowId, raterUserId, playerId])
+  @@index([windowId, playerId])
+  @@map("player_seed_submissions")
 }
 
 model Tournament {

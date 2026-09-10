@@ -22,6 +22,10 @@ export default function AppTabsLayout() {
         options={{ title: "Fantasy", tabBarIcon: ({ color, size }) => <Ionicons name="trophy" size={size} color={color} /> }}
       />
       <Tabs.Screen
+        name="rate"
+        options={{ title: "Rate", tabBarIcon: ({ color, size }) => <Ionicons name="star" size={size} color={color} /> }}
+      />
+      <Tabs.Screen
         name="profile"
         options={{ title: "Profile", tabBarIcon: ({ color, size }) => <Ionicons name="person-circle" size={size} color={color} /> }}
       />

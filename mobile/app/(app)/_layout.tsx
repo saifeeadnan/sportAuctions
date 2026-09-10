@@ -6,6 +6,7 @@ export default function AppLayout() {
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="auctions/[id]" options={{ title: "Live Auction" }} />
       <Stack.Screen name="fantasy/[id]" options={{ title: "Fantasy Team" }} />
+      <Stack.Screen name="seeding/[rosterId]" options={{ title: "Rate players" }} />
     </Stack>
   );
 }

@@ -304,6 +304,10 @@ export const ROSTER_EXPORT_COLUMNS: {
     field: "fieldingRating",
     get: (p) => (p.fieldingRating != null ? Number(p.fieldingRating) : ""),
   },
+  // Peer-seeding output only — never settable via roster upload (field:
+  // null, same as Name), so a re-import of this export can't accidentally
+  // overwrite a finalized seed.
+  { header: "Seed", field: null, get: (p) => p.seed ?? "" },
 ];
 
 export function rosterExportRows(players: Player[]): (string | number)[][] {

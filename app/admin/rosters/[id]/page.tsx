@@ -4,14 +4,18 @@ import { prisma } from "@/lib/prisma";
 import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
 import { isLeagueReadOnly } from "@/lib/services/league.service";
 import { createPlayerAction } from "@/lib/actions/roster.actions";
+import { getSeedingSummary } from "@/lib/services/playerSeeding.service";
 import { ActionResultForm } from "@/components/ui/ActionResultForm";
 import { PlayerFormFields } from "@/components/roster/PlayerFormFields";
 import { DeletePlayerButton } from "@/components/admin/DeletePlayerButton";
 import { RenameRosterForm } from "@/components/admin/RenameRosterForm";
+import { EditSeedingWindowForm } from "@/components/admin/EditSeedingWindowForm";
 import { withLeagueParam } from "@/lib/adminNav";
+import { formatDateTime, toDateInputValue } from "@/lib/dates";
 import { card, buttonPrimary } from "@/lib/ui";
+import { Badge } from "@/components/ui/Badge";
 
-const SORT_FIELDS = ["name", "position", "category", "rating"] as const;
+const SORT_FIELDS = ["name", "position", "category", "rating", "seed"] as const;
 type SortField = (typeof SORT_FIELDS)[number];
 type SortDir = "asc" | "desc";
 
@@ -20,6 +24,7 @@ const SORT_FIELD_TO_COLUMN: Record<SortField, string> = {
   position: "position",
   category: "defaultCategory",
   rating: "rating",
+  seed: "seed",
 };
 
 function resolveSortField(value?: string): SortField {
@@ -73,12 +78,14 @@ export default async function RosterDetailPage({
     select: { endDate: true },
   });
   const readOnly = isLeagueReadOnly(rosterLeague);
+  const seeding = await getSeedingSummary(roster.id);
 
   const columns: { field: SortField; label: string }[] = [
     { field: "name", label: "Name" },
     { field: "position", label: "Position" },
     { field: "category", label: "Category" },
     { field: "rating", label: "Rating" },
+    { field: "seed", label: "Seed" },
   ];
 
   return (
@@ -101,6 +108,57 @@ export default async function RosterDetailPage({
         >
           Export XLSX
         </a>
+      </div>
+
+      <div className={`${card} mb-6 px-4 py-3 flex flex-col gap-2`}>
+        <h2 className="text-sm font-medium">Peer seeding</h2>
+        {seeding.status === "not-started" && (
+          <p className="text-sm text-black/60 dark:text-white/60">
+            Not started — roster members haven&apos;t been asked to rate each other yet.
+          </p>
+        )}
+        {seeding.status === "scheduled" && seeding.window && (
+          <p className="text-sm text-black/60 dark:text-white/60">
+            Opens <span className="font-medium">{formatDateTime(seeding.window.opensAt)}</span> · closes{" "}
+            {formatDateTime(seeding.window.closesAt)}
+          </p>
+        )}
+        {seeding.status === "open" && seeding.window && (
+          <p className="text-sm text-black/60 dark:text-white/60">
+            <Badge variant="warning">Open</Badge> until{" "}
+            <span className="font-medium">{formatDateTime(seeding.window.closesAt)}</span> ·{" "}
+            {seeding.participation.submitted}/{seeding.participation.eligible} members have rated
+          </p>
+        )}
+        {seeding.status === "closed" && seeding.window && (
+          <p className="text-sm text-black/60 dark:text-white/60">
+            <Badge variant="info">Closed</Badge> {formatDateTime(seeding.window.closesAt)} — ready to finalize ·{" "}
+            {seeding.participation.submitted}/{seeding.participation.eligible} members rated
+          </p>
+        )}
+        {seeding.status === "finalized" && seeding.window && (
+          <p className="text-sm text-black/60 dark:text-white/60">
+            <Badge variant="success">Finalized</Badge>
+          </p>
+        )}
+        <div className="flex items-center gap-3 flex-wrap">
+          <EditSeedingWindowForm
+            rosterId={roster.id}
+            hasWindow={seeding.window != null}
+            opensAt={seeding.window ? toDateInputValue(seeding.window.opensAt) : null}
+            closesAt={seeding.window ? toDateInputValue(seeding.window.closesAt) : null}
+            maxSeed={seeding.window?.maxSeed ?? 10}
+            disabled={seeding.status === "finalized"}
+          />
+          {(seeding.status === "closed" || seeding.status === "finalized") && (
+            <Link
+              href={withLeagueParam(`/admin/rosters/${roster.id}/seeding`, leagueParam)}
+              className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline underline-offset-2"
+            >
+              Review &amp; finalize seeding
+            </Link>
+          )}
+        </div>
       </div>
 
       {readOnly ? (
@@ -169,6 +227,7 @@ export default async function RosterDetailPage({
                 <td className="py-2 pr-4">
                   {player.rating != null ? String(player.rating) : "—"}
                 </td>
+                <td className="py-2 pr-4">{player.seed ?? "—"}</td>
                 <td className="py-2 pr-4">
                   <div className="flex items-center justify-end gap-3">
                     <Link

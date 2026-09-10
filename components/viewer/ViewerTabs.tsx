@@ -7,6 +7,7 @@ import { tabsTrack, tabItem } from "@/lib/ui";
 const TABS = [
   { href: "/viewer", label: "Watch auctions" },
   { href: "/viewer/fantasy", label: "Fantasy teams" },
+  { href: "/viewer/rate", label: "Rate players" },
 ];
 
 export function ViewerTabs() {
@@ -14,7 +15,12 @@ export function ViewerTabs() {
 
   function isActive(href: string) {
     if (href === "/viewer/fantasy") return pathname.startsWith("/viewer/fantasy");
-    return pathname.startsWith("/viewer") && !pathname.startsWith("/viewer/fantasy");
+    if (href === "/viewer/rate") return pathname.startsWith("/viewer/rate");
+    return (
+      pathname.startsWith("/viewer") &&
+      !pathname.startsWith("/viewer/fantasy") &&
+      !pathname.startsWith("/viewer/rate")
+    );
   }
 
   return (

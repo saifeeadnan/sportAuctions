@@ -7,6 +7,7 @@ import { tabsTrack, tabItem } from "@/lib/ui";
 const TABS = [
   { href: "/manager", label: "Tournaments" },
   { href: "/manager/fantasy", label: "Fantasy teams" },
+  { href: "/manager/rate", label: "Rate players" },
 ];
 
 export function ManagerTabs() {
@@ -14,7 +15,12 @@ export function ManagerTabs() {
 
   function isActive(href: string) {
     if (href === "/manager/fantasy") return pathname.startsWith("/manager/fantasy");
-    return pathname.startsWith("/manager") && !pathname.startsWith("/manager/fantasy");
+    if (href === "/manager/rate") return pathname.startsWith("/manager/rate");
+    return (
+      pathname.startsWith("/manager") &&
+      !pathname.startsWith("/manager/fantasy") &&
+      !pathname.startsWith("/manager/rate")
+    );
   }
 
   return (
