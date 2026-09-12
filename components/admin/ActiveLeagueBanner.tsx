@@ -3,6 +3,7 @@
 import { useSearchParams } from "next/navigation";
 import { formatCalendarDate } from "@/lib/dates";
 import { Badge } from "@/components/ui/Badge";
+import { CopyInviteLinkButton } from "@/components/admin/CopyInviteLinkButton";
 
 type League = {
   id: string;
@@ -54,6 +55,11 @@ export function ActiveLeagueBanner({
         <div className="flex items-center gap-2 text-sm">
           <span className="font-medium">{league ? league.name : "All leagues"}</span>
           {league && isReadOnly(league) && <Badge variant="warning">Read-only</Badge>}
+          {/* Visible to a League Admin too (their own fixedLeague), not just
+           * a site Admin — registering for a league is something a League
+           * Admin should be able to hand out on their own, without needing
+           * a site Admin to look it up from /admin/leagues. */}
+          {league && <CopyInviteLinkButton path={`/register?league=${league.id}`} label="Copy registration link" />}
         </div>
         {league && (
           <p className="text-xs text-black/60 dark:text-white/60">
