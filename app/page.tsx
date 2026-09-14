@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { auth } from "@/auth";
+import { prisma } from "@/lib/prisma";
 import { LandingHero } from "@/components/LandingHero";
 
 // Every role lands straight on its own tabbed content page — no intermediate
@@ -8,7 +9,20 @@ export default async function Home() {
   const session = await auth();
 
   if (!session?.user) {
-    return <LandingHero />;
+    // Global, platform-wide counts for the landing page's social-proof
+    // strip — deliberately "auctions COMPLETED", not every auction row, so
+    // it can't be inflated by auctions that were only ever created and
+    // never actually run.
+    const [leagueCount, tournamentCount, completedAuctionCount] = await Promise.all([
+      prisma.league.count(),
+      prisma.tournament.count(),
+      prisma.auction.count({ where: { status: "COMPLETED" } }),
+    ]);
+    return (
+      <LandingHero
+        stats={{ leagueCount, tournamentCount, completedAuctionCount }}
+      />
+    );
   }
 
   const roles = new Set(session.user.memberships.map((m) => m.role));

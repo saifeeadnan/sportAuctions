@@ -57,7 +57,37 @@ const FEATURES: { title: string; description: string; icon: React.ReactNode }[] 
   },
 ];
 
-export function LandingHero() {
+type PlatformStats = {
+  leagueCount: number;
+  tournamentCount: number;
+  completedAuctionCount: number;
+};
+
+function StatStrip({ stats }: { stats: PlatformStats }) {
+  const items = [
+    { value: stats.leagueCount, label: "Leagues" },
+    { value: stats.tournamentCount, label: "Tournaments" },
+    { value: stats.completedAuctionCount, label: "Auctions completed" },
+  ];
+  // A brand-new, empty install has nothing worth bragging about yet — skip
+  // the strip entirely rather than show a row of zeros.
+  if (items.every((item) => item.value === 0)) return null;
+
+  return (
+    <div className="mt-12 flex items-center justify-center gap-8 sm:gap-14">
+      {items.map((item) => (
+        <div key={item.label} className="text-center">
+          <p className="text-3xl sm:text-4xl font-bold tracking-tight">
+            {item.value.toLocaleString()}
+          </p>
+          <p className="mt-1 text-xs sm:text-sm text-black/60 dark:text-white/60">{item.label}</p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+export function LandingHero({ stats }: { stats: PlatformStats }) {
   return (
     <div className="relative overflow-hidden">
       <div
@@ -111,6 +141,7 @@ export function LandingHero() {
             </Link>
           </div>
           <PoweredByBytzSport className="mt-4" />
+          <StatStrip stats={stats} />
         </div>
 
         <div className="mt-20 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
