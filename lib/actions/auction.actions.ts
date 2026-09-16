@@ -16,6 +16,7 @@ import {
   resetAuctionToPreBidding,
   deleteAuction,
   updateCategoryBidIncrement,
+  updateCategoryMaxPerTeam,
   addPlayerToAuction,
   updateAuctionPlayerCategory,
   updateAuctionTeamSettings,
@@ -147,6 +148,19 @@ export async function updateCategoryBidIncrementAction(
     const { session, leagueIds } = await requireAdminOrLeagueAdmin();
     await loadScopedAuction(auctionId, leagueIds);
     await updateCategoryBidIncrement(categoryId, bidIncrement, session.user.id);
+    revalidatePath(`/admin/auctions/${auctionId}`);
+  });
+}
+
+export async function updateCategoryMaxPerTeamAction(
+  auctionId: string,
+  categoryId: string,
+  maxPerTeam: number | null
+): Promise<ActionResult> {
+  return toActionResult(async () => {
+    const { session, leagueIds } = await requireAdminOrLeagueAdmin();
+    await loadScopedAuction(auctionId, leagueIds);
+    await updateCategoryMaxPerTeam(categoryId, maxPerTeam, session.user.id);
     revalidatePath(`/admin/auctions/${auctionId}`);
   });
 }

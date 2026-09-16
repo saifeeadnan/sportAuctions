@@ -8,6 +8,8 @@ function baseState(): AuctionState {
     name: "Test Auction",
     status: "BIDDING",
     tournamentName: "Test Tournament",
+    leagueType: "Cricket",
+    categoryMaxPerTeam: {},
     onClockTemplate: "CLASSIC",
     onClockVisibleFields: [],
     lotTimerSeconds: null,

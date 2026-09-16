@@ -4,6 +4,7 @@ import { useState } from "react";
 import { placeBidAction } from "@/lib/actions/bidding.actions";
 import type { AuctionStatePlayer } from "@/lib/services/auctionState.service";
 import { useBidTiming } from "@/hooks/useBidTiming";
+import { isAtOrOverCap } from "@/lib/auction/categoryCaps";
 import { buttonPrimary } from "@/lib/ui";
 
 function formatAmount(n: number) {
@@ -17,6 +18,8 @@ export function BidControl({
   slotsFilled,
   slotsTotal,
   maxBid,
+  categoryCount,
+  categoryCap,
 }: {
   auctionId: string;
   player: AuctionStatePlayer;
@@ -27,6 +30,10 @@ export function BidControl({
    * once the relevant amount would exceed it, rather than letting the
    * server be the only thing that catches it. */
   maxBid?: number | null;
+  /** Advisory only — never disables bidding, just shows a warning once this
+   * team is already at/over the on-clock player's category cap. */
+  categoryCount?: number;
+  categoryCap?: number | null;
 }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -35,6 +42,7 @@ export function BidControl({
   const isLeading = player.currentBidderEntryId === teamEntryId;
   const noRoom = slotsFilled >= slotsTotal;
   const quickBidExceedsMax = maxBid != null && minNext > maxBid;
+  const atCategoryCap = isAtOrOverCap(categoryCount ?? 0, categoryCap);
 
   async function submit(value: number) {
     setLoading(true);
@@ -66,6 +74,11 @@ export function BidControl({
 
   return (
     <div className="flex flex-col gap-2">
+      {atCategoryCap && (
+        <p className="text-xs text-amber-600 dark:text-amber-400">
+          Your squad already has {categoryCount}/{categoryCap} {player.categoryName} players.
+        </p>
+      )}
       <button
         type="button"
         disabled={loading || onCooldown || quickBidExceedsMax}

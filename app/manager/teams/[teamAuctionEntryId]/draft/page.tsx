@@ -9,6 +9,7 @@ import { listTournamentSponsors } from "@/lib/services/tournamentSponsor.service
 import { RosterRibbon } from "@/components/roster/RosterRibbon";
 import { SponsorRibbon } from "@/components/tournament/SponsorRibbon";
 import type { RatedPlayer } from "@/lib/teamStrength";
+import { isCricketLeague } from "@/lib/leagueSport";
 
 function toRatedPlayer(player: {
   position: string | null;
@@ -38,12 +39,14 @@ export default async function DraftPage({
     where: { id: teamAuctionEntryId },
     include: {
       team: true,
-      auction: true,
+      auction: { include: { tournament: { include: { league: { select: { type: true } } } } } },
       draftSubmissions: true,
     },
   });
 
   if (!entry || entry.team.managerId !== session!.user.id) notFound();
+
+  const isCricket = isCricketLeague(entry.auction.tournament.league.type);
 
   const [availablePlayersRaw, lockedPlayerId, confirmedPlayers] = await Promise.all([
     prisma.auctionPlayer.findMany({
@@ -65,6 +68,13 @@ export default async function DraftPage({
   // pool, except the manager's own guaranteed self-pick, which is never gated.
   const availablePlayers = availablePlayersRaw.filter(
     (ap) => ap.category.preAuctionEligible || ap.id === lockedPlayerId
+  );
+
+  // Advisory only — never blocks a draft pick. Derived free from the pool
+  // query above rather than a separate categories query — any category with
+  // no available players has no tab in DraftForm anyway.
+  const categoryCaps: Record<string, number | null> = Object.fromEntries(
+    new Map(availablePlayers.map((ap) => [ap.category.name, ap.category.maxPerTeam]))
   );
 
   const editable = entry.status === "PRE_AUCTION_DRAFTING" || entry.status === "PRE_AUCTION_SUBMITTED";
@@ -121,6 +131,8 @@ export default async function DraftPage({
               }))}
               initialSelected={entry.draftSubmissions.map((s) => s.auctionPlayerId)}
               lockedPlayerId={lockedPlayerId ?? undefined}
+              isCricket={isCricket}
+              categoryCaps={categoryCaps}
             />
           ) : allocated ? (
             <div className="flex flex-col gap-3">
@@ -128,10 +140,12 @@ export default async function DraftPage({
                 The pre-auction draft has been resolved — uniquely-picked players are confirmed to
                 your roster, and any contested picks moved to the live auction pool.
               </p>
-              <TeamStrengthSummary
-                players={confirmedPlayers.map((ap) => toRatedPlayer(ap.player))}
-                squadSize={entry.slotsTotal}
-              />
+              {isCricket && (
+                <TeamStrengthSummary
+                  players={confirmedPlayers.map((ap) => toRatedPlayer(ap.player))}
+                  squadSize={entry.slotsTotal}
+                />
+              )}
             </div>
           ) : (
             <p className="text-black/60 dark:text-white/60">

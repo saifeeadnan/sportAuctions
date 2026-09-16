@@ -10,6 +10,7 @@ import { AssignPlayerForm } from "@/components/admin/AssignPlayerForm";
 import { AddPlayerToAuctionForm } from "@/components/admin/AddPlayerToAuctionForm";
 import { ChangePlayerCategoryForm } from "@/components/admin/ChangePlayerCategoryForm";
 import { EditCategoryBidIncrementForm } from "@/components/admin/EditCategoryBidIncrementForm";
+import { EditCategoryMaxPerTeamForm } from "@/components/admin/EditCategoryMaxPerTeamForm";
 import { EditAuctionBudgetForm } from "@/components/admin/EditAuctionBudgetForm";
 import { EditAuctionSquadSizeForm } from "@/components/admin/EditAuctionSquadSizeForm";
 import { EditOnClockDisplayForm } from "@/components/admin/EditOnClockDisplayForm";
@@ -89,6 +90,28 @@ export default async function AuctionDetailPage({
   // entire live session including every gap between players.
   const playerOnClock = auction.auctionPlayers.some((ap) => ap.status === "IN_BIDDING");
 
+  // Advisory category-cap data — teamEntryId -> categoryName -> count of
+  // SOLD players that team already has in that category, plus the same
+  // shape collapsed to a single "highest team" count per category for the
+  // settings section. Cap enforcement never blocks any write path; this is
+  // purely for the warning annotations below.
+  const soldPlayers = auction.auctionPlayers.filter((ap) => ap.status === "SOLD" && ap.soldToEntryId);
+  const teamCategoryCounts: Record<string, Record<string, number>> = {};
+  const highestCountByCategoryName: Record<string, number> = {};
+  for (const ap of soldPlayers) {
+    const entryId = ap.soldToEntryId!;
+    const categoryName = ap.category.name;
+    teamCategoryCounts[entryId] ??= {};
+    teamCategoryCounts[entryId][categoryName] = (teamCategoryCounts[entryId][categoryName] ?? 0) + 1;
+    highestCountByCategoryName[categoryName] = Math.max(
+      highestCountByCategoryName[categoryName] ?? 0,
+      teamCategoryCounts[entryId][categoryName]
+    );
+  }
+  const categoryCaps: Record<string, number | null> = Object.fromEntries(
+    auction.categories.map((c) => [c.name, c.maxPerTeam])
+  );
+
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 flex flex-col gap-8">
       <div>
@@ -118,6 +141,7 @@ export default async function AuctionDetailPage({
                 <th className="py-2 pr-4">Players</th>
                 <th className="py-2 pr-4">Pre-auction draft</th>
                 <th className="py-2 pr-4">Bid increment</th>
+                <th className="py-2 pr-4">Max/team</th>
               </tr>
             </thead>
             <tbody>
@@ -134,6 +158,7 @@ export default async function AuctionDetailPage({
                   <td className="py-2 pr-4">
                     {c.bidIncrement != null ? `+${String(c.bidIncrement)}` : "—"}
                   </td>
+                  <td className="py-2 pr-4">{c.maxPerTeam ?? "—"}</td>
                 </tr>
               ))}
             </tbody>
@@ -276,6 +301,8 @@ export default async function AuctionDetailPage({
                       slotsFilled: entry.slotsFilled,
                       slotsTotal: entry.slotsTotal,
                     }))}
+                    categoryCaps={categoryCaps}
+                    teamCategoryCounts={teamCategoryCounts}
                   />
                 </div>
               </details>
@@ -356,6 +383,39 @@ export default async function AuctionDetailPage({
                           bidIncrement={c.bidIncrement != null ? String(c.bidIncrement) : null}
                         />
                       )}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </details>
+
+            <details>
+              <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
+                Category caps
+              </summary>
+              <div className="px-4 pb-4">
+                <p className="text-sm text-black/60 dark:text-white/60 mb-3">
+                  Advisory only — a team can still be assigned or bid past this cap; it just shows
+                  as a warning wherever a player is being put on a team, so the cap can never
+                  silently trap a team below its cap already.
+                </p>
+                <ul className="flex flex-col gap-2">
+                  {auction.categories.map((c) => (
+                    <li key={c.id} className="flex items-center justify-between gap-3 text-sm">
+                      <span>
+                        {c.name}
+                        {(highestCountByCategoryName[c.name] ?? 0) > 0 && (
+                          <span className="text-black/50 dark:text-white/50">
+                            {" "}
+                            (highest team: {highestCountByCategoryName[c.name]})
+                          </span>
+                        )}
+                      </span>
+                      <EditCategoryMaxPerTeamForm
+                        auctionId={auction.id}
+                        categoryId={c.id}
+                        maxPerTeam={c.maxPerTeam != null ? String(c.maxPerTeam) : null}
+                      />
                     </li>
                   ))}
                 </ul>

@@ -46,18 +46,23 @@ export type AuctionState = {
   name: string;
   status: string;
   tournamentName: string;
+  leagueType: string;
   onClockTemplate: OnClockTemplate;
   onClockVisibleFields: OnClockFieldKey[];
   lotTimerSeconds: number | null;
   players: AuctionStatePlayer[];
   teams: AuctionStateTeam[];
+  /** Advisory only — never enforced. Keyed by category name (safe: unique
+   * per auction). Null = no cap configured for that category. */
+  categoryMaxPerTeam: Record<string, number | null>;
 };
 
 export async function getAuctionState(auctionId: string): Promise<AuctionState | null> {
   const auction = await prisma.auction.findUnique({
     where: { id: auctionId },
     include: {
-      tournament: true,
+      tournament: { include: { league: { select: { type: true } } } },
+      categories: { select: { name: true, maxPerTeam: true } },
       auctionPlayers: {
         include: {
           player: true,
@@ -81,6 +86,7 @@ export async function getAuctionState(auctionId: string): Promise<AuctionState |
     name: auction.name,
     status: auction.status,
     tournamentName: auction.tournament.name,
+    leagueType: auction.tournament.league.type,
     onClockTemplate: auction.onClockTemplate,
     onClockVisibleFields: auction.onClockVisibleFields as OnClockFieldKey[],
     lotTimerSeconds: auction.lotTimerSeconds,
@@ -122,6 +128,7 @@ export async function getAuctionState(auctionId: string): Promise<AuctionState |
       slotsTotal: e.slotsTotal,
       hasSponsorImage: !!e.team.sponsorImage,
     })),
+    categoryMaxPerTeam: Object.fromEntries(auction.categories.map((c) => [c.name, c.maxPerTeam])),
   };
 }
 

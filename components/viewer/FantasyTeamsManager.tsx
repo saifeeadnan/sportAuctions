@@ -32,6 +32,7 @@ export function FantasyTeamsManager({
   selfPickRequired,
   maxTeams,
   initialTeams,
+  isCricket,
 }: {
   auctionId: string;
   cap: number;
@@ -41,6 +42,7 @@ export function FantasyTeamsManager({
   selfPickRequired: boolean;
   maxTeams: number;
   initialTeams: MyFantasyTeam[];
+  isCricket: boolean;
 }) {
   const [activeTeamId, setActiveTeamId] = useState<string | null>(initialTeams[0]?.id ?? null);
   const [creatingNew, setCreatingNew] = useState(initialTeams.length === 0);
@@ -100,6 +102,7 @@ export function FantasyTeamsManager({
         players={players}
         lockedPlayerId={lockedPlayerId}
         selfPickRequired={selfPickRequired}
+        isCricket={isCricket}
         fantasyTeamId={activeTeam?.id}
         initialSelected={activeTeam?.picks}
         initialName={activeTeam?.name ?? undefined}

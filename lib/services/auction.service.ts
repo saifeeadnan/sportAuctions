@@ -5,6 +5,7 @@ import {
   InsufficientBudgetError,
   InvalidStateTransitionError,
   SquadCapExceededError,
+  CategoryCapExceededError,
 } from "@/lib/errors";
 import { computeManagerSlotPrice } from "@/lib/services/budget.service";
 import { assertLeagueNotReadOnly, assertAuctionLeagueNotReadOnly } from "@/lib/services/league.service";
@@ -39,6 +40,7 @@ export type CreateAuctionInput = {
     basePrice: number;
     preAuctionEligible?: boolean;
     bidIncrement?: number;
+    maxPerTeam?: number;
   }[];
   playerAssignments: { playerId: string; categoryName: string }[];
 };
@@ -122,6 +124,9 @@ export async function createAuction(input: CreateAuctionInput) {
     if (cat.bidIncrement != null && cat.bidIncrement <= 0) {
       throw new ValidationError(`Category "${cat.name}"'s bid increment must be greater than 0`);
     }
+    if (cat.maxPerTeam != null && (!Number.isInteger(cat.maxPerTeam) || cat.maxPerTeam <= 0)) {
+      throw new ValidationError(`Category "${cat.name}"'s max per team must be a whole number greater than 0`);
+    }
   }
 
   if (input.playerAssignments.length === 0) {
@@ -181,6 +186,7 @@ export async function createAuction(input: CreateAuctionInput) {
             basePrice: c.basePrice,
             preAuctionEligible: c.preAuctionEligible ?? true,
             bidIncrement: c.bidIncrement ?? null,
+            maxPerTeam: c.maxPerTeam ?? null,
           },
         })
       )
@@ -372,6 +378,65 @@ export async function updateCategoryBidIncrement(
   });
 }
 
+/** Advisory only — never enforced at any assignment write path (live
+ * bidding, admin assignment, pre-auction draft, post-auction edits all keep
+ * working past the cap; see lib/auction/categoryCaps.ts for the warning-UI
+ * side of this). The only thing this function actually blocks is lowering
+ * the cap below a count some team has already reached. */
+export async function updateCategoryMaxPerTeam(
+  categoryId: string,
+  maxPerTeam: number | null,
+  actorUserId: string
+) {
+  if (maxPerTeam != null && (!Number.isInteger(maxPerTeam) || maxPerTeam <= 0)) {
+    throw new ValidationError("Max per team must be a whole number greater than 0");
+  }
+
+  const category = await prisma.auctionCategory.findUnique({
+    where: { id: categoryId },
+    include: { auction: true },
+  });
+  if (!category) throw new ValidationError("Category not found");
+  await assertAuctionLeagueNotReadOnly(category.auctionId);
+
+  if (maxPerTeam != null) {
+    const counts = await prisma.auctionPlayer.groupBy({
+      by: ["soldToEntryId"],
+      where: { categoryId, status: "SOLD" },
+      _count: true,
+    });
+    const overCap = counts
+      .filter((c) => c.soldToEntryId != null && c._count > maxPerTeam)
+      .sort((a, b) => b._count - a._count)[0];
+    if (overCap) {
+      const entry = await prisma.teamAuctionEntry.findUnique({
+        where: { id: overCap.soldToEntryId! },
+        include: { team: true },
+      });
+      throw new CategoryCapExceededError(
+        `Team "${entry?.team.name ?? "Unknown"}" already has ${overCap._count} player(s) in "${category.name}" — above the new cap of ${maxPerTeam}`
+      );
+    }
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.auctionCategory.update({
+      where: { id: categoryId },
+      data: { maxPerTeam },
+    });
+    await writeAuditLog(tx, {
+      entityType: "AuctionCategory",
+      entityId: categoryId,
+      auctionId: category.auctionId,
+      action: "CATEGORY_MAX_PER_TEAM_CHANGED",
+      actorUserId,
+      before: { maxPerTeam: category.maxPerTeam },
+      after: { maxPerTeam },
+    });
+    return updated;
+  });
+}
+
 type AuctionForEntryPlanning = Prisma.AuctionGetPayload<{
   include: { tournament: { include: { teams: true } } };
 }>;
@@ -540,6 +605,44 @@ export async function startBiddingDirect(auctionId: string, actorUserId: string)
   });
 }
 
+/** Category caps are advisory (see updateCategoryMaxPerTeam's doc comment) —
+ * resolveOverlaps never blocks on one, so a category can end up over cap
+ * purely from automated overlap resolution with no human in the loop. This
+ * doesn't change that behavior; it just surfaces it on the lock's audit
+ * entry so an admin reviewing the auction afterward can see it happened. */
+async function describeCategoryCapOverages(
+  tx: Prisma.TransactionClient,
+  auctionId: string
+): Promise<string[]> {
+  const cappedCategories = await tx.auctionCategory.findMany({
+    where: { auctionId, maxPerTeam: { not: null } },
+  });
+  if (cappedCategories.length === 0) return [];
+
+  const counts = await tx.auctionPlayer.groupBy({
+    by: ["soldToEntryId", "categoryId"],
+    where: { auctionId, status: "SOLD", categoryId: { in: cappedCategories.map((c) => c.id) } },
+    _count: true,
+  });
+  const overages = counts.flatMap((c) => {
+    if (c.soldToEntryId == null) return [];
+    const category = cappedCategories.find((cat) => cat.id === c.categoryId)!;
+    if (c._count <= category.maxPerTeam!) return [];
+    return [{ entryId: c.soldToEntryId, categoryName: category.name, count: c._count, cap: category.maxPerTeam! }];
+  });
+  if (overages.length === 0) return [];
+
+  const entries = await tx.teamAuctionEntry.findMany({
+    where: { id: { in: overages.map((o) => o.entryId) } },
+    include: { team: true },
+  });
+  const teamNameById = new Map(entries.map((e) => [e.id, e.team.name]));
+  return overages.map(
+    (o) =>
+      `${o.count} pick(s) pushed "${teamNameById.get(o.entryId) ?? "Unknown"}" over its "${o.categoryName}" cap (${o.count} > ${o.cap})`
+  );
+}
+
 export async function lockPreAuction(auctionId: string, force: boolean, actorUserId: string) {
   const auction = await prisma.auction.findUnique({
     where: { id: auctionId },
@@ -568,6 +671,7 @@ export async function lockPreAuction(auctionId: string, force: boolean, actorUse
     });
 
     const result = await resolveOverlaps(tx, auctionId);
+    const capOverages = await describeCategoryCapOverages(tx, auctionId);
 
     if (actorUserId) {
       await writeAuditLog(tx, {
@@ -578,7 +682,10 @@ export async function lockPreAuction(auctionId: string, force: boolean, actorUse
         actorUserId,
         before: { status: "PRE_AUCTION_OPEN" },
         after: { status: "PRE_AUCTION_LOCKED" },
-        note: `Auto-resolved ${result.autoAllocated} overlapping pick(s), ${result.sentToPool} sent to the live pool`,
+        note: [
+          `Auto-resolved ${result.autoAllocated} overlapping pick(s), ${result.sentToPool} sent to the live pool`,
+          ...capOverages,
+        ].join("; "),
       });
     }
   });

@@ -516,6 +516,11 @@ model AuctionCategory {
   basePrice          Decimal  @db.Decimal(12, 2)
   preAuctionEligible Boolean  @default(true)
   bidIncrement       Decimal? @db.Decimal(12, 2)
+  // Advisory only — never enforced/blocked at any write path. Null = no cap.
+  // Every UI surface that assigns a player to a team shows a non-blocking
+  // warning once a team reaches this many SOLD players in the category, so
+  // an admin/manager/auctioneer can self-regulate.
+  maxPerTeam         Int?
 
   auctionPlayers       AuctionPlayer[]
   budgetTargets        AuctionCategoryBudgetTarget[]

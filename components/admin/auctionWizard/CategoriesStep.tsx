@@ -5,6 +5,7 @@ export type WizardCategory = {
   basePrice: string;
   preAuctionEligible: boolean;
   bidIncrement: string;
+  maxPerTeam: string;
 };
 
 export function CategoriesStep({
@@ -20,7 +21,11 @@ export function CategoriesStep({
    * pre-auction-eligible either — there's no draft phase for it to matter
    * in, so the checkbox is shown grayed out and unchecked. */
   skipPreAuctionDraft: boolean;
-  onUpdateCategory: (index: number, field: "name" | "basePrice" | "bidIncrement", value: string) => void;
+  onUpdateCategory: (
+    index: number,
+    field: "name" | "basePrice" | "bidIncrement" | "maxPerTeam",
+    value: string
+  ) => void;
   onToggleCategoryPreAuctionEligible: (index: number) => void;
   onAddCategory: () => void;
   onRemoveCategory: (index: number) => void;
@@ -55,6 +60,16 @@ export function CategoriesStep({
                 value={cat.bidIncrement}
                 onChange={(e) => onUpdateCategory(i, "bidIncrement", e.target.value)}
                 className={`${inputClass} w-36`}
+              />
+              <input
+                placeholder="Max/team (optional)"
+                type="number"
+                min={1}
+                step="1"
+                value={cat.maxPerTeam}
+                onChange={(e) => onUpdateCategory(i, "maxPerTeam", e.target.value)}
+                className={`${inputClass} w-32`}
+                title="Advisory only — teams can still exceed this; it just shows as a warning"
               />
               {categories.length > 1 && (
                 <button

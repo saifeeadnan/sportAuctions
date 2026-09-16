@@ -29,6 +29,7 @@ export function FantasyTeamForm({
   players,
   lockedPlayerId,
   selfPickRequired,
+  isCricket,
   fantasyTeamId,
   initialSelected,
   initialName,
@@ -44,6 +45,7 @@ export function FantasyTeamForm({
    * one), in which case it's just a normal, freely-toggleable pick. */
   lockedPlayerId: string | null;
   selfPickRequired: boolean;
+  isCricket: boolean;
   /** Omitted = this form is building a brand-new team (subject to the
    * auction's max-teams-per-user cap); provided = editing this specific
    * existing team. */
@@ -217,7 +219,7 @@ export function FantasyTeamForm({
           Current team ({selected.size})
         </summary>
         <div className="px-4 pb-4 flex flex-col gap-4">
-          <TeamStrengthSummary players={teamSoFar} squadSize={cap} />
+          {isCricket && <TeamStrengthSummary players={teamSoFar} squadSize={cap} />}
           <RosterRibbon
             grid
             highlightId={lockedPlayerId}

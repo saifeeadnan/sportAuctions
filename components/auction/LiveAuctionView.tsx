@@ -15,6 +15,8 @@ import { BidControl } from "@/components/auction/BidControl";
 import { computeMaxBid } from "@/lib/auction/maxBid";
 import { computeBidGuidance, computeLiveCategoryAvgPrice, type InitialStrategy } from "@/lib/auction/guidance";
 import { openAnalyticsDashboardWindow, openAnalyticsV2DashboardWindow } from "@/lib/auction/popupWindow";
+import { isCricketLeague } from "@/lib/leagueSport";
+import { countInCategory } from "@/lib/auction/categoryCaps";
 import { card, tabsTrack, tabItem } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 
@@ -97,6 +99,13 @@ export function LiveAuctionView({
       ? computeMaxBid(remainingPoolBasePrices, Number(myTeam.budgetRemaining), myTeam.slotsTotal - myTeam.slotsFilled)
       : null;
 
+  // Advisory only — never blocks bidding, just annotates BidControl with a
+  // warning once my team is at/over the on-clock category's cap.
+  const soldPlayers = state.players.filter((p) => p.status === "SOLD");
+  const myCategoryCount =
+    myTeam && onClock ? countInCategory(soldPlayers, myTeam.id, onClock.categoryName) : 0;
+  const categoryCap = onClock ? state.categoryMaxPerTeam[onClock.categoryName] ?? null : null;
+
   // Other must-have picks still in play in the same category — bidding hard
   // on a non-priority player here could leave too little for those.
   const otherMustHavesRemainingInCategory = onClock
@@ -165,7 +174,9 @@ export function LiveAuctionView({
                 </span>
               </span>
             </div>
-            <TeamStrengthSummary players={myPlayers} squadSize={myTeam.slotsTotal} />
+            {isCricketLeague(state.leagueType) && (
+              <TeamStrengthSummary players={myPlayers} squadSize={myTeam.slotsTotal} />
+            )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
@@ -242,6 +253,8 @@ export function LiveAuctionView({
                         slotsFilled={myTeam.slotsFilled}
                         slotsTotal={myTeam.slotsTotal}
                         maxBid={myMaxBid}
+                        categoryCount={myCategoryCount}
+                        categoryCap={categoryCap}
                       />
                     )}
                     {myMaxBid != null && (

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { adminAssignPlayerAction } from "@/lib/actions/bidding.actions";
+import { isAtOrOverCap } from "@/lib/auction/categoryCaps";
 import { buttonPrimary, inputClass, selectClass } from "@/lib/ui";
 
 type PlayerOption = { id: string; name: string; categoryName: string; basePrice: string };
@@ -18,10 +19,19 @@ export function AssignPlayerForm({
   auctionId,
   players,
   teams,
+  categoryCaps,
+  teamCategoryCounts,
 }: {
   auctionId: string;
   players: PlayerOption[];
   teams: TeamOption[];
+  /** Advisory only — a team can still be assigned a player past its cap;
+   * this just annotates the team options once a player is selected. Keyed
+   * by category name. */
+  categoryCaps: Record<string, number | null>;
+  /** teamEntryId -> categoryName -> count of players that team has already
+   * won in that category. */
+  teamCategoryCounts: Record<string, Record<string, number>>;
 }) {
   const router = useRouter();
   const [playerId, setPlayerId] = useState("");
@@ -87,11 +97,19 @@ export function AssignPlayerForm({
           <option value="">Select team…</option>
           {teams
             .filter((t) => t.slotsFilled < t.slotsTotal)
-            .map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.teamName} (budget {t.budgetRemaining}, slots {t.slotsFilled}/{t.slotsTotal})
-              </option>
-            ))}
+            .map((t) => {
+              const cap = selectedPlayer ? categoryCaps[selectedPlayer.categoryName] ?? null : null;
+              const count = selectedPlayer
+                ? teamCategoryCounts[t.id]?.[selectedPlayer.categoryName] ?? 0
+                : 0;
+              const atCap = selectedPlayer != null && isAtOrOverCap(count, cap);
+              return (
+                <option key={t.id} value={t.id}>
+                  {t.teamName} (budget {t.budgetRemaining}, slots {t.slotsFilled}/{t.slotsTotal})
+                  {atCap ? ` — ⚠ already has ${count}/${cap} ${selectedPlayer!.categoryName}` : ""}
+                </option>
+              );
+            })}
         </select>
       </label>
 

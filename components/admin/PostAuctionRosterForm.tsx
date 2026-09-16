@@ -7,6 +7,7 @@ import {
   addPlayerPostAuctionAction,
   replacePlayerPostAuctionAction,
 } from "@/lib/actions/bidding.actions";
+import { isAtOrOverCap } from "@/lib/auction/categoryCaps";
 import { buttonPrimary, inputClass, selectClass } from "@/lib/ui";
 
 type ConfirmedPlayer = {
@@ -35,12 +36,18 @@ export function PostAuctionRosterForm({
   confirmedPlayers,
   replacementCandidates,
   categories,
+  categoryCaps,
+  categoryCounts,
 }: {
   auctionId: string;
   teamAuctionEntryId: string;
   confirmedPlayers: ConfirmedPlayer[];
   replacementCandidates: ReplacementCandidate[];
   categories: CategoryOption[];
+  /** Advisory only — never blocks the add/replace/remove below. Keyed by
+   * category name. */
+  categoryCaps: Record<string, number | null>;
+  categoryCounts: Record<string, number>;
 }) {
   const router = useRouter();
   const [outgoingId, setOutgoingId] = useState("");
@@ -92,6 +99,26 @@ export function PostAuctionRosterForm({
   const canSubmit =
     action === "remove" ||
     (action !== null && !!price && (!needsCategoryPicker || !!incomingCategoryId));
+
+  // Advisory only — never blocks submission. Accounts for the outgoing
+  // player leaving the same category on a swap, so the count shown reflects
+  // this team's state right after the change, not a stale pre-change count.
+  const incomingCategoryName = needsCategoryPicker
+    ? (categories.find((c) => c.id === incomingCategoryId)?.name ?? null)
+    : (incomingCandidate?.categoryName ?? null);
+  const outgoingCategoryName = outgoingId
+    ? (confirmedPlayers.find((p) => p.auctionPlayerId === outgoingId)?.categoryName ?? null)
+    : null;
+  const categoryWarning =
+    incomingCategoryName != null
+      ? (() => {
+          const cap = categoryCaps[incomingCategoryName] ?? null;
+          const count =
+            (categoryCounts[incomingCategoryName] ?? 0) -
+            (outgoingCategoryName === incomingCategoryName ? 1 : 0);
+          return isAtOrOverCap(count, cap) ? { count, cap } : null;
+        })()
+      : null;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -204,6 +231,13 @@ export function PostAuctionRosterForm({
             className={inputClass}
           />
         </label>
+      )}
+
+      {categoryWarning && (
+        <p className="text-xs text-amber-600 dark:text-amber-400">
+          This team already has {categoryWarning.count}/{categoryWarning.cap} {incomingCategoryName}{" "}
+          players.
+        </p>
       )}
 
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}

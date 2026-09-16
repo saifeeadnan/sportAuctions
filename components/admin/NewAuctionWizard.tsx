@@ -43,7 +43,7 @@ export function NewAuctionWizard({
   const [teamBudget, setTeamBudget] = useState("");
   const [auctionType, setAuctionType] = useState<AuctionType>("LIVE");
   const [categories, setCategories] = useState<WizardCategory[]>([
-    { name: "", basePrice: "", preAuctionEligible: true, bidIncrement: "" },
+    { name: "", basePrice: "", preAuctionEligible: true, bidIncrement: "", maxPerTeam: "" },
   ]);
   const [assignments, setAssignments] = useState<Record<string, string>>({});
   const [overridden, setOverridden] = useState<Set<string>>(new Set());
@@ -99,7 +99,11 @@ export function NewAuctionWizard({
     setAssignments((prev) => ({ ...prev, [playerId]: categoryName }));
   }
 
-  function updateCategory(index: number, field: "name" | "basePrice" | "bidIncrement", value: string) {
+  function updateCategory(
+    index: number,
+    field: "name" | "basePrice" | "bidIncrement" | "maxPerTeam",
+    value: string
+  ) {
     setCategories((prev) => prev.map((c, i) => (i === index ? { ...c, [field]: value } : c)));
   }
 
@@ -112,7 +116,7 @@ export function NewAuctionWizard({
   function addCategory() {
     setCategories((prev) => [
       ...prev,
-      { name: "", basePrice: "", preAuctionEligible: true, bidIncrement: "" },
+      { name: "", basePrice: "", preAuctionEligible: true, bidIncrement: "", maxPerTeam: "" },
     ]);
   }
 
@@ -178,6 +182,7 @@ export function NewAuctionWizard({
           // draft phase for any category to be eligible for.
           preAuctionEligible: skipPreAuctionDraft ? false : c.preAuctionEligible,
           bidIncrement: c.bidIncrement.trim() ? Number(c.bidIncrement) : undefined,
+          maxPerTeam: c.maxPerTeam.trim() ? Number(c.maxPerTeam) : undefined,
         })),
       playerAssignments,
     });

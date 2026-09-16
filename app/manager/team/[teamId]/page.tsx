@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { ConfirmedRosterTable } from "@/components/roster/ConfirmedRosterTable";
 import { RosterCardLinkPanel } from "@/components/roster/RosterCardLinkPanel";
+import { isAtOrOverCap } from "@/lib/auction/categoryCaps";
 import { Badge } from "@/components/ui/Badge";
 
 const ENTRY_STATUS_VARIANT: Record<string, "neutral" | "info" | "success" | "warning"> = {
@@ -66,7 +67,16 @@ export default async function ManagerTeamDetailPage({
           This team hasn&apos;t participated in an auction yet.
         </p>
       ) : (
-        team.entries.map((entry) => (
+        team.entries.map((entry) => {
+          // Advisory only — never affects any action on this page, just
+          // shows the team's current composition against any configured cap.
+          const categoryCounts: Record<string, number> = {};
+          const categoryCaps: Record<string, number | null> = {};
+          for (const ap of entry.playersWon) {
+            categoryCounts[ap.category.name] = (categoryCounts[ap.category.name] ?? 0) + 1;
+            categoryCaps[ap.category.name] = ap.category.maxPerTeam;
+          }
+          return (
           <section key={entry.id}>
             <div className="flex items-center gap-2 mb-1">
               <h2 className="text-lg font-medium">{entry.auction.name}</h2>
@@ -76,6 +86,21 @@ export default async function ManagerTeamDetailPage({
               Budget remaining: {String(entry.budgetRemaining)} &middot; Slots: {entry.slotsFilled}/
               {entry.slotsTotal}
             </p>
+            {Object.entries(categoryCaps).some(([, cap]) => cap != null) && (
+              <div className="flex flex-wrap gap-2 mb-3">
+                {Object.entries(categoryCaps)
+                  .filter(([, cap]) => cap != null)
+                  .map(([categoryName, cap]) => {
+                    const count = categoryCounts[categoryName] ?? 0;
+                    const atCap = isAtOrOverCap(count, cap);
+                    return (
+                      <Badge key={categoryName} variant={atCap ? "warning" : "neutral"}>
+                        {categoryName}: {count}/{cap}
+                      </Badge>
+                    );
+                  })}
+              </div>
+            )}
             <ConfirmedRosterTable
               players={entry.playersWon.map((ap) => ({
                 id: ap.id,
@@ -129,7 +154,8 @@ export default async function ManagerTeamDetailPage({
               )}
             </div>
           </section>
-        ))
+          );
+        })
       )}
 
       <Link href="/manager" className="text-sm underline underline-offset-2">

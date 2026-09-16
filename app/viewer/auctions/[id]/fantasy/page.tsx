@@ -18,6 +18,7 @@ import { MostPickedPlayersTable } from "@/components/fantasy/MostPickedPlayersTa
 import { SponsorRibbon } from "@/components/tournament/SponsorRibbon";
 import { SponsorSplash } from "@/components/tournament/SponsorSplash";
 import { formatDateTime } from "@/lib/dates";
+import { isCricketLeague } from "@/lib/leagueSport";
 
 export default async function FantasyTeamPage({
   params,
@@ -145,6 +146,7 @@ export default async function FantasyTeamPage({
           )}
           lockedPlayerId={eligibility.selfAuctionPlayerId}
           selfPickRequired={auction.fantasySelfPickRequired}
+          isCricket={isCricketLeague(auction.tournament.league.type)}
           maxTeams={auction.fantasyMaxTeamsPerUser}
           initialTeams={myTeams.map((t) => ({
             id: t.id,

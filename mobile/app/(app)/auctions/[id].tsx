@@ -4,6 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { apiFetch, ApiError } from "@/services/apiClient";
 import type { AuctionState, AuctionStatePlayer } from "@/lib/auctionState/reduceAuctionEvent";
 import { computeMaxBid } from "@/lib/auction/maxBid";
+import { isCricketLeague } from "@/lib/leagueSport";
+import { countInCategory } from "@/lib/auction/categoryCaps";
 import { useAuctionSocket } from "@/hooks/useAuctionSocket";
 import { BidControl } from "@/components/BidControl";
 import { OnClockCard } from "@/components/OnClockCard";
@@ -116,6 +118,12 @@ function LiveAuctionBody({
       ? computeMaxBid(remainingPoolBasePrices, Number(myTeamEntry.budgetRemaining), myTeamEntry.slotsTotal - myTeamEntry.slotsFilled)
       : null;
 
+  const myCategoryCount =
+    myTeamEntry && onClock
+      ? countInCategory(state.players.filter((p) => p.status === "SOLD"), myTeamEntry.id, onClock.categoryName)
+      : 0;
+  const categoryCap = onClock ? state.categoryMaxPerTeam[onClock.categoryName] ?? null : null;
+
   return (
     <ScrollView
       style={styles.container}
@@ -138,7 +146,9 @@ function LiveAuctionBody({
                 Budget {myTeamEntry.budgetRemaining} · Slots {myTeamEntry.slotsFilled}/{myTeamEntry.slotsTotal}
               </ThemedText>
             </View>
-            <TeamStrengthSummary players={myPlayers} squadSize={myTeamEntry.slotsTotal} />
+            {isCricketLeague(state.leagueType) && (
+              <TeamStrengthSummary players={myPlayers} squadSize={myTeamEntry.slotsTotal} />
+            )}
           </Card>
 
           <Card style={styles.onClockCard}>
@@ -172,6 +182,8 @@ function LiveAuctionBody({
                     slotsFilled={myTeamEntry.slotsFilled}
                     slotsTotal={myTeamEntry.slotsTotal}
                     maxBid={myMaxBid}
+                    categoryCount={myCategoryCount}
+                    categoryCap={categoryCap}
                   />
                 </View>
               </>

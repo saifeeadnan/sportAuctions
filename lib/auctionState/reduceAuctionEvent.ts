@@ -14,11 +14,13 @@ export type AuctionState = {
   name: string;
   status: string;
   tournamentName: string;
+  leagueType: string;
   onClockTemplate: OnClockTemplate;
   onClockVisibleFields: OnClockFieldKey[];
   lotTimerSeconds: number | null;
   players: AuctionStatePlayer[];
   teams: AuctionStateTeam[];
+  categoryMaxPerTeam: Record<string, number | null>;
 };
 
 export type AuctionStatePlayer = {

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { submitDraftAction } from "@/lib/actions/auction.actions";
 import type { RatedPlayer } from "@/lib/teamStrength";
 import { TeamStrengthSummary } from "@/components/manager/TeamStrengthSummary";
+import { isAtOrOverCap } from "@/lib/auction/categoryCaps";
 import { card, buttonPrimary, tabsTrack, tabItem } from "@/lib/ui";
 
 type PlayerOption = RatedPlayer & {
@@ -27,6 +28,8 @@ export function DraftForm({
   players,
   initialSelected,
   lockedPlayerId,
+  isCricket,
+  categoryCaps,
 }: {
   entryId: string;
   cap: number;
@@ -38,6 +41,10 @@ export function DraftForm({
   players: PlayerOption[];
   initialSelected: string[];
   lockedPlayerId?: string;
+  isCricket: boolean;
+  /** Advisory only — never blocks a pick, just annotates each category tab.
+   * Keyed by category name. */
+  categoryCaps: Record<string, number | null>;
 }) {
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(
@@ -123,7 +130,7 @@ export function DraftForm({
             {formatAmount(budgetRemainingAfterSelection)}
           </span>
         </p>
-        <TeamStrengthSummary players={teamSoFar} squadSize={squadSize} />
+        {isCricket && <TeamStrengthSummary players={teamSoFar} squadSize={squadSize} />}
       </div>
 
       <div className={tabsTrack}>
@@ -132,6 +139,8 @@ export function DraftForm({
             (p) => p.categoryName === cat && selected.has(p.id)
           ).length;
           const totalInCategory = players.filter((p) => p.categoryName === cat).length;
+          const categoryCap = categoryCaps[cat] ?? null;
+          const atCategoryCap = isAtOrOverCap(selectedInCategory, categoryCap);
           return (
             <button
               key={cat}
@@ -140,6 +149,12 @@ export function DraftForm({
               className={tabItem(activeCategory === cat)}
             >
               {cat} ({selectedInCategory}/{totalInCategory})
+              {categoryCap != null && (
+                <span className={atCategoryCap ? "text-amber-600 dark:text-amber-400" : undefined}>
+                  {" "}
+                  · cap {categoryCap}
+                </span>
+              )}
             </button>
           );
         })}

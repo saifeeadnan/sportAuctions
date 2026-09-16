@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { AuctionStatePlayer } from "@/lib/auctionState/reduceAuctionEvent";
 import { apiFetch } from "@/services/apiClient";
 import { useBidTiming } from "@/hooks/useBidTiming";
+import { isAtOrOverCap } from "@/lib/auction/categoryCaps";
 import { ThemedText } from "@/components/themed-text";
 import { Button } from "@/components/Button";
 import { Spacing } from "@/constants/theme";
@@ -23,6 +24,8 @@ export function BidControl({
   slotsFilled,
   slotsTotal,
   maxBid,
+  categoryCount,
+  categoryCap,
 }: {
   auctionId: string;
   player: AuctionStatePlayer;
@@ -30,6 +33,10 @@ export function BidControl({
   slotsFilled: number;
   slotsTotal: number;
   maxBid?: number | null;
+  /** Advisory only — never disables bidding, just shows a warning once this
+   * team is already at/over the on-clock player's category cap. */
+  categoryCount?: number;
+  categoryCap?: number | null;
 }) {
   const [error, setError] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -38,6 +45,7 @@ export function BidControl({
   const isLeading = player.currentBidderEntryId === teamEntryId;
   const noRoom = slotsFilled >= slotsTotal;
   const quickBidExceedsMax = maxBid != null && minNext > maxBid;
+  const atCategoryCap = isAtOrOverCap(categoryCount ?? 0, categoryCap);
 
   const mutation = useMutation({
     mutationFn: (amount: number) =>
@@ -76,6 +84,11 @@ export function BidControl({
 
   return (
     <View style={styles.container}>
+      {atCategoryCap && (
+        <ThemedText type="small" themeColor="accent">
+          Your squad already has {categoryCount}/{categoryCap} {player.categoryName} players.
+        </ThemedText>
+      )}
       <Button onPress={() => mutation.mutate(minNext)} disabled={disabled} loading={mutation.isPending}>
         {onCooldown ? `Wait ${Math.ceil(cooldownMs / 1000)}s…` : `Bid ${formatAmount(minNext)}`}
       </Button>

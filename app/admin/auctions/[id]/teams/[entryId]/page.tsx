@@ -9,6 +9,7 @@ import { ToggleAnalyticsEnabledButton } from "@/components/admin/ToggleAnalytics
 import { PostAuctionRosterForm } from "@/components/admin/PostAuctionRosterForm";
 import { RosterCardLinkPanel } from "@/components/roster/RosterCardLinkPanel";
 import { withLeagueParam } from "@/lib/adminNav";
+import { isAtOrOverCap } from "@/lib/auction/categoryCaps";
 import { card } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 
@@ -61,6 +62,17 @@ export default async function TeamRosterPage({
       }),
       prisma.auctionCategory.findMany({ where: { auctionId: id } }),
     ]);
+
+  // Advisory only — never blocks anything on this page; purely a warning
+  // annotation on the post-auction roster-change form plus the visibility
+  // badges below the confirmed roster.
+  const categoryCounts: Record<string, number> = {};
+  for (const ap of confirmedPlayers) {
+    categoryCounts[ap.category.name] = (categoryCounts[ap.category.name] ?? 0) + 1;
+  }
+  const categoryCaps: Record<string, number | null> = Object.fromEntries(
+    categories.map((c) => [c.name, c.maxPerTeam])
+  );
 
   const showDraftPicks =
     entry.status === "PRE_AUCTION_DRAFTING" || entry.status === "PRE_AUCTION_SUBMITTED";
@@ -135,6 +147,21 @@ export default async function TeamRosterPage({
 
       <section>
         <h2 className="text-lg font-medium mb-3">Confirmed roster ({confirmedPlayers.length})</h2>
+        {Object.entries(categoryCaps).some(([, cap]) => cap != null) && (
+          <div className="flex flex-wrap gap-2 mb-3">
+            {Object.entries(categoryCaps)
+              .filter(([, cap]) => cap != null)
+              .map(([categoryName, cap]) => {
+                const count = categoryCounts[categoryName] ?? 0;
+                const atCap = isAtOrOverCap(count, cap);
+                return (
+                  <Badge key={categoryName} variant={atCap ? "warning" : "neutral"}>
+                    {categoryName}: {count}/{cap}
+                  </Badge>
+                );
+              })}
+          </div>
+        )}
         <ConfirmedRosterTable
           players={confirmedPlayers.map((ap) => ({
             id: ap.id,
@@ -174,6 +201,8 @@ export default async function TeamRosterPage({
                 name: c.name,
                 basePrice: String(c.basePrice),
               }))}
+              categoryCaps={categoryCaps}
+              categoryCounts={categoryCounts}
             />
           )}
         </section>

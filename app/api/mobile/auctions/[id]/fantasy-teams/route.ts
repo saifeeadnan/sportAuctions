@@ -43,6 +43,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       auctionName: eligibility.auction.name,
       tournamentName: eligibility.auction.tournament.name,
       leagueName: eligibility.auction.tournament.league.name,
+      leagueType: eligibility.auction.tournament.league.type,
     });
   } catch (error) {
     return toErrorResponse(error);

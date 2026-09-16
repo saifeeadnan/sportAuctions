@@ -20,6 +20,7 @@ import {
 } from "@/lib/actions/bidding.actions";
 import { resetAuctionAction } from "@/lib/actions/auction.actions";
 import { computeMaxBid } from "@/lib/auction/maxBid";
+import { countInCategory, isAtOrOverCap } from "@/lib/auction/categoryCaps";
 import { card, buttonPrimary, buttonSecondary, buttonDanger, inputClass, selectClass, tabsTrack, tabItem } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 
@@ -447,11 +448,17 @@ export function AuctioneerConsole({
                       <option value="">Select team…</option>
                       {state.teams
                         .filter((t) => t.slotsFilled < t.slotsTotal)
-                        .map((t) => (
-                          <option key={t.id} value={t.id}>
-                            {t.teamName} (budget {t.budgetRemaining})
-                          </option>
-                        ))}
+                        .map((t) => {
+                          const count = countInCategory(soldPlayers, t.id, onClock.categoryName);
+                          const cap = state.categoryMaxPerTeam[onClock.categoryName] ?? null;
+                          const atCap = isAtOrOverCap(count, cap);
+                          return (
+                            <option key={t.id} value={t.id}>
+                              {t.teamName} (budget {t.budgetRemaining})
+                              {atCap ? ` — ⚠ already has ${count}/${cap} ${onClock.categoryName}` : ""}
+                            </option>
+                          );
+                        })}
                     </select>
                     <div className="flex gap-2">
                       <input

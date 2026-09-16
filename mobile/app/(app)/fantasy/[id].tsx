@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Ionicons } from "@expo/vector-icons";
 import { apiFetch } from "@/services/apiClient";
 import { formatDateTime } from "@/lib/dates";
+import { isCricketLeague } from "@/lib/leagueSport";
 import type { RatedPlayer } from "@/lib/teamStrength";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
@@ -46,6 +47,7 @@ type FantasyTeamsResponse =
       auctionName: string;
       tournamentName: string;
       leagueName: string;
+      leagueType: string;
     };
 
 type Eligible = Extract<FantasyTeamsResponse, { eligible: true }>;
@@ -370,7 +372,9 @@ function TeamEditor({
       </Collapsible>
 
       <Collapsible title={`Current team (${selected.size})`}>
-        <TeamStrengthSummary players={teamSoFar} squadSize={eligible.cap} />
+        {isCricketLeague(eligible.leagueType) && (
+          <TeamStrengthSummary players={teamSoFar} squadSize={eligible.cap} />
+        )}
         <RosterRibbon
           grid
           highlightId={lockedPlayerId}
