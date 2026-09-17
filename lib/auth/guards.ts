@@ -127,3 +127,18 @@ export function assertCanAccessTeamEntry(
   if (adminLeagues === null || adminLeagues.includes(entry.auction.tournament.leagueId)) return;
   throw new AuthError("Not authorized for this team's roster card");
 }
+
+/**
+ * Same shape as assertCanAccessTeamEntry, but for a bare Team (no auction
+ * entry required) — e.g. managing a team's sponsor picture, which a manager
+ * should be able to do before their team has ever entered an auction.
+ */
+export function assertCanManageTeam(
+  session: Session,
+  team: { managerId: string | null; tournament: { leagueId: string } }
+) {
+  if (team.managerId === session.user.id) return;
+  const adminLeagues = leagueIdsForRoles(session, "LEAGUE_ADMIN"); // null = site admin
+  if (adminLeagues === null || adminLeagues.includes(team.tournament.leagueId)) return;
+  throw new AuthError("Not authorized to manage this team");
+}

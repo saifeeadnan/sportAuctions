@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { requireAdminOrLeagueAdmin } from "@/lib/auth/guards";
-import { loadScopedTeam } from "@/lib/auth/scope";
+import { requireSession, assertCanManageTeam } from "@/lib/auth/guards";
+import { prisma } from "@/lib/prisma";
 import { toErrorResponse } from "@/lib/api/errors";
 import {
   uploadTeamSponsorImage,
@@ -8,11 +8,28 @@ import {
   getTeamSponsorImageContent,
 } from "@/lib/services/teamSponsorImage.service";
 
+/** The team's own manager, a league admin of its league, or the site Admin —
+ * same OR-of-grants shape as assertCanAccessTeamEntry, just for a bare Team
+ * (a manager should be able to set their sponsor picture before the team has
+ * ever entered an auction, so this can't be scoped through TeamAuctionEntry). */
+async function loadTeamForSponsorImageManagement(teamId: string) {
+  const session = await requireSession();
+  const team = await prisma.team.findUnique({
+    where: { id: teamId },
+    include: { tournament: { select: { leagueId: true } } },
+  });
+  if (!team) return null;
+  assertCanManageTeam(session, team);
+  return team;
+}
+
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { leagueIds } = await requireAdminOrLeagueAdmin();
     const { id: teamId } = await params;
-    await loadScopedTeam(teamId, leagueIds);
+    const team = await loadTeamForSponsorImageManagement(teamId);
+    if (!team) {
+      return NextResponse.json({ error: "Team not found" }, { status: 404 });
+    }
 
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
@@ -57,9 +74,11 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const { leagueIds } = await requireAdminOrLeagueAdmin();
     const { id: teamId } = await params;
-    await loadScopedTeam(teamId, leagueIds);
+    const team = await loadTeamForSponsorImageManagement(teamId);
+    if (!team) {
+      return NextResponse.json({ error: "Team not found" }, { status: 404 });
+    }
 
     await deleteTeamSponsorImage(teamId);
     return NextResponse.json({ ok: true });

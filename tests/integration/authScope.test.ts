@@ -15,7 +15,7 @@ vi.mock("@/auth", () => ({ auth: vi.fn() }));
 vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
 
 const { loadScopedAuction } = await import("@/lib/auth/scope");
-const { AuthError, assertCanAccessTeamEntry } = await import("@/lib/auth/guards");
+const { AuthError, assertCanAccessTeamEntry, assertCanManageTeam } = await import("@/lib/auth/guards");
 const { createAuction } = await import("@/lib/services/auction.service");
 
 beforeEach(resetDb);
@@ -149,5 +149,62 @@ describe("assertCanAccessTeamEntry", () => {
   it("rejects a plain viewer of the league", () => {
     const s = session("v", [{ leagueId: "A", role: "VIEWER" }]);
     expect(() => assertCanAccessTeamEntry(s, entry("other-mgr", "A"))).toThrow(AuthError);
+  });
+});
+
+/**
+ * Same policy as assertCanAccessTeamEntry, but for a bare Team (used by the
+ * team sponsor-image upload/delete route) — a manager must be able to set
+ * their team's sponsor picture before the team has ever entered an auction,
+ * so there's no TeamAuctionEntry to scope through yet.
+ */
+describe("assertCanManageTeam", () => {
+  type Session = Parameters<typeof assertCanManageTeam>[0];
+  const team = (managerId: string | null, leagueId: string) => ({
+    managerId,
+    tournament: { leagueId },
+  });
+  const session = (
+    id: string,
+    memberships: { leagueId: string; role: string }[],
+    isSiteAdmin = false
+  ) => ({ user: { id, name: "Someone", isSiteAdmin, memberships } }) as unknown as Session;
+
+  it("allows the team's own manager", () => {
+    const s = session("mgr", [{ leagueId: "A", role: "TEAM_MANAGER" }]);
+    expect(() => assertCanManageTeam(s, team("mgr", "A"))).not.toThrow();
+  });
+
+  it("rejects a manager of a different team", () => {
+    const s = session("mgr", [{ leagueId: "A", role: "TEAM_MANAGER" }]);
+    expect(() => assertCanManageTeam(s, team("other-mgr", "A"))).toThrow(AuthError);
+  });
+
+  it("allows a league admin of the team's league", () => {
+    const s = session("la", [{ leagueId: "A", role: "LEAGUE_ADMIN" }]);
+    expect(() => assertCanManageTeam(s, team("other-mgr", "A"))).not.toThrow();
+  });
+
+  it("allows the site admin regardless of league", () => {
+    const s = session("root", [], true);
+    expect(() => assertCanManageTeam(s, team("other-mgr", "Z"))).not.toThrow();
+  });
+
+  it("rejects a league admin of another league who is only a viewer here", () => {
+    const s = session("la", [
+      { leagueId: "A", role: "LEAGUE_ADMIN" },
+      { leagueId: "B", role: "VIEWER" },
+    ]);
+    expect(() => assertCanManageTeam(s, team("other-mgr", "B"))).toThrow(AuthError);
+  });
+
+  it("rejects a plain viewer of the league", () => {
+    const s = session("v", [{ leagueId: "A", role: "VIEWER" }]);
+    expect(() => assertCanManageTeam(s, team("other-mgr", "A"))).toThrow(AuthError);
+  });
+
+  it("rejects a manager with no team of their own on an unassigned team", () => {
+    const s = session("mgr", [{ leagueId: "A", role: "TEAM_MANAGER" }]);
+    expect(() => assertCanManageTeam(s, team(null, "A"))).toThrow(AuthError);
   });
 });
