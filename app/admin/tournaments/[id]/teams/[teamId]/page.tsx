@@ -2,9 +2,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import { requireAdminOrLeagueAdmin, assertInScope } from "@/lib/auth/guards";
+import { isLeagueReadOnly } from "@/lib/services/league.service";
 import { ConfirmedRosterTable } from "@/components/roster/ConfirmedRosterTable";
 import { UploadTeamSponsorImageForm } from "@/components/admin/UploadTeamSponsorImageForm";
 import { DeleteTeamSponsorImageButton } from "@/components/admin/DeleteTeamSponsorImageButton";
+import { RenameTeamForm } from "@/components/admin/RenameTeamForm";
 import { withLeagueParam } from "@/lib/adminNav";
 import { card } from "@/lib/ui";
 
@@ -22,7 +24,7 @@ export default async function TournamentTeamRosterPage({
   const team = await prisma.team.findUnique({
     where: { id: teamId },
     include: {
-      tournament: true,
+      tournament: { include: { league: true } },
       manager: true,
       sponsorImage: { select: { id: true } },
       entries: {
@@ -37,10 +39,19 @@ export default async function TournamentTeamRosterPage({
   if (!team || team.tournamentId !== id) notFound();
   assertInScope(leagueIds, team.tournament.leagueId);
 
+  // A team's identity (its name) is locked in once it's actually been part
+  // of an auction — renaming it after players have already been bought
+  // under that name would be confusing on every roster card, results page,
+  // and audit entry that already references it.
+  const canRename = team.entries.length === 0 && !isLeagueReadOnly(team.tournament.league);
+
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 flex flex-col gap-6">
       <div>
-        <h1 className="text-xl font-semibold mb-1">{team.name}</h1>
+        <div className="flex items-center gap-2 flex-wrap mb-1">
+          <h1 className="text-xl font-semibold">{team.name}</h1>
+          {canRename && <RenameTeamForm teamId={team.id} name={team.name} />}
+        </div>
         <p className="text-sm text-black/60 dark:text-white/60">
           {team.tournament.name} &middot;{" "}
           {team.manager ? `Manager: ${team.manager.name}` : "No manager assigned"}

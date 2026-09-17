@@ -10,6 +10,7 @@ import {
   attachRosterToTournament,
   deleteTournament,
   deleteTeam,
+  renameTeam,
   updateTournamentDates,
 } from "@/lib/services/tournament.service";
 
@@ -94,6 +95,16 @@ export async function updateTournamentDatesAction(
     });
     revalidatePath(`/admin/tournaments/${tournamentId}`);
     revalidatePath("/admin/tournaments");
+  });
+}
+
+export async function renameTeamAction(teamId: string, name: string): Promise<ActionResult> {
+  return toActionResult(async () => {
+    const { session, leagueIds } = await requireAdminOrLeagueAdmin();
+    const team = await loadScopedTeam(teamId, leagueIds);
+    await renameTeam(teamId, name, session.user.id);
+    revalidatePath(`/admin/tournaments/${team.tournamentId}`);
+    revalidatePath(`/admin/tournaments/${team.tournamentId}/teams/${teamId}`);
   });
 }
 

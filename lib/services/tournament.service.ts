@@ -168,6 +168,44 @@ export async function createTeam(input: CreateTeamInput, actorUserId: string) {
   });
 }
 
+export async function renameTeam(teamId: string, name: string, actorUserId: string) {
+  if (!name.trim()) throw new ValidationError("Team name is required");
+
+  const team = await prisma.team.findUnique({
+    where: { id: teamId },
+    include: { _count: { select: { entries: true } }, tournament: { include: { league: true } } },
+  });
+  if (!team) throw new ValidationError("Team not found");
+  assertLeagueNotReadOnly(team.tournament.league);
+
+  if (team._count.entries > 0) {
+    throw new ValidationError(
+      `Cannot rename "${team.name}" — it has participated in ${team._count.entries} auction(s).`
+    );
+  }
+
+  const trimmed = name.trim();
+  const existing = await prisma.team.findUnique({
+    where: { tournamentId_name: { tournamentId: team.tournamentId, name: trimmed } },
+  });
+  if (existing && existing.id !== teamId) {
+    throw new ValidationError("A team with this name already exists in this tournament");
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.team.update({ where: { id: teamId }, data: { name: trimmed } });
+    await writeAuditLog(tx, {
+      entityType: "Team",
+      entityId: teamId,
+      action: "TEAM_RENAMED",
+      actorUserId,
+      before: { name: team.name },
+      after: { name: trimmed },
+    });
+    return updated;
+  });
+}
+
 export async function deleteTeam(teamId: string, actorUserId: string) {
   const team = await prisma.team.findUnique({
     where: { id: teamId },
