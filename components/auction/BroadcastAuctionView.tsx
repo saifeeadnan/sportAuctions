@@ -93,13 +93,8 @@ export function BroadcastAuctionView({
             <p className="text-2xl font-semibold text-center shrink-0">
               {state.status === "COMPLETED"
                 ? "Auction complete — thanks for watching"
-                : "Waiting for the next player…"}
+                : `Waiting for the next player… (${playersLeft} left)`}
             </p>
-            {state.status !== "COMPLETED" && (
-              <p className="text-sm text-black/50 dark:text-white/50 text-center shrink-0">
-                {playersLeft} Left
-              </p>
-            )}
             <div className="flex-1 min-h-0 w-full overflow-y-auto">
               <BroadcastSoldTicker players={state.players} teams={state.teams} />
             </div>

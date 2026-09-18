@@ -92,17 +92,12 @@ export function BroadcastSoldTicker({
           <div className="flex flex-col gap-1 min-w-0 flex-1">
             <p className="text-sm font-semibold truncate">
               {col.name}{" "}
-              {!col.isUnsold && col.players.length > 0 && (
+              {!col.isUnsold && (
                 <span className="text-black/50 dark:text-white/50 font-medium">
-                  ({col.players.length})
+                  ({col.players.length}) Left : {col.budgetRemaining}
                 </span>
               )}
             </p>
-            {!col.isUnsold && (
-              <p className="text-xs text-black/50 dark:text-white/50">
-                Budget: {col.budgetRemaining}
-              </p>
-            )}
             {col.players.length === 0 ? (
               <p className="text-xs text-black/40 dark:text-white/40">—</p>
             ) : (
