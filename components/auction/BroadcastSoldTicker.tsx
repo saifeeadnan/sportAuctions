@@ -40,8 +40,16 @@ export function BroadcastSoldTicker({
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const columns = [
-    ...teams.map((t) => ({ name: t.teamName, players: soldByTeam.get(t.teamName) ?? [], isUnsold: false })),
-    ...(unsold.length > 0 ? [{ name: "Unsold", players: unsold, isUnsold: true }] : []),
+    ...teams.map((t) => ({
+      name: t.teamName,
+      teamId: t.teamId,
+      hasSponsorImage: t.hasSponsorImage,
+      players: soldByTeam.get(t.teamName) ?? [],
+      isUnsold: false,
+    })),
+    ...(unsold.length > 0
+      ? [{ name: "Unsold", teamId: null, hasSponsorImage: false, players: unsold, isUnsold: true }]
+      : []),
   ];
 
   if (columns.every((c) => c.players.length === 0)) {
@@ -55,9 +63,19 @@ export function BroadcastSoldTicker({
     >
       {columns.map((col) => (
         <div key={col.name} className={`${card} p-3 flex flex-col gap-1.5 min-w-0`}>
-          <p className="text-xs font-medium text-black/60 dark:text-white/60 truncate">
-            {col.name} {!col.isUnsold && col.players.length > 0 && `(${col.players.length})`}
-          </p>
+          <div className="flex items-center gap-1.5 min-w-0">
+            {col.hasSponsorImage && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={`/api/teams/${col.teamId}/sponsor-image`}
+                alt=""
+                className="h-5 w-5 rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-0.5 shrink-0"
+              />
+            )}
+            <p className="text-xs font-medium text-black/60 dark:text-white/60 truncate">
+              {col.name} {!col.isUnsold && col.players.length > 0 && `(${col.players.length})`}
+            </p>
+          </div>
           {col.players.length === 0 ? (
             <p className="text-xs text-black/40 dark:text-white/40">—</p>
           ) : (
