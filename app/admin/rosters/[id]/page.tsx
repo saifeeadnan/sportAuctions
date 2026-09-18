@@ -186,8 +186,9 @@ export default async function RosterDetailPage({
         <table className="w-full text-sm border-collapse">
           <thead>
             <tr className="text-left border-b border-black/10 dark:border-white/10">
-              {columns.map((col, i) => (
-                <th key={col.field} className={i === 0 ? "py-2 pl-4 pr-4" : "py-2 pr-4"}>
+              <th className="py-2 pl-4 pr-4 text-black/50 dark:text-white/50">#</th>
+              {columns.map((col) => (
+                <th key={col.field} className="py-2 pr-4">
                   <Link
                     href={sortHref(col.field, sortField, sortDir, leagueParam)}
                     className="inline-flex items-center gap-1 hover:underline"
@@ -205,9 +206,10 @@ export default async function RosterDetailPage({
             </tr>
           </thead>
           <tbody>
-            {roster.players.map((player) => (
+            {roster.players.map((player, index) => (
               <tr key={player.id} className="border-b border-black/5 dark:border-white/5 last:border-0">
-                <td className="py-2 pl-4 pr-4">
+                <td className="py-2 pl-4 pr-4 text-black/50 dark:text-white/50">{index + 1}</td>
+                <td className="py-2 pr-4">
                   <div className="flex items-center gap-2">
                     {player.photoUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
