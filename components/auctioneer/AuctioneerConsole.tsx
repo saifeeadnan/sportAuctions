@@ -534,7 +534,7 @@ export function AuctioneerConsole({
           {soldPlayers.length === 0 ? (
             <p className="text-sm text-black/60 dark:text-white/60">No players allocated yet.</p>
           ) : (
-            <div className="flex gap-3 overflow-x-auto">
+            <div className="grid gap-3" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))" }}>
               {state.teams.map((team) => {
                 const teamPlayers = soldPlayers
                   .filter((p) => p.soldToEntryId === team.id)
@@ -542,7 +542,7 @@ export function AuctioneerConsole({
                 return (
                   <div
                     key={team.id}
-                    className="flex-1 min-w-[200px] rounded-lg border border-black/[0.06] dark:border-white/10 p-3"
+                    className="min-w-0 rounded-lg border border-black/[0.06] dark:border-white/10 p-3"
                   >
                     <p className="text-sm font-medium mb-2">
                       {team.teamName}{" "}
