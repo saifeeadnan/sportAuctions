@@ -21,17 +21,9 @@ import {
 import { resetAuctionAction } from "@/lib/actions/auction.actions";
 import { computeMaxBid } from "@/lib/auction/maxBid";
 import { countInCategory, isAtOrOverCap } from "@/lib/auction/categoryCaps";
+import { shortName } from "@/lib/playerDisplayName";
 import { card, buttonPrimary, buttonSecondary, buttonDanger, inputClass, selectClass, tabsTrack, tabItem } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
-
-// "Abdulqadir Zumkhawala" -> "Abdulqadir Z." — keeps allocation columns compact.
-function shortName(fullName: string): string {
-  const parts = fullName.trim().split(/\s+/);
-  if (parts.length < 2) return fullName;
-  const first = parts[0];
-  const lastInitial = parts[parts.length - 1][0];
-  return `${first} ${lastInitial}.`;
-}
 
 export function AuctioneerConsole({
   initialState,
