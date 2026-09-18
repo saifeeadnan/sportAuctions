@@ -60,6 +60,9 @@ export function BroadcastAuctionView({
   const { state, connected, lastSale } = useAuctionSocket(initialState.id, initialState);
   const onClock = state.players.find((p) => p.status === "IN_BIDDING");
   const photoSize = usePhotoSize();
+  const playersLeft = state.players.filter(
+    (p) => p.status === "AVAILABLE" || p.status === "IN_PRE_AUCTION_POOL" || p.status === "UNSOLD"
+  ).length;
 
   return (
     <div className="fixed inset-0 flex flex-col bg-white dark:bg-neutral-950 text-black dark:text-white">
@@ -92,6 +95,11 @@ export function BroadcastAuctionView({
                 ? "Auction complete — thanks for watching"
                 : "Waiting for the next player…"}
             </p>
+            {state.status !== "COMPLETED" && (
+              <p className="text-sm text-black/50 dark:text-white/50 text-center shrink-0">
+                {playersLeft} Left
+              </p>
+            )}
             <div className="flex-1 min-h-0 w-full overflow-y-auto">
               <BroadcastSoldTicker players={state.players} teams={state.teams} />
             </div>
