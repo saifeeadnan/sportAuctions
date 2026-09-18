@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { inputClass, buttonPrimary, buttonSecondary, tabsTrack, tabItem } from "@/lib/ui";
+import { inputClass, buttonPrimary, tabsTrack, tabItem } from "@/lib/ui";
 
 async function readErrorMessage(res: Response, fallback: string): Promise<string> {
   try {
@@ -13,7 +13,7 @@ async function readErrorMessage(res: Response, fallback: string): Promise<string
   }
 }
 
-export function ProfilePhotoForm({ userId, hasPhoto }: { userId: string; hasPhoto: boolean }) {
+export function ProfilePhotoForm({ userId }: { userId: string }) {
   const router = useRouter();
   const [source, setSource] = useState<"file" | "url">("file");
   const [loading, setLoading] = useState(false);
@@ -37,20 +37,6 @@ export function ProfilePhotoForm({ userId, hasPhoto }: { userId: string; hasPhot
       router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update photo");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleRemove() {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/users/${userId}/photo`, { method: "DELETE" });
-      if (!res.ok) throw new Error(await readErrorMessage(res, "Failed to remove photo"));
-      router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to remove photo");
     } finally {
       setLoading(false);
     }
@@ -91,16 +77,9 @@ export function ProfilePhotoForm({ userId, hasPhoto }: { userId: string; hasPhot
           </label>
         )}
         {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
-        <div className="flex items-center gap-2">
-          <button type="submit" disabled={loading} className={buttonPrimary}>
-            {loading ? "Saving…" : "Save photo"}
-          </button>
-          {hasPhoto && (
-            <button type="button" disabled={loading} onClick={handleRemove} className={buttonSecondary}>
-              Remove photo
-            </button>
-          )}
-        </div>
+        <button type="submit" disabled={loading} className={`${buttonPrimary} self-start`}>
+          {loading ? "Saving…" : "Save photo"}
+        </button>
       </form>
     </div>
   );

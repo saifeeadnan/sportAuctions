@@ -2,6 +2,7 @@ import { requireSession } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { changePasswordAction, updateProfileAction } from "@/lib/actions/auth.actions";
 import { ProfilePhotoForm } from "@/components/ProfilePhotoForm";
+import { RemoveProfilePhotoButton } from "@/components/RemoveProfilePhotoButton";
 import { card, buttonPrimary, inputClass } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 
@@ -76,16 +77,36 @@ export default async function ProfilePage({
         </div>
       </div>
 
-      <div className="flex flex-col gap-3">
+      <section>
+        <h3 className="text-sm font-medium mb-2">Profile picture</h3>
+        <div className={`${card} px-4 py-3 flex items-center justify-between gap-4 flex-wrap mb-3`}>
+          {photoSrc ? (
+            <>
+              <div className="flex items-center gap-3">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={photoSrc}
+                  alt={session.user.name ?? ""}
+                  className="h-16 w-16 rounded-full object-cover bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-1"
+                />
+              </div>
+              <RemoveProfilePhotoButton userId={session.user.id} />
+            </>
+          ) : (
+            <p className="text-sm text-black/60 dark:text-white/60">No profile picture set yet.</p>
+          )}
+        </div>
         <details className={card}>
           <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
-            Profile picture
+            {photoSrc ? "Replace profile picture" : "Upload profile picture"}
           </summary>
           <div className="px-4 pb-4">
-            <ProfilePhotoForm userId={session.user.id} hasPhoto={photoSrc != null} />
+            <ProfilePhotoForm userId={session.user.id} />
           </div>
         </details>
+      </section>
 
+      <div className="flex flex-col gap-3">
         <details className={card}>
           <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
             Update profile
