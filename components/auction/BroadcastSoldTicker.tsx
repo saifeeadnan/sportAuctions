@@ -41,15 +41,27 @@ export function BroadcastSoldTicker({
     .sort((a, b) => a.name.localeCompare(b.name));
 
   const columns = [
-    ...teams.map((t) => ({
-      name: t.teamName,
-      teamId: t.teamId,
-      hasSponsorImage: t.hasSponsorImage,
-      players: soldByTeam.get(t.teamName) ?? [],
-      isUnsold: false,
-    })),
+    ...[...teams]
+      .sort((a, b) => Number(b.budgetRemaining) - Number(a.budgetRemaining))
+      .map((t) => ({
+        name: t.teamName,
+        teamId: t.teamId,
+        hasSponsorImage: t.hasSponsorImage,
+        budgetRemaining: t.budgetRemaining,
+        players: soldByTeam.get(t.teamName) ?? [],
+        isUnsold: false,
+      })),
     ...(unsold.length > 0
-      ? [{ name: "Unsold", teamId: null, hasSponsorImage: false, players: unsold, isUnsold: true }]
+      ? [
+          {
+            name: "Unsold",
+            teamId: null,
+            hasSponsorImage: false,
+            budgetRemaining: null,
+            players: unsold,
+            isUnsold: true,
+          },
+        ]
       : []),
   ];
 
@@ -86,6 +98,11 @@ export function BroadcastSoldTicker({
                 </span>
               )}
             </p>
+            {!col.isUnsold && (
+              <p className="text-xs text-black/50 dark:text-white/50">
+                Budget: {col.budgetRemaining}
+              </p>
+            )}
             {col.players.length === 0 ? (
               <p className="text-xs text-black/40 dark:text-white/40">—</p>
             ) : (
