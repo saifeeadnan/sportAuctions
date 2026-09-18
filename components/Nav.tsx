@@ -2,6 +2,7 @@ import Link from "next/link";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { logoutAction } from "@/lib/actions/auth.actions";
+import { accessibleSections, sectionHref, sectionLabel } from "@/lib/auth/sections";
 import { buttonSecondary } from "@/lib/ui";
 import { LogoMark } from "@/components/ui/LogoMark";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
@@ -9,6 +10,13 @@ import { NavVisibility } from "@/components/NavVisibility";
 
 export async function Nav() {
   const session = await auth();
+  // A user can hold different roles in different leagues (e.g. TEAM_MANAGER
+  // in one, VIEWER in another) — each section's own layout already allows
+  // that (see lib/auth/sections.ts, which mirrors those guards), but
+  // there's otherwise no link anywhere from e.g. /manager to /viewer. Only
+  // shown once there's actually more than one reachable section, so a
+  // single-role user sees nothing extra here.
+  const sections = session?.user ? accessibleSections(session) : [];
   // session.user.name/photo come from the JWT (set once at login), so a
   // profile-photo change wouldn't show up here until next login without
   // this live lookup — same reasoning app/profile/page.tsx already re-reads
@@ -33,6 +41,26 @@ export async function Nav() {
             <ThemeToggle />
             {session?.user ? (
               <>
+                {sections.length > 1 && (
+                  <details className="relative">
+                    <summary
+                      className={`${buttonSecondary} px-3 py-1.5 text-xs cursor-pointer select-none list-none`}
+                    >
+                      Switch view
+                    </summary>
+                    <div className="absolute right-0 mt-1 w-40 rounded-lg border border-black/10 dark:border-white/10 bg-white dark:bg-neutral-900 shadow-lg py-1 z-20">
+                      {sections.map((s) => (
+                        <Link
+                          key={s}
+                          href={sectionHref(s)}
+                          className="block px-3 py-1.5 text-xs text-black/70 dark:text-white/70 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] hover:text-black dark:hover:text-white transition-colors"
+                        >
+                          {sectionLabel(s)}
+                        </Link>
+                      ))}
+                    </div>
+                  </details>
+                )}
                 <Link
                   href="/profile"
                   className="flex items-center gap-2 text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white transition-colors"
