@@ -7,6 +7,7 @@ import { openPreAuctionAction, startBiddingAction, startBiddingDirectAction } fr
 import { ActionResultForm } from "@/components/ui/ActionResultForm";
 import { listTournamentSponsors } from "@/lib/services/tournamentSponsor.service";
 import { AssignPlayerForm } from "@/components/admin/AssignPlayerForm";
+import { RemovePlayerAllocationButton } from "@/components/admin/RemovePlayerAllocationButton";
 import { AddPlayerToAuctionForm } from "@/components/admin/AddPlayerToAuctionForm";
 import { ChangePlayerCategoryForm } from "@/components/admin/ChangePlayerCategoryForm";
 import { EditCategoryBidIncrementForm } from "@/components/admin/EditCategoryBidIncrementForm";
@@ -110,6 +111,9 @@ export default async function AuctionDetailPage({
   }
   const categoryCaps: Record<string, number | null> = Object.fromEntries(
     auction.categories.map((c) => [c.name, c.maxPerTeam])
+  );
+  const teamNameByEntryId: Record<string, string> = Object.fromEntries(
+    auction.entries.map((e) => [e.id, e.team.name])
   );
 
   return (
@@ -304,6 +308,38 @@ export default async function AuctionDetailPage({
                     categoryCaps={categoryCaps}
                     teamCategoryCounts={teamCategoryCounts}
                   />
+
+                  {soldPlayers.length > 0 && (
+                    <div className="mt-4">
+                      <h3 className="text-xs font-medium text-black/60 dark:text-white/60 mb-2">
+                        Currently assigned ({soldPlayers.length}) — remove one if it was a mistake
+                      </h3>
+                      <ul className="flex flex-col gap-1.5">
+                        {soldPlayers.map((ap) => {
+                          const teamName = ap.soldToEntryId
+                            ? (teamNameByEntryId[ap.soldToEntryId] ?? "Unknown team")
+                            : "Unknown team";
+                          return (
+                            <li key={ap.id} className="flex items-center justify-between gap-3 text-sm">
+                              <span>
+                                {ap.player.name}{" "}
+                                <span className="text-black/50 dark:text-white/50">
+                                  &middot; {teamName} &middot; {ap.category.name} &middot; {String(ap.soldPrice)}
+                                </span>
+                              </span>
+                              <RemovePlayerAllocationButton
+                                auctionId={auction.id}
+                                auctionPlayerId={ap.id}
+                                playerName={ap.player.name}
+                                teamName={teamName}
+                                readOnly={readOnly}
+                              />
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  )}
                 </div>
               </details>
             )}
