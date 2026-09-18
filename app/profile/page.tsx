@@ -1,6 +1,7 @@
 import { requireSession } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { changePasswordAction, updateProfileAction } from "@/lib/actions/auth.actions";
+import { ProfilePhotoForm } from "@/components/ProfilePhotoForm";
 import { card, buttonPrimary, inputClass } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 
@@ -39,7 +40,7 @@ export default async function ProfilePage({
   const [account, memberships] = await Promise.all([
     prisma.user.findUniqueOrThrow({
       where: { id: session.user.id },
-      select: { email: true, phone: true },
+      select: { email: true, phone: true, photoUrl: true, photoMimeType: true },
     }),
     session.user.isSiteAdmin
       ? Promise.resolve([])
@@ -50,16 +51,41 @@ export default async function ProfilePage({
         }),
   ]);
 
+  const photoSrc = account.photoUrl ?? (account.photoMimeType ? `/api/users/${session.user.id}/photo` : null);
+
   return (
     <div className="mx-auto max-w-sm px-4 py-16 flex flex-col gap-6">
-      <div>
-        <h2 className="text-lg font-medium mb-1">Profile</h2>
-        <p className="text-sm text-black/60 dark:text-white/60">
-          {session.user.name} &middot; {roleSummary}
-        </p>
+      <div className="flex items-center gap-3">
+        {photoSrc ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={photoSrc}
+            alt={session.user.name ?? ""}
+            className="h-14 w-14 rounded-full object-cover bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 shrink-0"
+          />
+        ) : (
+          <div className="h-14 w-14 rounded-full bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/10 flex items-center justify-center text-lg font-medium text-black/40 dark:text-white/40 shrink-0">
+            {(session.user.name ?? "?").charAt(0).toUpperCase()}
+          </div>
+        )}
+        <div>
+          <h2 className="text-lg font-medium mb-1">Profile</h2>
+          <p className="text-sm text-black/60 dark:text-white/60">
+            {session.user.name} &middot; {roleSummary}
+          </p>
+        </div>
       </div>
 
       <div className="flex flex-col gap-3">
+        <details className={card}>
+          <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
+            Profile picture
+          </summary>
+          <div className="px-4 pb-4">
+            <ProfilePhotoForm userId={session.user.id} hasPhoto={photoSrc != null} />
+          </div>
+        </details>
+
         <details className={card}>
           <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
             Update profile

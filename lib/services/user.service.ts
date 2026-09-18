@@ -273,6 +273,110 @@ export async function updateUserProfile(userId: string, input: { email: string; 
   });
 }
 
+const PHOTO_MAX_SIZE_BYTES = 300 * 1024;
+const PHOTO_ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/jpg", "image/png"]);
+
+export type ProfilePhotoFile = { type: string; data: Buffer };
+
+function validatePhotoUrl(url: string): string {
+  const trimmed = url.trim();
+  if (!trimmed) throw new ValidationError("Photo URL is required");
+  try {
+    new URL(trimmed);
+  } catch {
+    throw new ValidationError("Photo URL must be a valid URL");
+  }
+  return trimmed;
+}
+
+/** Self-service profile photo — exactly one of `file` or `photoUrl`, same
+ * upload-OR-link shape as TournamentSponsor's logo. */
+export async function updateUserProfilePhoto(
+  userId: string,
+  input: { file?: ProfilePhotoFile; photoUrl?: string }
+) {
+  if (input.file && input.photoUrl) {
+    throw new ValidationError("Provide either a photo file or a photo URL, not both");
+  }
+  if (!input.file && !input.photoUrl) {
+    throw new ValidationError("Provide a photo file or a photo URL");
+  }
+
+  let photoUrl: string | null = null;
+  let photoMimeType: string | null = null;
+  let photoData: Uint8Array<ArrayBuffer> | null = null;
+
+  if (input.file) {
+    if (input.file.data.length === 0) throw new ValidationError("Photo file is empty");
+    if (input.file.data.length > PHOTO_MAX_SIZE_BYTES) {
+      throw new ValidationError("Photo must be 300KB or smaller");
+    }
+    if (!PHOTO_ALLOWED_MIME_TYPES.has(input.file.type)) {
+      throw new ValidationError("Only JPG or PNG images are allowed for the profile photo");
+    }
+    photoMimeType = input.file.type;
+    // Prisma's Bytes field wants a plain Uint8Array backed by a real
+    // ArrayBuffer, not Node's Buffer.
+    photoData = new Uint8Array(input.file.data);
+  } else {
+    photoUrl = validatePhotoUrl(input.photoUrl!);
+  }
+
+  const before = await prisma.user.findUniqueOrThrow({
+    where: { id: userId },
+    select: { photoUrl: true, photoMimeType: true },
+  });
+
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.user.update({
+      where: { id: userId },
+      data: { photoUrl, photoMimeType, photoData },
+    });
+    // Never snapshot raw photoData into the audit trail — only the URL and
+    // whether an upload was present, matching writeAuditLog's own rule
+    // against storing secrets/large blobs in before/after.
+    await writeAuditLog(tx, {
+      entityType: "User",
+      entityId: userId,
+      action: "PROFILE_UPDATED_SELF",
+      actorUserId: userId,
+      before: { photoUrl: before.photoUrl, hadUploadedPhoto: !!before.photoMimeType },
+      after: { photoUrl, hadUploadedPhoto: !!photoMimeType },
+    });
+    return updated;
+  });
+}
+
+export async function removeUserProfilePhoto(userId: string) {
+  const before = await prisma.user.findUniqueOrThrow({
+    where: { id: userId },
+    select: { photoUrl: true, photoMimeType: true },
+  });
+  if (!before.photoUrl && !before.photoMimeType) return;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: userId },
+      data: { photoUrl: null, photoMimeType: null, photoData: null },
+    });
+    await writeAuditLog(tx, {
+      entityType: "User",
+      entityId: userId,
+      action: "PROFILE_UPDATED_SELF",
+      actorUserId: userId,
+      before: { photoUrl: before.photoUrl, hadUploadedPhoto: !!before.photoMimeType },
+      after: { photoUrl: null, hadUploadedPhoto: false },
+    });
+  });
+}
+
+export async function getUserPhotoContent(userId: string) {
+  return prisma.user.findUnique({
+    where: { id: userId },
+    select: { photoMimeType: true, photoData: true },
+  });
+}
+
 /** Self-service email/phone update for the mobile client — same semantics
  * as updateUserProfile, but throws full human-readable ValidationError
  * messages (this route's existing JSON-API convention) instead of short

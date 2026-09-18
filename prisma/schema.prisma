@@ -115,6 +115,13 @@ model User {
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
 
+  // Profile photo — exactly one of (photoUrl) or (photoMimeType + photoData)
+  // is set at a time, never both; all null = no photo. Same nullable-triple
+  // shape as TournamentSponsor's logo fields (upload OR external URL).
+  photoUrl      String?
+  photoMimeType String?
+  photoData     Bytes?
+
   memberships        LeagueMembership[]
   createdRosters     PlayerRoster[]
   managedTeams       Team[]
