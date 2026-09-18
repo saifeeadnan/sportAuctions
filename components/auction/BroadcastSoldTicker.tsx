@@ -59,21 +59,26 @@ export function BroadcastSoldTicker({
   return (
     <div
       className="grid gap-3 w-full"
-      style={{ gridTemplateColumns: "repeat(auto-fit, minmax(11rem, 1fr))" }}
+      style={{ gridTemplateColumns: "repeat(auto-fit, minmax(15rem, 1fr))" }}
     >
       {columns.map((col) => (
-        <div key={col.name} className={`${card} p-3 flex flex-col gap-1.5 min-w-0`}>
-          <div className="flex items-center gap-1.5 min-w-0">
+        <div key={col.name} className={`${card} p-3 flex flex-col gap-2 min-w-0`}>
+          <div className="flex items-center gap-2 min-w-0">
             {col.hasSponsorImage && (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={`/api/teams/${col.teamId}/sponsor-image`}
                 alt=""
-                className="h-5 w-5 rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-0.5 shrink-0"
+                className="h-16 w-16 rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-1 shrink-0"
               />
             )}
-            <p className="text-xs font-medium text-black/60 dark:text-white/60 truncate">
-              {col.name} {!col.isUnsold && col.players.length > 0 && `(${col.players.length})`}
+            <p className="text-sm font-semibold truncate">
+              {col.name}{" "}
+              {!col.isUnsold && col.players.length > 0 && (
+                <span className="text-black/50 dark:text-white/50 font-medium">
+                  ({col.players.length})
+                </span>
+              )}
             </p>
           </div>
           {col.players.length === 0 ? (
