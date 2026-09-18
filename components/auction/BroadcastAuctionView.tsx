@@ -6,7 +6,7 @@ import type { SponsorTier } from "@/lib/sponsorTiers";
 import { useAuctionSocket } from "@/hooks/useAuctionSocket";
 import { BroadcastOnClockCard } from "@/components/auction/BroadcastOnClockCard";
 import { SaleAnnouncement } from "@/components/auction/SaleAnnouncement";
-import { SoldTicker } from "@/components/auction/SoldTicker";
+import { BroadcastSoldTicker } from "@/components/auction/BroadcastSoldTicker";
 import { SponsorRibbon } from "@/components/tournament/SponsorRibbon";
 import { Badge } from "@/components/ui/Badge";
 
@@ -93,7 +93,7 @@ export function BroadcastAuctionView({
                 : "Waiting for the next player…"}
             </p>
             <div className="flex-1 min-h-0 w-full overflow-y-auto">
-              <SoldTicker players={state.players} teams={state.teams} />
+              <BroadcastSoldTicker players={state.players} teams={state.teams} />
             </div>
           </div>
         )}
