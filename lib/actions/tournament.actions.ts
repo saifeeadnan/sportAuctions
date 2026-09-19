@@ -2,9 +2,11 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { requireAdminOrLeagueAdmin } from "@/lib/auth/guards";
+import { requireAdminOrLeagueAdmin, requireSession, assertCanManageTeam } from "@/lib/auth/guards";
 import { loadScopedRoster, loadScopedTournament, loadScopedTeam } from "@/lib/auth/scope";
 import { toActionResult, type ActionResult } from "@/lib/actions/result";
+import { prisma } from "@/lib/prisma";
+import { ValidationError } from "@/lib/errors";
 import {
   createTournament,
   attachRosterToTournament,
@@ -98,13 +100,19 @@ export async function updateTournamentDatesAction(
   });
 }
 
+// Team's own manager, a league admin of its league, or the site Admin — same
+// OR-of-grants shape as sponsor-picture self-service (assertCanManageTeam),
+// so a manager can rename their own team without needing an admin.
 export async function renameTeamAction(teamId: string, name: string): Promise<ActionResult> {
   return toActionResult(async () => {
-    const { session, leagueIds } = await requireAdminOrLeagueAdmin();
-    const team = await loadScopedTeam(teamId, leagueIds);
+    const session = await requireSession();
+    const team = await prisma.team.findUnique({ where: { id: teamId }, include: { tournament: true } });
+    if (!team) throw new ValidationError("Team not found");
+    assertCanManageTeam(session, team);
     await renameTeam(teamId, name, session.user.id);
     revalidatePath(`/admin/tournaments/${team.tournamentId}`);
     revalidatePath(`/admin/tournaments/${team.tournamentId}/teams/${teamId}`);
+    revalidatePath(`/manager/team/${teamId}`);
   });
 }
 

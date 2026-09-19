@@ -6,7 +6,9 @@ import { ConfirmedRosterTable } from "@/components/roster/ConfirmedRosterTable";
 import { RosterCardLinkPanel } from "@/components/roster/RosterCardLinkPanel";
 import { UploadTeamSponsorImageForm } from "@/components/admin/UploadTeamSponsorImageForm";
 import { DeleteTeamSponsorImageButton } from "@/components/admin/DeleteTeamSponsorImageButton";
+import { RenameTeamForm } from "@/components/admin/RenameTeamForm";
 import { isAtOrOverCap } from "@/lib/auction/categoryCaps";
+import { isLeagueReadOnly } from "@/lib/services/league.service";
 import { card } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 
@@ -31,7 +33,7 @@ export default async function ManagerTeamDetailPage({
   const team = await prisma.team.findUnique({
     where: { id: teamId },
     include: {
-      tournament: true,
+      tournament: { include: { league: true } },
       sponsorImage: { select: { id: true } },
       entries: {
         include: {
@@ -46,6 +48,7 @@ export default async function ManagerTeamDetailPage({
     },
   });
   if (!team || team.managerId !== session!.user.id) notFound();
+  const canRename = team.entries.length === 0 && !isLeagueReadOnly(team.tournament.league);
 
   return (
     <div className="flex flex-col gap-6">
@@ -61,6 +64,7 @@ export default async function ManagerTeamDetailPage({
             />
           )}
           <h1 className="text-xl font-semibold">{team.name}</h1>
+          {canRename && <RenameTeamForm teamId={team.id} name={team.name} />}
         </div>
         <p className="text-sm text-black/60 dark:text-white/60">{team.tournament.name}</p>
       </div>
