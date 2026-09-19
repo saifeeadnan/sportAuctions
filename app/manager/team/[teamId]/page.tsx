@@ -48,7 +48,9 @@ export default async function ManagerTeamDetailPage({
     },
   });
   if (!team || team.managerId !== session!.user.id) notFound();
-  const canRename = team.entries.length === 0 && !isLeagueReadOnly(team.tournament.league);
+  const canRename =
+    !team.entries.some((e) => e.auction.status === "COMPLETED") &&
+    !isLeagueReadOnly(team.tournament.league);
 
   return (
     <div className="flex flex-col gap-6">

@@ -173,15 +173,22 @@ export async function renameTeam(teamId: string, name: string, actorUserId: stri
 
   const team = await prisma.team.findUnique({
     where: { id: teamId },
-    include: { _count: { select: { entries: true } }, tournament: { include: { league: true } } },
+    include: { tournament: { include: { league: true } } },
   });
   if (!team) throw new ValidationError("Team not found");
   assertLeagueNotReadOnly(team.tournament.league);
 
-  if (team._count.entries > 0) {
-    throw new ValidationError(
-      `Cannot rename "${team.name}" — it has participated in ${team._count.entries} auction(s).`
-    );
+  // Locked only once an auction the team played in has actually concluded —
+  // nothing reads a team name from a stale snapshot (every display joins
+  // Team.name live), so there's no correctness reason to block renaming
+  // while an auction is still in progress. Once COMPLETED, results/roster
+  // cards/audit history are the permanent record and a rename after the
+  // fact would just confuse anyone reviewing them.
+  const completedEntry = await prisma.teamAuctionEntry.findFirst({
+    where: { teamId, auction: { status: "COMPLETED" } },
+  });
+  if (completedEntry) {
+    throw new ValidationError(`Cannot rename "${team.name}" — it has completed an auction.`);
   }
 
   const trimmed = name.trim();

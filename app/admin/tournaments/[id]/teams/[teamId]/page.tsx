@@ -39,11 +39,14 @@ export default async function TournamentTeamRosterPage({
   if (!team || team.tournamentId !== id) notFound();
   assertInScope(leagueIds, team.tournament.leagueId);
 
-  // A team's identity (its name) is locked in once it's actually been part
-  // of an auction — renaming it after players have already been bought
-  // under that name would be confusing on every roster card, results page,
-  // and audit entry that already references it.
-  const canRename = team.entries.length === 0 && !isLeagueReadOnly(team.tournament.league);
+  // A team's identity (its name) is locked in only once an auction it
+  // played in has actually concluded — renaming after results are final
+  // would be confusing on every roster card, results page, and audit entry
+  // that already references it. Renaming is still fine while an auction is
+  // merely in progress, since every display reads the name live.
+  const canRename =
+    !team.entries.some((e) => e.auction.status === "COMPLETED") &&
+    !isLeagueReadOnly(team.tournament.league);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 flex flex-col gap-6">

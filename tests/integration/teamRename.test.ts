@@ -11,7 +11,8 @@ import {
 import { prisma } from "@/lib/prisma";
 import { updateLeagueSettings } from "@/lib/services/league.service";
 import { renameTeam } from "@/lib/services/tournament.service";
-import { createAuction, openPreAuction } from "@/lib/services/auction.service";
+import { createAuction, openPreAuction, lockPreAuction, startBidding } from "@/lib/services/auction.service";
+import { concludeAuction } from "@/lib/services/bidding.service";
 import { expectAuditLog } from "../helpers/auditLog";
 
 beforeEach(resetDb);
@@ -72,7 +73,7 @@ describe("renameTeam", () => {
     await expect(renameTeam(teamA.id, "New Name", admin.id)).rejects.toThrow(/read-only/i);
   });
 
-  it("rejects renaming once the team has participated in an auction", async () => {
+  it("allows renaming while the team's auction is still in progress (not yet completed)", async () => {
     const fixture = await createAuctionReadyFixture({
       playerNames: ["Player A"],
       teamNames: ["Team 1"],
@@ -87,10 +88,36 @@ describe("renameTeam", () => {
       playerAssignments: fixture.players.map((p) => ({ playerId: p.id, categoryName: "Regular" })),
     });
     await openPreAuction(auction.id, fixture.admin.id);
+    await lockPreAuction(auction.id, true, fixture.admin.id);
+    await startBidding(auction.id, fixture.admin.id);
+
+    const team = await prisma.team.findFirstOrThrow({ where: { tournamentId: fixture.tournament.id } });
+    const updated = await renameTeam(team.id, "New Name", fixture.admin.id);
+    expect(updated.name).toBe("New Name");
+  });
+
+  it("rejects renaming once the team has completed an auction", async () => {
+    const fixture = await createAuctionReadyFixture({
+      playerNames: ["Player A"],
+      teamNames: ["Team 1"],
+      squadSize: 5,
+    });
+    const auction = await createAuction({
+      tournamentId: fixture.tournament.id,
+      name: "Test Auction",
+      teamBudget: 1000,
+      createdById: fixture.admin.id,
+      categories: [{ name: "Regular", basePrice: 100 }],
+      playerAssignments: fixture.players.map((p) => ({ playerId: p.id, categoryName: "Regular" })),
+    });
+    await openPreAuction(auction.id, fixture.admin.id);
+    await lockPreAuction(auction.id, true, fixture.admin.id);
+    await startBidding(auction.id, fixture.admin.id);
+    await concludeAuction(auction.id, fixture.admin.id);
 
     const team = await prisma.team.findFirstOrThrow({ where: { tournamentId: fixture.tournament.id } });
     await expect(renameTeam(team.id, "New Name", fixture.admin.id)).rejects.toThrow(
-      /participated in \d+ auction/i
+      /completed an auction/i
     );
 
     const unchanged = await prisma.team.findUniqueOrThrow({ where: { id: team.id } });
