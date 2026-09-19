@@ -57,7 +57,7 @@ export function BroadcastAuctionView({
   initialState: AuctionState;
   sponsors: Sponsor[];
 }) {
-  const { state, connected, lastSale } = useAuctionSocket(initialState.id, initialState);
+  const { state, connected, lastSale } = useAuctionSocket(initialState.id, initialState, { public: true });
   const onClock = state.players.find((p) => p.status === "IN_BIDDING");
   const photoSize = usePhotoSize();
   const playersLeft = state.players.filter(

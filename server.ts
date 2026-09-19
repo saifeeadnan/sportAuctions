@@ -69,6 +69,20 @@ app.prepare().then(() => {
 
       socket.join(`auction:${auctionId}`);
     });
+
+    // Public, unauthenticated join for the OBS broadcast view
+    // (app/auctioneer/auctions/[id]/broadcast) — deliberately no token/scope
+    // check, matching that page's own posture: the link is meant to be
+    // shared (dropped into OBS, posted for co-streamers) and work without a
+    // logged-in session, the same way app/highlights/[token] and
+    // app/roster-card/[token] are public. Still validates the auction
+    // actually exists, so a garbage id can't create an empty room.
+    socket.on("join:public", async (auctionId: string) => {
+      if (typeof auctionId !== "string" || !auctionId) return;
+      const auction = await prisma.auction.findUnique({ where: { id: auctionId }, select: { id: true } });
+      if (!auction) return;
+      socket.join(`auction:${auctionId}`);
+    });
   });
   setIO(io);
 

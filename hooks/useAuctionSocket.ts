@@ -23,7 +23,12 @@ const EVENT_TYPES: AuctionSocketEvent["type"][] = [
   "auction:reset",
 ];
 
-export function useAuctionSocket(auctionId: string, initialState: AuctionState) {
+export function useAuctionSocket(
+  auctionId: string,
+  initialState: AuctionState,
+  options: { public?: boolean } = {}
+) {
+  const isPublic = options.public ?? false;
   const [state, setState] = useState<AuctionState>(initialState);
   const [connected, setConnected] = useState(false);
   const [lastSale, setLastSale] = useState<SaleAnnouncement | null>(null);
@@ -46,7 +51,7 @@ export function useAuctionSocket(auctionId: string, initialState: AuctionState) 
 
     socket.on("connect", () => {
       setConnected(true);
-      socket.emit("join", auctionId);
+      socket.emit(isPublic ? "join:public" : "join", auctionId);
     });
     socket.on("disconnect", () => setConnected(false));
 
