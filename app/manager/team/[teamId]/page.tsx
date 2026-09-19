@@ -81,7 +81,7 @@ export default async function ManagerTeamDetailPage({
                 <img
                   src={`/api/teams/${team.id}/sponsor-image`}
                   alt={`${team.name} sponsor`}
-                  className="h-16 w-16 rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-1"
+                  className="h-32 w-32 rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-1"
                 />
               </div>
               <DeleteTeamSponsorImageButton teamId={team.id} />
