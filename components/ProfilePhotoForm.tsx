@@ -13,7 +13,7 @@ async function readErrorMessage(res: Response, fallback: string): Promise<string
   }
 }
 
-export function ProfilePhotoForm({ userId }: { userId: string }) {
+export function ProfilePhotoForm({ actionUrl }: { actionUrl: string }) {
   const router = useRouter();
   const [source, setSource] = useState<"file" | "url">("file");
   const [loading, setLoading] = useState(false);
@@ -28,7 +28,7 @@ export function ProfilePhotoForm({ userId }: { userId: string }) {
     setError(null);
     try {
       const formData = new FormData(form);
-      const res = await fetch(`/api/users/${userId}/photo`, {
+      const res = await fetch(actionUrl, {
         method: "POST",
         body: formData,
       });

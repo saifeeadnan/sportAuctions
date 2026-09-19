@@ -1,8 +1,14 @@
 import { requireSession } from "@/lib/auth/guards";
 import { prisma } from "@/lib/prisma";
 import { changePasswordAction, updateProfileAction } from "@/lib/actions/auth.actions";
+import {
+  linkPlayerPhotoToProfileAction,
+  linkSelectedPlayerPhotosToProfileAction,
+} from "@/lib/actions/playerPhoto.actions";
+import { listMyPlayerRows } from "@/lib/services/playerPhoto.service";
 import { ProfilePhotoForm } from "@/components/ProfilePhotoForm";
 import { RemoveProfilePhotoButton } from "@/components/RemoveProfilePhotoButton";
+import { ActionResultForm } from "@/components/ui/ActionResultForm";
 import { card, buttonPrimary, inputClass } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 
@@ -38,7 +44,7 @@ export default async function ProfilePage({
     ? "Site Admin"
     : session.user.memberships.map((m) => m.role).join(", ") || "No league memberships";
 
-  const [account, memberships] = await Promise.all([
+  const [account, memberships, myPlayers] = await Promise.all([
     prisma.user.findUniqueOrThrow({
       where: { id: session.user.id },
       select: { email: true, phone: true, photoUrl: true, photoMimeType: true },
@@ -50,7 +56,9 @@ export default async function ProfilePage({
           include: { league: { select: { name: true } } },
           orderBy: { createdAt: "asc" },
         }),
+    listMyPlayerRows(session.user.id),
   ]);
+  const hasProfilePhoto = !!(account.photoUrl || account.photoMimeType);
 
   const photoSrc = account.photoUrl ?? (account.photoMimeType ? `/api/users/${session.user.id}/photo` : null);
 
@@ -90,7 +98,10 @@ export default async function ProfilePage({
                   className="h-16 w-16 rounded-full object-cover bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-1"
                 />
               </div>
-              <RemoveProfilePhotoButton userId={session.user.id} />
+              <RemoveProfilePhotoButton
+                actionUrl={`/api/users/${session.user.id}/photo`}
+                confirmMessage="Remove your profile picture?"
+              />
             </>
           ) : (
             <p className="text-sm text-black/60 dark:text-white/60">No profile picture set yet.</p>
@@ -101,10 +112,110 @@ export default async function ProfilePage({
             {photoSrc ? "Replace profile picture" : "Upload profile picture"}
           </summary>
           <div className="px-4 pb-4">
-            <ProfilePhotoForm userId={session.user.id} />
+            <ProfilePhotoForm actionUrl={`/api/users/${session.user.id}/photo`} />
           </div>
         </details>
       </section>
+
+      {myPlayers.length > 0 && (
+        <section>
+          <h3 className="text-sm font-medium mb-2">Your roster photos</h3>
+          <div className="flex flex-col gap-3">
+            {myPlayers.map((player) => {
+              const isLinked = player.linkedUserId === session.user.id;
+              const status = isLinked ? "Linked to your profile" : player.photoUrl ? "Custom photo" : "No photo";
+              return (
+                <div key={player.id} className={`${card} p-3 flex flex-col gap-3`}>
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div className="flex items-center gap-3">
+                      {player.photoUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={player.photoUrl}
+                          alt={player.name}
+                          className="h-14 w-14 rounded-full object-cover bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-1 shrink-0"
+                        />
+                      ) : (
+                        <div className="h-14 w-14 rounded-full bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/10 flex items-center justify-center text-sm font-medium text-black/40 dark:text-white/40 shrink-0">
+                          {player.name.charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div>
+                        <p className="text-sm font-medium">{player.name}</p>
+                        <p className="text-xs text-black/50 dark:text-white/50">
+                          {player.leagueName} &middot; {player.rosterName}
+                        </p>
+                      </div>
+                    </div>
+                    <Badge variant={isLinked ? "success" : player.photoUrl ? "info" : "neutral"}>
+                      {status}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    {hasProfilePhoto && !isLinked && (
+                      <ActionResultForm action={linkPlayerPhotoToProfileAction.bind(null, player.id)}>
+                        <button type="submit" className={buttonPrimary}>
+                          Link to my profile photo
+                        </button>
+                      </ActionResultForm>
+                    )}
+                    {player.photoUrl && (
+                      <RemoveProfilePhotoButton
+                        actionUrl={`/api/players/${player.id}/photo`}
+                        confirmMessage="Remove this roster photo?"
+                      />
+                    )}
+                  </div>
+                  <details className={card}>
+                    <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
+                      {player.photoUrl ? "Upload a different photo" : "Upload a photo"}
+                    </summary>
+                    <div className="px-4 pb-4">
+                      <ProfilePhotoForm actionUrl={`/api/players/${player.id}/photo`} />
+                    </div>
+                  </details>
+                </div>
+              );
+            })}
+          </div>
+
+          {hasProfilePhoto && myPlayers.length >= 2 && (
+            <details className={`${card} mt-3`}>
+              <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
+                Apply my profile photo to multiple rosters at once
+              </summary>
+              <div className="px-4 pb-4">
+                <ActionResultForm
+                  action={linkSelectedPlayerPhotosToProfileAction}
+                  className="flex flex-col gap-3"
+                >
+                  <div className="flex flex-col gap-2">
+                    {myPlayers.map((player) => (
+                      <label key={player.id} className="flex items-center gap-2 text-sm">
+                        <input type="checkbox" name="playerIds" value={player.id} />
+                        {player.name}{" "}
+                        <span className="text-black/50 dark:text-white/50">
+                          ({player.leagueName} &middot; {player.rosterName})
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  <button type="submit" className={`${buttonPrimary} self-start`}>
+                    Link selected to my profile photo
+                  </button>
+                </ActionResultForm>
+              </div>
+            </details>
+          )}
+
+          {hasProfilePhoto && (
+            <p className="text-xs text-black/50 dark:text-white/50 mt-2">
+              A roster photo linked to your profile is visible to anyone with a link to that roster
+              or its highlights — no login required.
+            </p>
+          )}
+        </section>
+      )}
 
       <div className="flex flex-col gap-3">
         <details className={card}>

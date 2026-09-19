@@ -7,7 +7,10 @@ import { prisma } from "@/lib/prisma";
 import { requireSession, assertCanAccessTeamEntry } from "@/lib/auth/guards";
 import { toErrorResponse } from "@/lib/api/errors";
 import { getTeamSponsorImageContent } from "@/lib/services/teamSponsorImage.service";
+import { getResolvedPlayerPhoto } from "@/lib/services/playerPhoto.service";
 import { isSafePublicUrl } from "@/lib/security/ssrf";
+
+const PLAYER_PHOTO_ROUTE_RE = /^\/api\/players\/([^/]+)\/photo$/;
 
 const SIZE = 1080;
 const MAX_PLAYERS_SHOWN = 15;
@@ -28,11 +31,13 @@ function colorFor(name: string): string {
 }
 
 /**
- * A player's photoUrl is either a relative path into this app's own public/
- * directory (the common case for a bulk-imported roster — read straight off
- * disk, no network round-trip) or a full external URL with no uptime
- * guarantee (fetched with a short timeout). Either way, any failure just
- * falls back to an initials avatar rather than failing the whole card.
+ * A player's photoUrl is one of three things: our own self-service photo
+ * route (resolved straight from the DB — see below, never fetched over
+ * HTTP), a relative path into this app's own public/ directory (the common
+ * case for a bulk-imported roster — read straight off disk, no network
+ * round-trip), or a full external URL with no uptime guarantee (fetched
+ * with a short timeout). Any failure just falls back to an initials avatar
+ * rather than failing the whole card.
  *
  * Source photos can be multi-megabyte, multi-megapixel camera originals —
  * Satori has to decode each embedded image to a raw pixel buffer to
@@ -44,7 +49,22 @@ function colorFor(name: string): string {
 async function loadPhotoAsDataUri(photoUrl: string, timeoutMs = 4000): Promise<string | null> {
   try {
     let buffer: Buffer;
-    if (photoUrl.startsWith("/")) {
+    const playerPhotoMatch = photoUrl.match(PLAYER_PHOTO_ROUTE_RE);
+    if (playerPhotoMatch) {
+      // Resolved directly against the DB, same reasoning as
+      // getTeamSponsorImageContent below being called directly rather than
+      // fetched over HTTP — a live-linked player's photo can itself be an
+      // external URL, in which case it falls through to the same
+      // SSRF-checked fetch as any other external photoUrl.
+      const resolved = await getResolvedPlayerPhoto(playerPhotoMatch[1]);
+      if (resolved.kind === "bytes") {
+        buffer = Buffer.from(resolved.data);
+      } else if (resolved.kind === "redirect") {
+        return loadPhotoAsDataUri(resolved.url, timeoutMs);
+      } else {
+        return null;
+      }
+    } else if (photoUrl.startsWith("/")) {
       const filePath = path.join(process.cwd(), "public", photoUrl);
       buffer = await readFile(filePath);
     } else {

@@ -2,6 +2,7 @@ import Papa from "papaparse";
 import { prisma } from "@/lib/prisma";
 import { ValidationError } from "@/lib/errors";
 import { assertLeagueNotReadOnly } from "@/lib/services/league.service";
+import { writeAuditLog } from "@/lib/services/auditLog.service";
 import { ROSTER_FIELD_LABELS, type RosterFieldKey } from "@/lib/rosterTemplates";
 import type { Player } from "@/app/generated/prisma/client";
 
@@ -238,7 +239,7 @@ export async function createPlayer(rosterId: string, input: PlayerInput) {
   });
 }
 
-export async function updatePlayer(playerId: string, input: PlayerInput) {
+export async function updatePlayer(playerId: string, input: PlayerInput, actorUserId: string) {
   if (!input.name.trim()) {
     throw new ValidationError("Player name is required");
   }
@@ -247,9 +248,35 @@ export async function updatePlayer(playerId: string, input: PlayerInput) {
     throw new ValidationError("Player not found");
   }
 
-  return prisma.player.update({
-    where: { id: playerId },
-    data: { ...input, name: input.name.trim() },
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.player.update({
+      where: { id: playerId },
+      data: {
+        ...input,
+        name: input.name.trim(),
+        // An admin setting photoUrl directly must visibly take effect —
+        // otherwise the self-service live-link route would keep resolving
+        // to the previously-linked account's photo instead, silently
+        // ignoring the admin's edit. parsePlayerInput's str() helper turns
+        // a blank field into `undefined`, never `""`, so this only fires
+        // when the admin actually typed a URL.
+        ...(input.photoUrl !== undefined ? { linkedUserId: null } : {}),
+      },
+    });
+    if (input.photoUrl !== undefined) {
+      await tx.playerPhoto.deleteMany({ where: { playerId } });
+      if (player.linkedUserId) {
+        await writeAuditLog(tx, {
+          entityType: "Player",
+          entityId: playerId,
+          action: "PLAYER_PHOTO_UNLINKED_BY_ADMIN",
+          actorUserId,
+          before: { linkedUserId: player.linkedUserId },
+          after: { photoUrl: input.photoUrl },
+        });
+      }
+    }
+    return updated;
   });
 }
 

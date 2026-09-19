@@ -2,14 +2,20 @@
 
 import { ConfirmDeleteButton } from "@/components/admin/ConfirmDeleteButton";
 
-export function RemoveProfilePhotoButton({ userId }: { userId: string }) {
+export function RemoveProfilePhotoButton({
+  actionUrl,
+  confirmMessage,
+}: {
+  actionUrl: string;
+  confirmMessage: string;
+}) {
   return (
     <ConfirmDeleteButton
-      confirmMessage="Remove your profile picture?"
+      confirmMessage={confirmMessage}
       label="Remove"
       loadingLabel="Removing…"
       action={async () => {
-        const res = await fetch(`/api/users/${userId}/photo`, { method: "DELETE" });
+        const res = await fetch(actionUrl, { method: "DELETE" });
         if (!res.ok) {
           const data = await res.json().catch(() => null);
           throw new Error(data?.error ?? "Failed to remove");

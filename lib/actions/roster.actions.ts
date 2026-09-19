@@ -99,9 +99,9 @@ export async function updatePlayerAction(
   formData: FormData
 ): Promise<ActionResult> {
   const result = await toActionResult(async () => {
-    const { leagueIds } = await requireAdminOrLeagueAdmin();
+    const { session, leagueIds } = await requireAdminOrLeagueAdmin();
     await loadScopedRoster(rosterId, leagueIds);
-    await updatePlayer(playerId, parsePlayerInput(formData));
+    await updatePlayer(playerId, parsePlayerInput(formData), session.user.id);
     revalidatePath(`/admin/rosters/${rosterId}`);
   });
   if (result.error) return result;

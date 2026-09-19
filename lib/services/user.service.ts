@@ -66,6 +66,14 @@ export async function deleteUser(userId: string, requestingUserId: string) {
       actorUserId: requestingUserId,
       before: { loginId: user.loginId, name: user.name },
     });
+    // onDelete: SetNull on Player.linkedUserId only clears the FK itself —
+    // it would leave Player.photoUrl still pointing at
+    // /api/players/[id]/photo, which then 404s instead of cleanly
+    // reverting to "no photo" everywhere that Player's photo is shown.
+    await tx.player.updateMany({
+      where: { linkedUserId: userId },
+      data: { linkedUserId: null, photoUrl: null },
+    });
     await tx.user.delete({ where: { id: userId } });
   });
 }
@@ -273,12 +281,12 @@ export async function updateUserProfile(userId: string, input: { email: string; 
   });
 }
 
-const PHOTO_MAX_SIZE_BYTES = 300 * 1024;
-const PHOTO_ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/jpg", "image/png"]);
+export const PHOTO_MAX_SIZE_BYTES = 300 * 1024;
+export const PHOTO_ALLOWED_MIME_TYPES = new Set(["image/jpeg", "image/jpg", "image/png"]);
 
 export type ProfilePhotoFile = { type: string; data: Buffer };
 
-function validatePhotoUrl(url: string): string {
+export function validatePhotoUrl(url: string): string {
   const trimmed = url.trim();
   if (!trimmed) throw new ValidationError("Photo URL is required");
   try {

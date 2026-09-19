@@ -13,7 +13,8 @@ export type AuditEntityType =
   | "User"
   | "LeagueMembership"
   | "FantasyPointsUpload"
-  | "PlayerRoster";
+  | "PlayerRoster"
+  | "Player";
 
 /** Every audited business action, as a semantic label — never a raw CRUD
  * verb. One entry per mutation actually hooked up; see the audit-log plan
@@ -76,7 +77,11 @@ export type AuditAction =
   | "FANTASY_POINTS_UPLOAD_DELETED"
   | "SEEDING_WINDOW_OPENED"
   | "SEEDING_WINDOW_UPDATED"
-  | "SEEDING_FINALIZED";
+  | "SEEDING_FINALIZED"
+  | "PLAYER_PHOTO_UPDATED_SELF"
+  | "PLAYER_PHOTO_REMOVED_SELF"
+  | "PLAYER_PHOTO_LINKED_TO_PROFILE_SELF"
+  | "PLAYER_PHOTO_UNLINKED_BY_ADMIN";
 
 /**
  * Writes one audit row. Always takes an explicit transaction client — never

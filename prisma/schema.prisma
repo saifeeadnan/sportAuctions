@@ -138,6 +138,7 @@ model User {
   seedingWindowsCreated   PlayerSeedingWindow[]  @relation("SeedingWindowsCreated")
   seedingWindowsFinalized PlayerSeedingWindow[]  @relation("SeedingWindowsFinalized")
   seedSubmissions         PlayerSeedSubmission[]
+  linkedPlayerPhotos      Player[]               @relation("PlayerLinkedPhoto")
 
   @@map("users")
 }
@@ -230,7 +231,24 @@ model Player {
   phone           String?
   defaultCategory String?
   previousTeam    String?
+  // The one field every render call site reads — either an external URL
+  // (admin-pasted, or a bulk-imported /images/... path) or our own
+  // /api/players/[id]/photo route once a self-service photo (independent
+  // upload, see `photo` below) or a live link (see `linkedUserId` below) is
+  // set. Callers never need to know which case they're in.
   photoUrl        String?
+  photo           PlayerPhoto?
+  // Live link to an account's profile photo, resolved at request time in
+  // /api/players/[id]/photo — NOT copied here, so changing or removing the
+  // linked User's profile photo is reflected immediately (the user-
+  // confirmed requirement this exists for). Mutually exclusive with an
+  // uploaded `photo` row; setting one clears the other. onDelete: SetNull
+  // matches this schema's other optional User-attribution FKs (e.g.
+  // PlayerSeedingWindow.createdById) — deleteUser() additionally clears
+  // photoUrl explicitly, since SetNull alone would leave it pointing at a
+  // now-404ing route instead of reverting to "no photo".
+  linkedUserId    String?
+  linkedUser      User?        @relation("PlayerLinkedPhoto", fields: [linkedUserId], references: [id], onDelete: SetNull)
   rating          Decimal?     @db.Decimal(6, 2)
   battingRating   Decimal?     @db.Decimal(6, 2)
   bowlingRating   Decimal?     @db.Decimal(6, 2)
@@ -359,6 +377,21 @@ model TeamSponsorImage {
   uploadedAt DateTime @default(now())
 
   @@map("team_sponsor_images")
+}
+
+/// A Player's independently self-uploaded photo — mutually exclusive with
+/// Player.linkedUserId (a live link to an account's profile photo instead).
+/// Same shape as TeamSponsorImage: a separate one-to-one bytes table, served
+/// publicly (Player photos already render on unauthenticated pages).
+model PlayerPhoto {
+  id         String   @id @default(cuid())
+  playerId   String   @unique
+  player     Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  mimeType   String
+  data       Bytes
+  uploadedAt DateTime @default(now())
+
+  @@map("player_photos")
 }
 
 model LeagueLogo {
