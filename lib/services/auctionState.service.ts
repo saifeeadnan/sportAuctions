@@ -46,7 +46,9 @@ export type AuctionState = {
   name: string;
   status: string;
   tournamentName: string;
+  leagueId: string;
   leagueType: string;
+  hasLeagueLogo: boolean;
   onClockTemplate: OnClockTemplate;
   onClockVisibleFields: OnClockFieldKey[];
   lotTimerSeconds: number | null;
@@ -61,7 +63,9 @@ export async function getAuctionState(auctionId: string): Promise<AuctionState |
   const auction = await prisma.auction.findUnique({
     where: { id: auctionId },
     include: {
-      tournament: { include: { league: { select: { type: true } } } },
+      tournament: {
+        include: { league: { select: { id: true, type: true, logo: { select: { id: true } } } } },
+      },
       categories: { select: { name: true, maxPerTeam: true } },
       auctionPlayers: {
         include: {
@@ -86,7 +90,9 @@ export async function getAuctionState(auctionId: string): Promise<AuctionState |
     name: auction.name,
     status: auction.status,
     tournamentName: auction.tournament.name,
+    leagueId: auction.tournament.league.id,
     leagueType: auction.tournament.league.type,
+    hasLeagueLogo: !!auction.tournament.league.logo,
     onClockTemplate: auction.onClockTemplate,
     onClockVisibleFields: auction.onClockVisibleFields as OnClockFieldKey[],
     lotTimerSeconds: auction.lotTimerSeconds,

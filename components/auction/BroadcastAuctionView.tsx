@@ -68,6 +68,17 @@ export function BroadcastAuctionView({
     <div className="fixed inset-0 flex flex-col bg-white dark:bg-neutral-950 text-black dark:text-white">
       <SaleAnnouncement sale={lastSale} />
 
+      {state.hasLeagueLogo && (
+        <div className="shrink-0 flex justify-center pt-3">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={`/api/leagues/${state.leagueId}/logo`}
+            alt=""
+            className="h-32 w-32 rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-1"
+          />
+        </div>
+      )}
+
       <header className="shrink-0 flex items-center justify-between gap-3 px-6 py-3">
         <div>
           <p className="text-sm font-medium">{state.name}</p>

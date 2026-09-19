@@ -14,7 +14,9 @@ export type AuctionState = {
   name: string;
   status: string;
   tournamentName: string;
+  leagueId: string;
   leagueType: string;
+  hasLeagueLogo: boolean;
   onClockTemplate: OnClockTemplate;
   onClockVisibleFields: OnClockFieldKey[];
   lotTimerSeconds: number | null;

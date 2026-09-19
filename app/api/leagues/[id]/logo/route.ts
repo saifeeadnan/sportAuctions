@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireSession, requireRole } from "@/lib/auth/guards";
+import { requireRole } from "@/lib/auth/guards";
 import { toErrorResponse } from "@/lib/api/errors";
 import {
   uploadLeagueLogo,
@@ -31,9 +31,11 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    // Cosmetic branding, not sensitive — any authenticated user may view it,
-    // same bar as a team's sponsor image.
-    await requireSession();
+    // Cosmetic branding, not sensitive — deliberately no auth check at all,
+    // same posture as /api/teams/[id]/sponsor-image: the public,
+    // unauthenticated OBS broadcast page (app/auctioneer/auctions/[id]/broadcast)
+    // embeds this logo, and gating it behind requireSession() would
+    // silently 403 the <img> for every anonymous viewer.
     const { id: leagueId } = await params;
 
     const logo = await getLeagueLogoContent(leagueId);
