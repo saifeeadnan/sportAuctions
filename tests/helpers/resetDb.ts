@@ -1,5 +1,11 @@
 import { prisma } from "@/lib/prisma";
 
+// The table list is discovered once per process and reused — it can't
+// legitimately change mid-run (migrations only ever run once, up front, via
+// test:db:setup), so re-querying pg_tables on every single resetDb() call
+// (hundreds of times across a full suite run) was pure round-trip waste.
+let cachedTableList: string | null = null;
+
 /**
  * Wipes every table in the test database between tests. Rather than
  * hand-listing tables in FK-safe order (the one existing precedent,
@@ -20,12 +26,14 @@ export async function resetDb() {
     );
   }
 
-  const tables = await prisma.$queryRaw<{ tablename: string }[]>`
-    SELECT tablename FROM pg_tables
-    WHERE schemaname = 'public' AND tablename != '_prisma_migrations'
-  `;
-  if (tables.length === 0) return;
+  if (cachedTableList === null) {
+    const tables = await prisma.$queryRaw<{ tablename: string }[]>`
+      SELECT tablename FROM pg_tables
+      WHERE schemaname = 'public' AND tablename != '_prisma_migrations'
+    `;
+    if (tables.length === 0) return;
+    cachedTableList = tables.map((t) => `"${t.tablename}"`).join(", ");
+  }
 
-  const tableList = tables.map((t) => `"${t.tablename}"`).join(", ");
-  await prisma.$executeRawUnsafe(`TRUNCATE TABLE ${tableList} RESTART IDENTITY CASCADE;`);
+  await prisma.$executeRawUnsafe(`TRUNCATE TABLE ${cachedTableList} RESTART IDENTITY CASCADE;`);
 }
