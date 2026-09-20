@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import { ConfirmedRosterTable } from "@/components/roster/ConfirmedRosterTable";
+import { PlayerPoolPreview } from "@/components/roster/PlayerPoolPreview";
 import { RosterCardLinkPanel } from "@/components/roster/RosterCardLinkPanel";
 import { UploadTeamSponsorImageForm } from "@/components/admin/UploadTeamSponsorImageForm";
 import { DeleteTeamSponsorImageButton } from "@/components/admin/DeleteTeamSponsorImageButton";
@@ -143,15 +144,12 @@ export default async function ManagerTeamDetailPage({
             <p className="text-sm text-black/60 dark:text-white/60 mb-3">
               Preview of the player pool — bidding hasn&apos;t started, so nothing here is final yet.
             </p>
-            <ConfirmedRosterTable
+            <PlayerPoolPreview
               players={auction.auctionPlayers.map((ap) => ({
                 id: ap.id,
                 playerName: ap.player.name,
                 photoUrl: ap.player.photoUrl,
                 categoryName: ap.category.name,
-                soldPrice: ap.soldPrice != null ? String(ap.soldPrice) : null,
-                soldVia: ap.soldVia,
-                isCaptain: entry ? ap.id === entry.captainAuctionPlayerId : false,
               }))}
             />
             {entry && !auction.skipPreAuctionDraft && DRAFT_STATUSES.has(entry.status) && (
