@@ -49,14 +49,19 @@ export default async function ManagerTeamDetailPage({
   });
   if (!team || team.managerId !== session!.user.id) notFound();
 
-  // A TeamAuctionEntry (team.entries above) is only created once an admin
-  // opens pre-auction/starts bidding — before that, an auction can still
-  // exist (with its full player pool already assigned) in CREATED status,
-  // but this team has no entry to hang a section off of yet. Surfacing the
-  // pool here is the whole point of this query: a manager should be able to
-  // preview who's up for auction before it's opened, not just once it is.
-  const upcomingAuctions = await prisma.auction.findMany({
-    where: { tournamentId: team.tournamentId, status: "CREATED" },
+  // A TeamAuctionEntry (team.entries above) only reflects a *confirmed*
+  // pick — empty until pre-auction draft picks are resolved, and even then
+  // it only ever shows picks this team actually won, never the rest of the
+  // pool. That left a real gap: an auction can sit in PRE_AUCTION_OPEN or
+  // PRE_AUCTION_LOCKED (pre-auction draft resolved, but bidding not started)
+  // with this team's entry showing zero confirmed players and no way to see
+  // who's even up for auction short of clicking through to the draft page.
+  // Querying every non-live/non-completed auction's full pool directly —
+  // covering both "no entry yet" (CREATED) and "entry exists but bidding
+  // hasn't started" (PRE_AUCTION_OPEN/LOCKED) in one place — closes that
+  // gap uniformly instead of only fixing the CREATED case.
+  const previewAuctions = await prisma.auction.findMany({
+    where: { tournamentId: team.tournamentId, status: { notIn: ["BIDDING", "COMPLETED"] } },
     include: {
       auctionPlayers: {
         include: { player: true, category: true },
@@ -65,6 +70,10 @@ export default async function ManagerTeamDetailPage({
     },
     orderBy: { createdAt: "desc" },
   });
+  const entryByAuctionId = new Map(team.entries.map((e) => [e.auctionId, e]));
+  const liveOrDoneEntries = team.entries.filter(
+    (e) => e.auction.status === "BIDDING" || e.auction.status === "COMPLETED"
+  );
   const canRename =
     !team.entries.some((e) => e.auction.status === "COMPLETED") &&
     !isLeagueReadOnly(team.tournament.league);
@@ -90,65 +99,83 @@ export default async function ManagerTeamDetailPage({
 
       <section>
         <h2 className="text-lg font-medium mb-3">Sponsor picture</h2>
-        <div className={`${card} px-4 py-3 flex items-center justify-between gap-4 flex-wrap mb-3`}>
-          {team.sponsorImage ? (
-            <>
-              <div className="flex items-center gap-3">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={`/api/teams/${team.id}/sponsor-image`}
-                  alt={`${team.name} sponsor`}
-                  className="h-32 w-32 rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-1"
-                />
-              </div>
-              <DeleteTeamSponsorImageButton teamId={team.id} />
-            </>
-          ) : (
-            <p className="text-sm text-black/60 dark:text-white/60">
-              No sponsor picture uploaded yet.
-            </p>
-          )}
-        </div>
-        <details className={card}>
-          <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
-            {team.sponsorImage ? "Replace sponsor picture" : "Upload sponsor picture"}
-          </summary>
-          <div className="px-4 pb-4">
-            <UploadTeamSponsorImageForm teamId={team.id} />
+        <div className={card}>
+          <div className="px-4 py-3 flex items-center justify-between gap-4 flex-wrap">
+            {team.sponsorImage ? (
+              <>
+                <div className="flex items-center gap-3">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={`/api/teams/${team.id}/sponsor-image`}
+                    alt={`${team.name} sponsor`}
+                    className="h-32 w-32 rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-1"
+                  />
+                </div>
+                <DeleteTeamSponsorImageButton teamId={team.id} />
+              </>
+            ) : (
+              <p className="text-sm text-black/60 dark:text-white/60">
+                No sponsor picture uploaded yet.
+              </p>
+            )}
           </div>
-        </details>
+          <details className="border-t border-black/[0.08] dark:border-white/10">
+            <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
+              {team.sponsorImage ? "Replace sponsor picture" : "Upload sponsor picture"}
+            </summary>
+            <div className="px-4 pb-4">
+              <UploadTeamSponsorImageForm teamId={team.id} />
+            </div>
+          </details>
+        </div>
       </section>
 
-      {upcomingAuctions.map((auction) => (
-        <section key={auction.id}>
-          <div className="flex items-center gap-2 mb-1">
-            <h2 className="text-lg font-medium">{auction.name}</h2>
-            <Badge variant="neutral">Not yet opened</Badge>
-          </div>
-          <p className="text-sm text-black/60 dark:text-white/60 mb-3">
-            Preview of the player pool — bidding hasn&apos;t started, so nothing here is final yet.
-          </p>
-          <ConfirmedRosterTable
-            players={auction.auctionPlayers.map((ap) => ({
-              id: ap.id,
-              playerName: ap.player.name,
-              photoUrl: ap.player.photoUrl,
-              categoryName: ap.category.name,
-              soldPrice: null,
-              soldVia: null,
-            }))}
-          />
-        </section>
-      ))}
+      {previewAuctions.map((auction) => {
+        const entry = entryByAuctionId.get(auction.id);
+        return (
+          <section key={auction.id}>
+            <div className="flex items-center gap-2 mb-1">
+              <h2 className="text-lg font-medium">{auction.name}</h2>
+              <Badge variant={entry?.status === "ALLOCATED_PRE_AUCTION" ? "warning" : "neutral"}>
+                {auction.status === "CREATED" ? "Not yet opened" : auction.status}
+              </Badge>
+            </div>
+            <p className="text-sm text-black/60 dark:text-white/60 mb-3">
+              Preview of the player pool — bidding hasn&apos;t started, so nothing here is final yet.
+            </p>
+            <ConfirmedRosterTable
+              players={auction.auctionPlayers.map((ap) => ({
+                id: ap.id,
+                playerName: ap.player.name,
+                photoUrl: ap.player.photoUrl,
+                categoryName: ap.category.name,
+                soldPrice: ap.soldPrice != null ? String(ap.soldPrice) : null,
+                soldVia: ap.soldVia,
+                isCaptain: entry ? ap.id === entry.captainAuctionPlayerId : false,
+              }))}
+            />
+            {entry && !auction.skipPreAuctionDraft && DRAFT_STATUSES.has(entry.status) && (
+              <div className="mt-2">
+                <Link
+                  href={`/manager/teams/${entry.id}/draft`}
+                  className="text-sm underline underline-offset-2"
+                >
+                  {entry.status === "ALLOCATED_PRE_AUCTION" ? "View draft results" : "Submit draft"}
+                </Link>
+              </div>
+            )}
+          </section>
+        );
+      })}
 
-      {team.entries.length === 0 ? (
-        upcomingAuctions.length === 0 && (
+      {liveOrDoneEntries.length === 0 ? (
+        previewAuctions.length === 0 && (
           <p className="text-black/60 dark:text-white/60">
             This team hasn&apos;t participated in an auction yet.
           </p>
         )
       ) : (
-        team.entries.map((entry) => {
+        liveOrDoneEntries.map((entry) => {
           // Advisory only — never affects any action on this page, just
           // shows the team's current composition against any configured cap.
           const categoryCounts: Record<string, number> = {};
@@ -194,14 +221,6 @@ export default async function ManagerTeamDetailPage({
               }))}
             />
             <div className="flex items-center gap-4 mt-2 flex-wrap">
-              {DRAFT_STATUSES.has(entry.status) && (
-                <Link
-                  href={`/manager/teams/${entry.id}/draft`}
-                  className="text-sm underline underline-offset-2"
-                >
-                  {entry.status === "ALLOCATED_PRE_AUCTION" ? "View draft results" : "Submit draft"}
-                </Link>
-              )}
               {LIVE_STATUSES.has(entry.status) && (
                 <Link
                   href={`/manager/teams/${entry.id}/live`}
