@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { auth } from "@/auth";
 import { allLeagueIds } from "@/lib/auth/guards";
-import { listViewableAuctions } from "@/lib/services/auction.service";
+import { listViewableAuctions, listUpcomingAuctionsForViewer } from "@/lib/services/auction.service";
 import { cardInteractive } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
 import { getRulesDocumentIfViewable } from "@/lib/services/tournamentDocument.service";
@@ -10,7 +10,10 @@ export default async function ViewerHomePage() {
   const session = await auth();
   const leagueIds = session?.user ? allLeagueIds(session) : null;
 
-  const auctions = await listViewableAuctions(leagueIds);
+  const [auctions, upcomingAuctions] = await Promise.all([
+    listViewableAuctions(leagueIds),
+    listUpcomingAuctionsForViewer(leagueIds),
+  ]);
 
   // Checked once per distinct tournament (several auctions can share one) so a
   // "Rules" link only shows where this viewer is actually on the roster.
@@ -64,6 +67,30 @@ export default async function ViewerHomePage() {
             </li>
           ))}
         </ul>
+      )}
+
+      {upcomingAuctions.length > 0 && (
+        <div className="mt-8">
+          <h2 className="text-lg font-medium mb-3">Upcoming</h2>
+          <ul className="flex flex-col gap-2">
+            {upcomingAuctions.map((a) => (
+              <li
+                key={a.id}
+                className={`${cardInteractive} flex items-center justify-between px-4 py-3`}
+              >
+                <Link href={`/viewer/auctions/${a.id}/players`} className="flex-1">
+                  <span>
+                    {a.name} &middot;{" "}
+                    <span className="text-black/60 dark:text-white/60">
+                      {a.tournament.name}
+                    </span>
+                  </span>
+                </Link>
+                <Badge variant="neutral">Not yet opened</Badge>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   );

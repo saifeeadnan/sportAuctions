@@ -1109,3 +1109,19 @@ export async function listViewableAuctions(leagueIds: string[] | null) {
     orderBy: { createdAt: "desc" },
   });
 }
+
+/** Auctions a viewer/manager can preview the player pool for before bidding
+ * opens — deliberately separate from listViewableAuctions (which the mobile
+ * app also shares) rather than widening that query's own status filter, so
+ * "watch" and "preview the pool" stay two distinct, independently-evolvable
+ * views. `leagueIds === null` means unrestricted (site Admin). */
+export async function listUpcomingAuctionsForViewer(leagueIds: string[] | null) {
+  return prisma.auction.findMany({
+    where: {
+      status: "CREATED",
+      tournament: leagueIds ? { leagueId: { in: leagueIds } } : undefined,
+    },
+    include: { tournament: true },
+    orderBy: { createdAt: "desc" },
+  });
+}

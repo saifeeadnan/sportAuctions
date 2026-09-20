@@ -48,6 +48,23 @@ export default async function ManagerTeamDetailPage({
     },
   });
   if (!team || team.managerId !== session!.user.id) notFound();
+
+  // A TeamAuctionEntry (team.entries above) is only created once an admin
+  // opens pre-auction/starts bidding — before that, an auction can still
+  // exist (with its full player pool already assigned) in CREATED status,
+  // but this team has no entry to hang a section off of yet. Surfacing the
+  // pool here is the whole point of this query: a manager should be able to
+  // preview who's up for auction before it's opened, not just once it is.
+  const upcomingAuctions = await prisma.auction.findMany({
+    where: { tournamentId: team.tournamentId, status: "CREATED" },
+    include: {
+      auctionPlayers: {
+        include: { player: true, category: true },
+        orderBy: { player: { name: "asc" } },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
   const canRename =
     !team.entries.some((e) => e.auction.status === "COMPLETED") &&
     !isLeagueReadOnly(team.tournament.league);
@@ -102,10 +119,34 @@ export default async function ManagerTeamDetailPage({
         </details>
       </section>
 
+      {upcomingAuctions.map((auction) => (
+        <section key={auction.id}>
+          <div className="flex items-center gap-2 mb-1">
+            <h2 className="text-lg font-medium">{auction.name}</h2>
+            <Badge variant="neutral">Not yet opened</Badge>
+          </div>
+          <p className="text-sm text-black/60 dark:text-white/60 mb-3">
+            Preview of the player pool — bidding hasn&apos;t started, so nothing here is final yet.
+          </p>
+          <ConfirmedRosterTable
+            players={auction.auctionPlayers.map((ap) => ({
+              id: ap.id,
+              playerName: ap.player.name,
+              photoUrl: ap.player.photoUrl,
+              categoryName: ap.category.name,
+              soldPrice: null,
+              soldVia: null,
+            }))}
+          />
+        </section>
+      ))}
+
       {team.entries.length === 0 ? (
-        <p className="text-black/60 dark:text-white/60">
-          This team hasn&apos;t participated in an auction yet.
-        </p>
+        upcomingAuctions.length === 0 && (
+          <p className="text-black/60 dark:text-white/60">
+            This team hasn&apos;t participated in an auction yet.
+          </p>
+        )
       ) : (
         team.entries.map((entry) => {
           // Advisory only — never affects any action on this page, just
