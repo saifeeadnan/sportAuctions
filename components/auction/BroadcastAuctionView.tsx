@@ -111,65 +111,72 @@ export function BroadcastAuctionView({
   const msUntilStart = useCountdown(countingDown ? state.scheduledStartAt : null);
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-white dark:bg-neutral-950 text-black dark:text-white">
-      <SaleAnnouncement sale={lastSale} />
+    // Always dark, regardless of the viewer's OS/browser preference — an
+    // OBS browser source has no theme toggle to respect, and a real
+    // deployment defaulting to light (no stored preference, no dark OS
+    // scheme) is exactly the reported bug. Same "wrap the root in .dark"
+    // technique as app/highlights/[token], which forces dark the same way.
+    <div className="dark">
+      <div className="fixed inset-0 flex flex-col bg-white dark:bg-neutral-950 text-black dark:text-white">
+        <SaleAnnouncement sale={lastSale} />
 
-      <header className="shrink-0 flex items-center justify-between gap-3 px-6 py-3">
-        <div>
-          <p className="text-sm font-medium">{state.name}</p>
-          <p className="text-xs text-black/50 dark:text-white/50">{state.tournamentName}</p>
-        </div>
-        <Badge variant={connected ? "success" : "warning"}>
-          {connected ? "Live" : "Connecting…"}
-        </Badge>
-      </header>
-
-      <main className="flex-1 min-h-0 overflow-hidden flex items-start justify-center px-6 pt-2">
-        {onClock ? (
-          <BroadcastOnClockCard
-            player={onClock}
-            template={state.onClockTemplate}
-            visibleFields={state.onClockVisibleFields}
-            photoWidth={photoSize.width}
-            photoHeight={photoSize.height}
-            totalSeconds={state.lotTimerSeconds}
-          />
-        ) : (
-          <div className="self-stretch w-full h-full flex flex-col items-center gap-3 pb-3">
-            <div className="flex items-center justify-center gap-3 shrink-0">
-              {state.hasLeagueLogo && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={`/api/leagues/${state.leagueId}/logo`}
-                  alt=""
-                  className="h-32 w-32 rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-1 shrink-0"
-                />
-              )}
-              <p className="text-2xl font-semibold text-center">
-                {state.status === "COMPLETED"
-                  ? "Auction complete — thanks for watching"
-                  : msUntilStart != null
-                    ? msUntilStart > 0
-                      ? `Auction starts in ${formatCountdown(msUntilStart)}`
-                      : "Starting soon…"
-                    : `Waiting for the next player… (${playersLeft} left)`}
-              </p>
-            </div>
-            <div ref={tickerBox.ref} className="flex-1 min-h-0 w-full overflow-y-auto">
-              <BroadcastSoldTicker
-                players={state.players}
-                teams={state.teams}
-                availableWidth={tickerBox.size.width}
-                availableHeight={tickerBox.size.height}
-              />
-            </div>
+        <header className="shrink-0 flex items-center justify-between gap-3 px-6 py-3">
+          <div>
+            <p className="text-sm font-medium">{state.name}</p>
+            <p className="text-xs text-black/50 dark:text-white/50">{state.tournamentName}</p>
           </div>
-        )}
-      </main>
+          <Badge variant={connected ? "success" : "warning"}>
+            {connected ? "Live" : "Connecting…"}
+          </Badge>
+        </header>
 
-      <footer className="shrink-0 px-6 pb-3">
-        <SponsorRibbon sponsors={sponsors} />
-      </footer>
+        <main className="flex-1 min-h-0 overflow-hidden flex items-start justify-center px-6 pt-2">
+          {onClock ? (
+            <BroadcastOnClockCard
+              player={onClock}
+              template={state.onClockTemplate}
+              visibleFields={state.onClockVisibleFields}
+              photoWidth={photoSize.width}
+              photoHeight={photoSize.height}
+              totalSeconds={state.lotTimerSeconds}
+            />
+          ) : (
+            <div className="self-stretch w-full h-full flex flex-col items-center gap-3 pb-3">
+              <div className="flex items-center justify-center gap-3 shrink-0">
+                {state.hasLeagueLogo && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={`/api/leagues/${state.leagueId}/logo`}
+                    alt=""
+                    className="h-32 w-32 rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-1 shrink-0"
+                  />
+                )}
+                <p className="text-2xl font-semibold text-center">
+                  {state.status === "COMPLETED"
+                    ? "Auction complete — thanks for watching"
+                    : msUntilStart != null
+                      ? msUntilStart > 0
+                        ? `Auction starts in ${formatCountdown(msUntilStart)}`
+                        : "Starting soon…"
+                      : `Waiting for the next player… (${playersLeft} left)`}
+                </p>
+              </div>
+              <div ref={tickerBox.ref} className="flex-1 min-h-0 w-full overflow-y-auto">
+                <BroadcastSoldTicker
+                  players={state.players}
+                  teams={state.teams}
+                  availableWidth={tickerBox.size.width}
+                  availableHeight={tickerBox.size.height}
+                />
+              </div>
+            </div>
+          )}
+        </main>
+
+        <footer className="shrink-0 px-6 pb-3">
+          <SponsorRibbon sponsors={sponsors} />
+        </footer>
+      </div>
     </div>
   );
 }
