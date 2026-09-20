@@ -14,6 +14,7 @@
     "db:restore": "tsx scripts/restore-database.ts",
     "dev:tunnel": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/dev-tunnel.ps1",
     "test": "vitest run",
+    "test:changed": "vitest run --changed",
     "test:watch": "vitest",
     "test:db:setup": "tsx scripts/setup-test-db.ts",
     "test:typecheck": "tsc --noEmit -p tsconfig.vitest.json"
