@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { AuctionState } from "@/lib/services/auctionState.service";
 import type { SponsorTier } from "@/lib/sponsorTiers";
 import { formatCountdown } from "@/lib/countdown";
@@ -40,6 +40,33 @@ function usePhotoSize() {
   return size;
 }
 
+/** Tracks the actual rendered size of the element `ref` is attached to —
+ * the real available box for the team-roster grid (whatever's left after
+ * the header/waiting-message/footer/sponsor-ribbon around it), not a guess
+ * at the OBS canvas size. A fixed-size guess is exactly what let 12 teams
+ * overflow into a vertical scrollbar before: the sponsor ribbon's actual
+ * height varies (zero sponsors vs several), so only measuring what's
+ * genuinely left over is reliable. */
+function useElementSize<T extends HTMLElement>() {
+  const ref = useRef<T | null>(null);
+  const [size, setSize] = useState({ width: 0, height: 0 });
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => {
+      const box = entry.contentBoxSize?.[0];
+      setSize(
+        box
+          ? { width: box.inlineSize, height: box.blockSize }
+          : { width: entry.contentRect.width, height: entry.contentRect.height }
+      );
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  return { ref, size };
+}
+
 /** Milliseconds remaining until `targetIso`, ticking once a second —
  * `targetIso: null` means "no countdown active" and the hook just returns
  * null without starting a timer. */
@@ -74,6 +101,7 @@ export function BroadcastAuctionView({
   const { state, connected, lastSale } = useAuctionSocket(initialState.id, initialState, { public: true });
   const onClock = state.players.find((p) => p.status === "IN_BIDDING");
   const photoSize = usePhotoSize();
+  const tickerBox = useElementSize<HTMLDivElement>();
   const playersLeft = state.players.filter(
     (p) => p.status === "AVAILABLE" || p.status === "IN_PRE_AUCTION_POOL" || p.status === "UNSOLD"
   ).length;
@@ -107,7 +135,7 @@ export function BroadcastAuctionView({
             totalSeconds={state.lotTimerSeconds}
           />
         ) : (
-          <div className="self-stretch w-full max-w-4xl h-full flex flex-col items-center gap-3 pb-3">
+          <div className="self-stretch w-full h-full flex flex-col items-center gap-3 pb-3">
             <div className="flex items-center justify-center gap-3 shrink-0">
               {state.hasLeagueLogo && (
                 // eslint-disable-next-line @next/next/no-img-element
@@ -127,8 +155,13 @@ export function BroadcastAuctionView({
                     : `Waiting for the next player… (${playersLeft} left)`}
               </p>
             </div>
-            <div className="flex-1 min-h-0 w-full overflow-y-auto">
-              <BroadcastSoldTicker players={state.players} teams={state.teams} />
+            <div ref={tickerBox.ref} className="flex-1 min-h-0 w-full overflow-y-auto">
+              <BroadcastSoldTicker
+                players={state.players}
+                teams={state.teams}
+                availableWidth={tickerBox.size.width}
+                availableHeight={tickerBox.size.height}
+              />
             </div>
           </div>
         )}
