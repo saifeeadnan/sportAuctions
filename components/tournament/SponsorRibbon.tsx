@@ -135,7 +135,7 @@ export function SponsorRibbon({
   return (
     <div className={showTopBorder ? "mt-4 pt-4 border-t border-black/[0.08] dark:border-white/10" : ""}>
       <p className="text-xs text-black/50 dark:text-white/50 mb-2">Sponsors</p>
-      <div className="flex flex-nowrap items-center gap-4 overflow-x-auto pb-2">
+      <div className="flex flex-nowrap items-center justify-center gap-4 overflow-x-auto pb-2">
         {orderedSponsors.map((sponsor, i) => {
           const isFeatured = i === rotationSequence[featuredStep];
           const logo = (
