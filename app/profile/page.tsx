@@ -70,10 +70,10 @@ export default async function ProfilePage({
           <img
             src={photoSrc}
             alt={session.user.name ?? ""}
-            className="h-14 w-14 rounded-full object-cover bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 shrink-0"
+            className="h-[84px] w-[84px] rounded-full object-cover bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 shrink-0"
           />
         ) : (
-          <div className="h-14 w-14 rounded-full bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/10 flex items-center justify-center text-lg font-medium text-black/40 dark:text-white/40 shrink-0">
+          <div className="h-[84px] w-[84px] rounded-full bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/10 flex items-center justify-center text-lg font-medium text-black/40 dark:text-white/40 shrink-0">
             {(session.user.name ?? "?").charAt(0).toUpperCase()}
           </div>
         )}
@@ -95,7 +95,7 @@ export default async function ProfilePage({
                 <img
                   src={photoSrc}
                   alt={session.user.name ?? ""}
-                  className="h-16 w-16 rounded-full object-cover bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-1"
+                  className="h-24 w-24 rounded-full object-cover bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-1"
                 />
               </div>
               <RemoveProfilePhotoButton
