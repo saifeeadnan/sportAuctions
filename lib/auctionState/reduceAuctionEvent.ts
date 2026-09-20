@@ -20,6 +20,7 @@ export type AuctionState = {
   onClockTemplate: OnClockTemplate;
   onClockVisibleFields: OnClockFieldKey[];
   lotTimerSeconds: number | null;
+  scheduledStartAt: string | null;
   players: AuctionStatePlayer[];
   teams: AuctionStateTeam[];
   categoryMaxPerTeam: Record<string, number | null>;

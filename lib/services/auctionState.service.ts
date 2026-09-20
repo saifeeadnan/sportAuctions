@@ -52,6 +52,9 @@ export type AuctionState = {
   onClockTemplate: OnClockTemplate;
   onClockVisibleFields: OnClockFieldKey[];
   lotTimerSeconds: number | null;
+  // Purely advisory target time for the OBS broadcast countdown — never
+  // enforced. Null = no countdown configured.
+  scheduledStartAt: string | null;
   players: AuctionStatePlayer[];
   teams: AuctionStateTeam[];
   /** Advisory only — never enforced. Keyed by category name (safe: unique
@@ -96,6 +99,7 @@ export async function getAuctionState(auctionId: string): Promise<AuctionState |
     onClockTemplate: auction.onClockTemplate,
     onClockVisibleFields: auction.onClockVisibleFields as OnClockFieldKey[],
     lotTimerSeconds: auction.lotTimerSeconds,
+    scheduledStartAt: auction.scheduledStartAt?.toISOString() ?? null,
     players: auction.auctionPlayers.map((ap) => ({
       id: ap.id,
       name: ap.player.name,

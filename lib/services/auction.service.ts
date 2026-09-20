@@ -1030,6 +1030,42 @@ export async function updateOnClockDisplaySettings(
   });
 }
 
+/** Purely advisory — powers the OBS broadcast countdown, never enforced
+ * anywhere (bidding only actually starts via startBidding/startBiddingDirect
+ * regardless of this value). `scheduledStartAt: null` clears it. Editable
+ * any time up until the auction concludes — mirrors the admin page's own
+ * "Settings" section, which is already hidden once COMPLETED. */
+export async function updateScheduledStartAt(
+  auctionId: string,
+  scheduledStartAt: Date | null,
+  actorUserId: string
+) {
+  if (scheduledStartAt != null && Number.isNaN(scheduledStartAt.getTime())) {
+    throw new ValidationError("Invalid date");
+  }
+  await assertAuctionLeagueNotReadOnly(auctionId);
+
+  const auction = await prisma.auction.findUnique({ where: { id: auctionId } });
+  if (!auction) throw new ValidationError("Auction not found");
+  if (auction.status === "COMPLETED") {
+    throw new ValidationError("Cannot change the scheduled start time — the auction has concluded.");
+  }
+
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.auction.update({ where: { id: auctionId }, data: { scheduledStartAt } });
+    await writeAuditLog(tx, {
+      entityType: "Auction",
+      entityId: auctionId,
+      auctionId,
+      action: "SCHEDULED_START_CHANGED",
+      actorUserId,
+      before: { scheduledStartAt: auction.scheduledStartAt?.toISOString() ?? null },
+      after: { scheduledStartAt: scheduledStartAt?.toISOString() ?? null },
+    });
+    return updated;
+  });
+}
+
 export async function deleteAuction(auctionId: string, actorUserId: string) {
   const auction = await prisma.auction.findUnique({ where: { id: auctionId } });
   if (!auction) throw new ValidationError("Auction not found");

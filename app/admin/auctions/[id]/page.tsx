@@ -15,6 +15,8 @@ import { EditCategoryMaxPerTeamForm } from "@/components/admin/EditCategoryMaxPe
 import { EditAuctionBudgetForm } from "@/components/admin/EditAuctionBudgetForm";
 import { EditAuctionSquadSizeForm } from "@/components/admin/EditAuctionSquadSizeForm";
 import { EditOnClockDisplayForm } from "@/components/admin/EditOnClockDisplayForm";
+import { EditScheduledStartAtForm } from "@/components/admin/EditScheduledStartAtForm";
+import { toZonedDateTimeInputValue, formatDateTime, DEADLINE_TIME_ZONE } from "@/lib/dates";
 import { HighlightsLinkPanel } from "@/components/admin/HighlightsLinkPanel";
 import type { OnClockFieldKey } from "@/lib/onClockDisplay";
 import { SponsorRibbon } from "@/components/tournament/SponsorRibbon";
@@ -123,6 +125,12 @@ export default async function AuctionDetailPage({
         <p className="text-sm text-black/60 dark:text-white/60">
           {auction.tournament.name} &middot; {AUCTION_TYPE_LABELS[auction.auctionType]} &middot;
           status: {auction.status} &middot; team budget: {String(auction.teamBudget)}
+          {auction.scheduledStartAt && (
+            <>
+              {" "}
+              &middot; scheduled start: {formatDateTime(auction.scheduledStartAt)}
+            </>
+          )}
         </p>
         <p className="text-sm text-black/60 dark:text-white/60">
           Player pool ({auction.auctionPlayers.length}):{" "}
@@ -228,6 +236,26 @@ export default async function AuctionDetailPage({
         <section>
           <h2 className="text-lg font-medium mb-3">Settings</h2>
           <div className={`${card} divide-y divide-black/5 dark:divide-white/5`}>
+            <details>
+              <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
+                Scheduled start time
+              </summary>
+              <div className="px-4 pb-4">
+                <p className="text-sm text-black/60 dark:text-white/60 mb-3">
+                  Shows a countdown on the OBS broadcast page until this time — purely
+                  informational, doesn&apos;t actually start bidding on its own.
+                </p>
+                <EditScheduledStartAtForm
+                  auctionId={auction.id}
+                  initialValue={
+                    auction.scheduledStartAt
+                      ? toZonedDateTimeInputValue(auction.scheduledStartAt, DEADLINE_TIME_ZONE)
+                      : ""
+                  }
+                />
+              </div>
+            </details>
+
             <details>
               <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
                 On-the-clock display

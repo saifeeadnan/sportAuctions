@@ -7,6 +7,7 @@ import { loadScopedTournament, loadScopedAuction } from "@/lib/auth/scope";
 import { ValidationError } from "@/lib/errors";
 import { prisma } from "@/lib/prisma";
 import { toActionResult, type ActionResult } from "@/lib/actions/result";
+import { fromZonedDateTimeInputValue, DEADLINE_TIME_ZONE } from "@/lib/dates";
 import {
   createAuction,
   openPreAuction,
@@ -21,6 +22,7 @@ import {
   updateAuctionPlayerCategory,
   updateAuctionTeamSettings,
   updateOnClockDisplaySettings,
+  updateScheduledStartAt,
   type CreateAuctionInput,
 } from "@/lib/services/auction.service";
 import { submitDraft, removeDraftPick } from "@/lib/services/preAuctionDraft.service";
@@ -188,6 +190,26 @@ export async function updateOnClockDisplaySettingsAction(
     await updateOnClockDisplaySettings(auctionId, input, session.user.id);
     revalidatePath(`/admin/auctions/${auctionId}`);
     revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
+  });
+}
+
+export async function updateScheduledStartAtAction(
+  auctionId: string,
+  /** A "YYYY-MM-DDTHH:mm" string from the datetime-local input, meant as
+   * Eastern wall-clock time (see components/admin/EditScheduledStartAtForm.tsx)
+   * — converted here to the real UTC instant it represents. Null clears it. */
+  scheduledStartAt: string | null
+): Promise<ActionResult> {
+  return toActionResult(async () => {
+    const { session, leagueIds } = await requireAdminOrLeagueAdmin();
+    await loadScopedAuction(auctionId, leagueIds);
+    await updateScheduledStartAt(
+      auctionId,
+      scheduledStartAt ? fromZonedDateTimeInputValue(scheduledStartAt, DEADLINE_TIME_ZONE) : null,
+      session.user.id
+    );
+    revalidatePath(`/admin/auctions/${auctionId}`);
+    revalidatePath(`/auctioneer/auctions/${auctionId}/broadcast`);
   });
 }
 

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import type { AuctionState } from "@/lib/services/auctionState.service";
 import type { SponsorTier } from "@/lib/sponsorTiers";
+import { formatCountdown } from "@/lib/countdown";
 import { useAuctionSocket } from "@/hooks/useAuctionSocket";
 import { BroadcastOnClockCard } from "@/components/auction/BroadcastOnClockCard";
 import { SaleAnnouncement } from "@/components/auction/SaleAnnouncement";
@@ -39,6 +40,19 @@ function usePhotoSize() {
   return size;
 }
 
+/** Milliseconds remaining until `targetIso`, ticking once a second —
+ * `targetIso: null` means "no countdown active" and the hook just returns
+ * null without starting a timer. */
+function useCountdown(targetIso: string | null): number | null {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!targetIso) return;
+    const interval = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [targetIso]);
+  return targetIso ? new Date(targetIso).getTime() - now : null;
+}
+
 /**
  * The OBS-friendly broadcast canvas: the on-clock player (in the auction's
  * own configured on-clock template), live bid, countdown, and sponsors — and
@@ -63,6 +77,10 @@ export function BroadcastAuctionView({
   const playersLeft = state.players.filter(
     (p) => p.status === "AVAILABLE" || p.status === "IN_PRE_AUCTION_POOL" || p.status === "UNSOLD"
   ).length;
+  // Only meaningful before bidding actually starts — once it does, the
+  // scheduled time has served its purpose regardless of whether it's set.
+  const countingDown = state.status !== "BIDDING" && state.status !== "COMPLETED";
+  const msUntilStart = useCountdown(countingDown ? state.scheduledStartAt : null);
 
   return (
     <div className="fixed inset-0 flex flex-col bg-white dark:bg-neutral-950 text-black dark:text-white">
@@ -102,7 +120,11 @@ export function BroadcastAuctionView({
               <p className="text-2xl font-semibold text-center">
                 {state.status === "COMPLETED"
                   ? "Auction complete — thanks for watching"
-                  : `Waiting for the next player… (${playersLeft} left)`}
+                  : msUntilStart != null
+                    ? msUntilStart > 0
+                      ? `Auction starts in ${formatCountdown(msUntilStart)}`
+                      : "Starting soon…"
+                    : `Waiting for the next player… (${playersLeft} left)`}
               </p>
             </div>
             <div className="flex-1 min-h-0 w-full overflow-y-auto">

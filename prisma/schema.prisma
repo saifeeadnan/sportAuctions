@@ -436,6 +436,12 @@ model Auction {
   createdAt    DateTime      @default(now())
   startedAt    DateTime?
   completedAt  DateTime?
+  // Admin/League-Admin-set target time for the OBS broadcast countdown —
+  // purely advisory, never enforced (bidding still only actually starts via
+  // startBidding/startBiddingDirect). Null = no countdown shown. Editable
+  // any time via updateScheduledStartAt, not write-once, same posture as
+  // fantasyLockDate.
+  scheduledStartAt DateTime?
   // When true, this auction skips the pre-auction draft phase entirely —
   // startBiddingDirect takes it straight from CREATED to BIDDING.
   skipPreAuctionDraft  Boolean         @default(false)
