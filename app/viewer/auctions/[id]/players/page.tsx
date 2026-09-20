@@ -22,7 +22,7 @@ export default async function UpcomingAuctionPlayersPage({
 
   const auctionPlayers = await prisma.auctionPlayer.findMany({
     where: { auctionId: id },
-    include: { player: true, category: true },
+    include: { player: true, category: true, soldToEntry: { include: { team: true } } },
     orderBy: { player: { name: "asc" } },
   });
 
@@ -42,6 +42,7 @@ export default async function UpcomingAuctionPlayersPage({
           playerName: ap.player.name,
           photoUrl: ap.player.photoUrl,
           categoryName: ap.category.name,
+          assignedTeamName: ap.soldToEntry?.team.name ?? null,
         }))}
       />
     </div>

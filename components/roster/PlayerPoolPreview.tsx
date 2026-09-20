@@ -2,12 +2,16 @@
 
 import { useState } from "react";
 import { card, tabsTrack, tabItem } from "@/lib/ui";
+import { Badge } from "@/components/ui/Badge";
 
 export type PlayerPoolPlayer = {
   id: string;
   playerName: string;
   photoUrl?: string | null;
   categoryName: string;
+  /** Team this player has already been assigned to (e.g. via a resolved
+   * pre-auction draft pick), if any — null while still unassigned. */
+  assignedTeamName?: string | null;
 };
 
 /** Read-only preview of an auction's player pool, grouped into one tab per
@@ -45,6 +49,7 @@ export function PlayerPoolPreview({ players }: { players: PlayerPoolPlayer[] }) 
             <tr className="text-left border-b border-black/10 dark:border-white/10">
               <th className="py-2 pl-4 pr-2 w-10">#</th>
               <th className="py-2 pr-4">Player</th>
+              <th className="py-2 pr-4">Team</th>
             </tr>
           </thead>
           <tbody>
@@ -65,6 +70,13 @@ export function PlayerPoolPreview({ players }: { players: PlayerPoolPlayer[] }) 
                     )}
                     {p.playerName}
                   </div>
+                </td>
+                <td className="py-2 pr-4">
+                  {p.assignedTeamName ? (
+                    <Badge variant="info">{p.assignedTeamName}</Badge>
+                  ) : (
+                    <span className="text-black/40 dark:text-white/40">—</span>
+                  )}
                 </td>
               </tr>
             ))}

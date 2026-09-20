@@ -65,7 +65,7 @@ export default async function ManagerTeamDetailPage({
     where: { tournamentId: team.tournamentId, status: { notIn: ["BIDDING", "COMPLETED"] } },
     include: {
       auctionPlayers: {
-        include: { player: true, category: true },
+        include: { player: true, category: true, soldToEntry: { include: { team: true } } },
         orderBy: { player: { name: "asc" } },
       },
     },
@@ -88,8 +88,7 @@ export default async function ManagerTeamDetailPage({
             <img
               src={`/api/teams/${team.id}/sponsor-image`}
               alt={`${team.name} sponsor`}
-              // 20% larger than the standard h-10/w-10 (40px) used elsewhere.
-              className="h-12 w-12 rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-1 shrink-0"
+              className="h-32 w-32 rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-1 shrink-0"
             />
           )}
           <h1 className="text-xl font-semibold">{team.name}</h1>
@@ -99,36 +98,15 @@ export default async function ManagerTeamDetailPage({
       </div>
 
       <section>
-        <h2 className="text-lg font-medium mb-3">Sponsor picture</h2>
-        <div className={card}>
-          <div className="px-4 py-3 flex items-center justify-between gap-4 flex-wrap">
-            {team.sponsorImage ? (
-              <>
-                <div className="flex items-center gap-3">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={`/api/teams/${team.id}/sponsor-image`}
-                    alt={`${team.name} sponsor`}
-                    className="h-32 w-32 rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-1"
-                  />
-                </div>
-                <DeleteTeamSponsorImageButton teamId={team.id} />
-              </>
-            ) : (
-              <p className="text-sm text-black/60 dark:text-white/60">
-                No sponsor picture uploaded yet.
-              </p>
-            )}
+        <details className={card}>
+          <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
+            Sponsor logo
+          </summary>
+          <div className="px-4 pb-4 flex flex-col gap-3 border-t border-black/[0.08] dark:border-white/10 pt-4">
+            {team.sponsorImage && <DeleteTeamSponsorImageButton teamId={team.id} />}
+            <UploadTeamSponsorImageForm teamId={team.id} />
           </div>
-          <details className="border-t border-black/[0.08] dark:border-white/10">
-            <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
-              {team.sponsorImage ? "Replace sponsor picture" : "Upload sponsor picture"}
-            </summary>
-            <div className="px-4 pb-4">
-              <UploadTeamSponsorImageForm teamId={team.id} />
-            </div>
-          </details>
-        </div>
+        </details>
       </section>
 
       {previewAuctions.map((auction) => {
@@ -150,6 +128,7 @@ export default async function ManagerTeamDetailPage({
                 playerName: ap.player.name,
                 photoUrl: ap.player.photoUrl,
                 categoryName: ap.category.name,
+                assignedTeamName: ap.soldToEntry?.team.name ?? null,
               }))}
             />
             {entry && !auction.skipPreAuctionDraft && DRAFT_STATUSES.has(entry.status) && (
