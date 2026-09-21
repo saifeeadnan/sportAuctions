@@ -174,7 +174,10 @@ export function BroadcastAuctionView({
         </main>
 
         <footer className="shrink-0 px-6 pb-3">
-          <SponsorRibbon sponsors={sponsors} />
+          {/* zoom, unlike transform: scale, shrinks the layout box too, so the freed height goes back to the team grid. */}
+          <div style={{ zoom: 0.8 }}>
+            <SponsorRibbon sponsors={sponsors} />
+          </div>
         </footer>
       </div>
     </div>
