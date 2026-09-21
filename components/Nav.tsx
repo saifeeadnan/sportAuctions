@@ -18,16 +18,17 @@ export async function Nav() {
   // single-role user sees nothing extra here.
   const sections = session?.user ? accessibleSections(session) : [];
   // session.user.name/photo come from the JWT (set once at login), so a
-  // profile-photo change wouldn't show up here until next login without
-  // this live lookup — same reasoning app/profile/page.tsx already re-reads
-  // email/phone from Prisma instead of trusting the session for those.
+  // profile-photo or name change wouldn't show up here until next login
+  // without this live lookup — same reasoning app/profile/page.tsx already
+  // re-reads email/phone from Prisma instead of trusting the session for those.
   const photo = session?.user
     ? await prisma.user.findUnique({
         where: { id: session.user.id },
-        select: { photoUrl: true, photoMimeType: true },
+        select: { name: true, photoUrl: true, photoMimeType: true },
       })
     : null;
   const photoSrc = photo?.photoUrl ?? (photo?.photoMimeType ? `/api/users/${session!.user.id}/photo` : null);
+  const displayName = photo?.name ?? session?.user?.name ?? "";
 
   return (
     <NavVisibility>
@@ -74,10 +75,10 @@ export async function Nav() {
                     />
                   ) : (
                     <span className="h-6 w-6 rounded-full bg-black/10 dark:bg-white/15 flex items-center justify-center text-[10px] font-medium shrink-0">
-                      {(session.user.name ?? "?").charAt(0).toUpperCase()}
+                      {(displayName || "?").charAt(0).toUpperCase()}
                     </span>
                   )}
-                  <span className="hidden sm:inline truncate max-w-[10rem]">{session.user.name}</span>
+                  <span className="hidden sm:inline truncate max-w-[10rem]">{displayName}</span>
                 </Link>
                 <form action={logoutAction}>
                   <button type="submit" className={`${buttonSecondary} px-3 py-1.5 text-xs`}>

@@ -11,6 +11,7 @@ import { RemoveProfilePhotoButton } from "@/components/RemoveProfilePhotoButton"
 import { ActionResultForm } from "@/components/ui/ActionResultForm";
 import { card, buttonPrimary, inputClass } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
+import { splitName } from "@/lib/personName";
 
 const ERROR_MESSAGES: Record<string, string> = {
   "missing-fields": "All fields are required.",
@@ -21,6 +22,8 @@ const ERROR_MESSAGES: Record<string, string> = {
 };
 
 const PROFILE_ERROR_MESSAGES: Record<string, string> = {
+  "name-required": "First name is required.",
+  "name-too-long": "First and last name must each be 60 characters or fewer.",
   "email-taken": "That email is already in use by another account.",
   "phone-taken": "That phone number is already in use by another account.",
   system: "Something went wrong — please try again in a moment.",
@@ -47,7 +50,7 @@ export default async function ProfilePage({
   const [account, memberships, myPlayers] = await Promise.all([
     prisma.user.findUniqueOrThrow({
       where: { id: session.user.id },
-      select: { email: true, phone: true, photoUrl: true, photoMimeType: true },
+      select: { name: true, email: true, phone: true, photoUrl: true, photoMimeType: true },
     }),
     session.user.isSiteAdmin
       ? Promise.resolve([])
@@ -59,30 +62,21 @@ export default async function ProfilePage({
     listMyPlayerRows(session.user.id),
   ]);
   const hasProfilePhoto = !!(account.photoUrl || account.photoMimeType);
+  // session.user.name is baked into the JWT at login, so a just-saved name
+  // change would keep showing the old one here until the next login — same
+  // reason email/phone/photo are re-read from Prisma above.
+  const displayName = account.name;
+  const { firstName, lastName } = splitName(account.name);
 
   const photoSrc = account.photoUrl ?? (account.photoMimeType ? `/api/users/${session.user.id}/photo` : null);
 
   return (
     <div className="mx-auto max-w-sm px-4 py-16 flex flex-col gap-6">
-      <div className="flex items-center gap-3">
-        {photoSrc ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={photoSrc}
-            alt={session.user.name ?? ""}
-            className="h-[84px] w-[84px] rounded-full object-cover bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 shrink-0"
-          />
-        ) : (
-          <div className="h-[84px] w-[84px] rounded-full bg-black/5 dark:bg-white/10 border border-black/10 dark:border-white/10 flex items-center justify-center text-lg font-medium text-black/40 dark:text-white/40 shrink-0">
-            {(session.user.name ?? "?").charAt(0).toUpperCase()}
-          </div>
-        )}
-        <div>
-          <h2 className="text-lg font-medium mb-1">Profile</h2>
-          <p className="text-sm text-black/60 dark:text-white/60">
-            {session.user.name} &middot; {roleSummary}
-          </p>
-        </div>
+      <div>
+        <h2 className="text-lg font-medium mb-1">Profile</h2>
+        <p className="text-sm text-black/60 dark:text-white/60">
+          {displayName} &middot; {roleSummary}
+        </p>
       </div>
 
       <section>
@@ -94,7 +88,7 @@ export default async function ProfilePage({
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={photoSrc}
-                  alt={session.user.name ?? ""}
+                  alt={displayName}
                   className="h-24 w-24 rounded-full object-cover bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-1"
                 />
               </div>
@@ -230,10 +224,33 @@ export default async function ProfilePage({
             )}
             {profileSuccess && (
               <p className="mb-4 text-sm text-emerald-600 dark:text-emerald-400">
-                Contact info updated.
+                Profile updated.
               </p>
             )}
             <form action={updateProfileAction} className="flex flex-col gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <label className="flex flex-col gap-1 text-sm">
+                  First name
+                  <input
+                    name="firstName"
+                    type="text"
+                    required
+                    maxLength={60}
+                    defaultValue={firstName}
+                    className={inputClass}
+                  />
+                </label>
+                <label className="flex flex-col gap-1 text-sm">
+                  Last name (optional)
+                  <input
+                    name="lastName"
+                    type="text"
+                    maxLength={60}
+                    defaultValue={lastName}
+                    className={inputClass}
+                  />
+                </label>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <label className="flex flex-col gap-1 text-sm">
                   Email (optional)

@@ -39,9 +39,13 @@ export default async function Home() {
     redirect("/auctioneer");
   }
 
+  // The JWT's name is fixed at login, so re-read it — a just-edited profile
+  // name would otherwise keep greeting the old one until the next sign-in.
+  const account = await prisma.user.findUnique({ where: { id: session.user.id }, select: { name: true } });
+
   return (
     <div className="mx-auto max-w-3xl px-4 py-16">
-      <h1 className="text-2xl font-semibold">Welcome, {session.user.name}</h1>
+      <h1 className="text-2xl font-semibold">Welcome, {account?.name ?? session.user.name}</h1>
     </div>
   );
 }

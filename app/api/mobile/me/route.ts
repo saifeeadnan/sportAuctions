@@ -11,14 +11,16 @@ export async function GET() {
     const [account, leagueNames] = await Promise.all([
       prisma.user.findUniqueOrThrow({
         where: { id: session.user.id },
-        select: { email: true, phone: true },
+        select: { name: true, email: true, phone: true },
       }),
       leagueNamesByIds(session.user.memberships.map((m) => m.leagueId)),
     ]);
 
     return NextResponse.json({
       id: session.user.id,
-      name: session.user.name,
+      // The bearer token embeds the name at login, so read it live instead —
+      // a name changed on the web would otherwise never reach the app.
+      name: account.name,
       isSiteAdmin: session.user.isSiteAdmin,
       email: account.email,
       phone: account.phone,

@@ -4,6 +4,7 @@ import type { $Enums } from "@/app/generated/prisma/client";
 import { ValidationError } from "@/lib/errors";
 import { assertLeagueNotReadOnly } from "@/lib/services/league.service";
 import { writeAuditLog } from "@/lib/services/auditLog.service";
+import { joinName } from "@/lib/personName";
 
 /** Finds an existing person by loginId, email, or phone — for the
  * admin-assisted "add an existing person to this league" flow. Exact match
@@ -243,14 +244,26 @@ export async function changePasswordWithMessage(userId: string, currentPassword:
   });
 }
 
-/** Self-service email/phone update, from the profile page. Both optional,
- * unique-when-provided — rejects saving a value already claimed by a
- * different account rather than silently overwriting the dedupe key. Throws
- * short ValidationError codes; see updateUserProfileWithMessage below for
- * the mobile client's human-readable equivalent. */
-export async function updateUserProfile(userId: string, input: { email: string; phone: string }) {
+/** Self-service name/email/phone update, from the profile page. Email and
+ * phone are optional, unique-when-provided — rejects saving a value already
+ * claimed by a different account rather than silently overwriting the dedupe
+ * key. `firstName`/`lastName` are opt-in: omit `firstName` to leave the name
+ * untouched (the mobile client and admin paths never send one). Throws short
+ * ValidationError codes; see updateUserProfileWithMessage below for the
+ * mobile client's human-readable equivalent. */
+export async function updateUserProfile(
+  userId: string,
+  input: { email: string; phone: string; firstName?: string; lastName?: string }
+) {
   const email = input.email.trim().toLowerCase();
   const phone = input.phone.trim();
+
+  let newName: string | null = null;
+  if (input.firstName !== undefined) {
+    const joined = joinName(input.firstName, input.lastName ?? "");
+    if ("error" in joined) throw new ValidationError(joined.error);
+    newName = joined.name;
+  }
 
   if (email) {
     const existing = await prisma.user.findFirst({
@@ -265,18 +278,24 @@ export async function updateUserProfile(userId: string, input: { email: string; 
 
   const before = await prisma.user.findUniqueOrThrow({
     where: { id: userId },
-    select: { email: true, phone: true },
+    select: { name: true, email: true, phone: true },
   });
+  // Re-saving an untouched form recombines to the same name — only record a
+  // name change (and touch the column) when it actually differs.
+  const nameChanged = newName !== null && newName !== before.name;
 
   await prisma.$transaction(async (tx) => {
-    await tx.user.update({ where: { id: userId }, data: { email: email || null, phone: phone || null } });
+    await tx.user.update({
+      where: { id: userId },
+      data: { email: email || null, phone: phone || null, ...(nameChanged ? { name: newName! } : {}) },
+    });
     await writeAuditLog(tx, {
       entityType: "User",
       entityId: userId,
       action: "PROFILE_UPDATED_SELF",
       actorUserId: userId,
-      before: { email: before.email, phone: before.phone },
-      after: { email: email || null, phone: phone || null },
+      before: { email: before.email, phone: before.phone, ...(nameChanged ? { name: before.name } : {}) },
+      after: { email: email || null, phone: phone || null, ...(nameChanged ? { name: newName } : {}) },
     });
   });
 }

@@ -197,9 +197,11 @@ export async function updateProfileAction(formData: FormData) {
   const session = await requireSession();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const phone = String(formData.get("phone") ?? "").trim();
+  const firstName = String(formData.get("firstName") ?? "");
+  const lastName = String(formData.get("lastName") ?? "");
 
   try {
-    await updateUserProfile(session.user.id, { email, phone });
+    await updateUserProfile(session.user.id, { email, phone, firstName, lastName });
   } catch (error) {
     const code = error instanceof ValidationError ? error.message : "system";
     redirect(`/profile?profileError=${code}`);
