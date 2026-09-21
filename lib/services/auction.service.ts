@@ -221,6 +221,97 @@ export async function createAuction(input: CreateAuctionInput) {
 }
 
 /**
+ * Copies an auction into a fresh CREATED auction in the same tournament:
+ * every setting, its categories, and its player pool (each player in the
+ * category the source currently has them in) — and nothing that belongs to
+ * one particular run: every player starts AVAILABLE with no team, price,
+ * bids or draft picks, and there are no scheduled/fantasy-lock dates (a
+ * copied date would just be stale), share token or status/timestamps.
+ * Teams need no copying: they belong to the tournament, and each auction's
+ * per-team entries are generated from them when it opens
+ * (planTeamAuctionEntries), so the clone picks up the same teams then.
+ */
+export async function cloneAuction(sourceAuctionId: string, name: string, actorUserId: string) {
+  if (!name.trim()) throw new ValidationError("Auction name is required");
+
+  const source = await prisma.auction.findUnique({
+    where: { id: sourceAuctionId },
+    include: {
+      categories: true,
+      auctionPlayers: { select: { playerId: true, categoryId: true } },
+      tournament: { include: { league: true } },
+    },
+  });
+  if (!source) throw new ValidationError("Auction not found");
+  assertLeagueNotReadOnly(source.tournament.league);
+
+  return prisma.$transaction(async (tx) => {
+    const clone = await tx.auction.create({
+      data: {
+        tournamentId: source.tournamentId,
+        name: name.trim(),
+        teamBudget: source.teamBudget,
+        auctionType: source.auctionType,
+        createdById: actorUserId,
+        skipPreAuctionDraft: source.skipPreAuctionDraft,
+        onClockTemplate: source.onClockTemplate,
+        onClockVisibleFields: source.onClockVisibleFields,
+        lotTimerSeconds: source.lotTimerSeconds,
+        reAuctionEnabled: source.reAuctionEnabled,
+        reAuctionDiscountPercent: source.reAuctionDiscountPercent,
+        fantasyPricingModel: source.fantasyPricingModel,
+        fantasySelfPickRequired: source.fantasySelfPickRequired,
+        fantasyMaxTeamsPerUser: source.fantasyMaxTeamsPerUser,
+        fantasyManagersAllowed: source.fantasyManagersAllowed,
+      },
+    });
+
+    // Created one by one (not createMany) to learn each new category's id —
+    // the pool below has to point at the clone's own categories, never the
+    // source's.
+    const cloneCategoryIdBySourceId = new Map<string, string>();
+    for (const c of source.categories) {
+      const created = await tx.auctionCategory.create({
+        data: {
+          auctionId: clone.id,
+          name: c.name,
+          basePrice: c.basePrice,
+          preAuctionEligible: c.preAuctionEligible,
+          bidIncrement: c.bidIncrement,
+          maxPerTeam: c.maxPerTeam,
+        },
+      });
+      cloneCategoryIdBySourceId.set(c.id, created.id);
+    }
+
+    await tx.auctionPlayer.createMany({
+      data: source.auctionPlayers.map((ap) => ({
+        auctionId: clone.id,
+        playerId: ap.playerId,
+        categoryId: cloneCategoryIdBySourceId.get(ap.categoryId)!,
+      })),
+    });
+
+    await writeAuditLog(tx, {
+      entityType: "Auction",
+      entityId: clone.id,
+      auctionId: clone.id,
+      action: "AUCTION_CLONED",
+      actorUserId,
+      after: {
+        name: clone.name,
+        clonedFromAuctionId: source.id,
+        clonedFromName: source.name,
+        categoryCount: source.categories.length,
+        playerCount: source.auctionPlayers.length,
+      },
+    });
+
+    return clone;
+  });
+}
+
+/**
  * Adds a roster player into an already-created auction's pool — the only way
  * a player joins an auction otherwise is the fixed set chosen at
  * createAuction time, so a player added to the roster afterward (or left out

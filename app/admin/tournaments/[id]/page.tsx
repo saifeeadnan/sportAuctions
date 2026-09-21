@@ -6,6 +6,7 @@ import { isLeagueReadOnly } from "@/lib/services/league.service";
 import { getRulesDocumentMeta } from "@/lib/services/tournamentDocument.service";
 import { listTournamentSponsors, listKnownSponsors } from "@/lib/services/tournamentSponsor.service";
 import { DeleteAuctionButton } from "@/components/admin/DeleteAuctionButton";
+import { CloneAuctionButton } from "@/components/admin/CloneAuctionButton";
 import { UploadRulesDocumentForm } from "@/components/admin/UploadRulesDocumentForm";
 import { DeleteRulesDocumentButton } from "@/components/admin/DeleteRulesDocumentButton";
 import { AddTeamForm } from "@/components/admin/AddTeamForm";
@@ -299,7 +300,10 @@ export default async function TournamentDetailPage({
                     <Badge variant={AUCTION_STATUS_VARIANT[a.status] ?? "neutral"}>{a.status}</Badge>
                   </span>
                 </Link>
-                <DeleteAuctionButton auctionId={a.id} auctionName={a.name} status={a.status} />
+                <div className="flex items-start gap-4">
+                  <CloneAuctionButton auctionId={a.id} auctionName={a.name} leagueParam={leagueParam} />
+                  <DeleteAuctionButton auctionId={a.id} auctionName={a.name} status={a.status} />
+                </div>
               </li>
             ))}
           </ul>

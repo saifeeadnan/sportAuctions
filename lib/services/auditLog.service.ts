@@ -21,6 +21,7 @@ export type AuditEntityType =
  * for which functions write which action. */
 export type AuditAction =
   | "AUCTION_CREATED"
+  | "AUCTION_CLONED"
   | "AUCTION_PLAYER_ADDED"
   | "AUCTION_PLAYER_CATEGORY_CHANGED"
   | "CATEGORY_BID_INCREMENT_CHANGED"

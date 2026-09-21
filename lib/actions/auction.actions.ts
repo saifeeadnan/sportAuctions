@@ -10,6 +10,7 @@ import { toActionResult, type ActionResult } from "@/lib/actions/result";
 import { fromZonedDateTimeInputValue, DEADLINE_TIME_ZONE } from "@/lib/dates";
 import {
   createAuction,
+  cloneAuction,
   openPreAuction,
   lockPreAuction,
   startBidding,
@@ -36,6 +37,19 @@ export async function createAuctionAction(
     await loadScopedTournament(input.tournamentId, leagueIds);
     const auction = await createAuction({ ...input, createdById: session.user.id });
     return { auctionId: auction.id };
+  });
+}
+
+export async function cloneAuctionAction(
+  sourceAuctionId: string,
+  name: string
+): Promise<ActionResult<{ auctionId: string }>> {
+  return toActionResult(async () => {
+    const { session, leagueIds } = await requireAdminOrLeagueAdmin();
+    const source = await loadScopedAuction(sourceAuctionId, leagueIds);
+    const clone = await cloneAuction(sourceAuctionId, name, session.user.id);
+    revalidatePath(`/admin/tournaments/${source.tournamentId}`);
+    return { auctionId: clone.id };
   });
 }
 
