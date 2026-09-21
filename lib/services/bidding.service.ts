@@ -383,8 +383,8 @@ export async function placeBid(
     // This specific rejection means the compare-and-swap above lost a real
     // race — two bids evaluated against the same stale currentBid snapshot —
     // as opposed to the earlier validation branches, which reject a bid that
-    // was simply stale/too low. Only this case is a genuine near-tie the
-    // auctioneer might want to manually override.
+    // was simply stale/too low. Only this case is a genuine near-tie worth
+    // flagging to the auctioneer in real time.
     if (err instanceof ValidationError && err.message.startsWith("Someone else just bid")) {
       emitAuctionEvent(auctionId, "bid:contested", {
         auctionPlayerId,
@@ -544,27 +544,6 @@ export async function removePlayerFromTeam(auctionId: string, auctionPlayerId: s
   });
 
   return { player: updatedPlayer, entry: updatedEntry };
-}
-
-/**
- * Reassigns a just-sold player to a different team at a specified price —
- * used when the auctioneer overrides which of two (or more) simultaneous
- * bids should have won a race that placeBid's optimistic lock resolved
- * arbitrarily by commit order (see the "bid:contested" event it emits).
- * Composes the two existing allocation primitives; each already writes its
- * own audit row, so this produces a two-row trail (removed from the
- * original winner, assigned to the override target) with no new audit
- * action needed.
- */
-export async function overrideContestedBid(
-  auctionId: string,
-  auctionPlayerId: string,
-  teamAuctionEntryId: string,
-  price: number,
-  actorUserId: string
-) {
-  await removePlayerFromTeam(auctionId, auctionPlayerId, actorUserId);
-  return adminAssignPlayer(auctionId, auctionPlayerId, teamAuctionEntryId, price, actorUserId);
 }
 
 function assertAuctionCompleted(auction: { status: $Enums.AuctionStatus }) {

@@ -13,7 +13,6 @@ import {
   concludeAuction,
   adminAssignPlayer,
   removePlayerFromTeam,
-  overrideContestedBid,
   placeBid,
   removePlayerPostAuction,
   addPlayerPostAuction,
@@ -136,24 +135,6 @@ export async function adminAssignPlayerAction(
     await adminAssignPlayer(auctionId, auctionPlayerId, teamAuctionEntryId, price, session.user.id);
     revalidatePath(`/admin/auctions/${auctionId}`);
     revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
-  });
-}
-
-/** Lets the auctioneer reassign a lot to the team that lost a "bid:contested"
- * race (see placeBid) — the same underlying operation as removing the
- * current allocation and admin-assigning it to the override target. */
-export async function overrideContestedBidAction(
-  auctionId: string,
-  auctionPlayerId: string,
-  teamAuctionEntryId: string,
-  price: number
-): Promise<ActionResult> {
-  return toActionResult(async () => {
-    const session = await requireRole("AUCTIONEER", "ADMIN", "LEAGUE_ADMIN");
-    await loadScopedAuction(auctionId, allLeagueIds(session));
-    await overrideContestedBid(auctionId, auctionPlayerId, teamAuctionEntryId, price, session.user.id);
-    revalidatePath(`/auctioneer/auctions/${auctionId}/console`);
-    revalidatePath(`/admin/auctions/${auctionId}`);
   });
 }
 
