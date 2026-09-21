@@ -12,6 +12,18 @@ export type SaleAnnouncement = {
   price: string;
 };
 
+/** A bid that lost the optimistic-concurrency race in placeBid — two bids
+ * evaluated against the same stale currentBid snapshot, one of which lost
+ * purely to commit order. Auctioneer-only, so it's delivered via a direct
+ * callback instead of the shared/mobile-mirrored reduceAuctionEvent. */
+export type ContestedBid = {
+  auctionPlayerId: string;
+  teamAuctionEntryId: string;
+  teamName: string;
+  amount: string;
+  attemptedAt: string;
+};
+
 const EVENT_TYPES: AuctionSocketEvent["type"][] = [
   "player:on-clock",
   "bid:placed",
@@ -26,13 +38,18 @@ const EVENT_TYPES: AuctionSocketEvent["type"][] = [
 export function useAuctionSocket(
   auctionId: string,
   initialState: AuctionState,
-  options: { public?: boolean } = {}
+  options: { public?: boolean; onContestedBid?: (payload: ContestedBid) => void } = {}
 ) {
   const isPublic = options.public ?? false;
   const [state, setState] = useState<AuctionState>(initialState);
   const [connected, setConnected] = useState(false);
   const [lastSale, setLastSale] = useState<SaleAnnouncement | null>(null);
   const socketRef = useRef<Socket | null>(null);
+  // Kept in a ref, not the connecting effect's dependency array — a fresh
+  // inline callback every render (the common case for a caller's handler)
+  // must not tear down and reopen the socket connection.
+  const onContestedBidRef = useRef(options.onContestedBid);
+  onContestedBidRef.current = options.onContestedBid;
 
   // useState's initializer only runs on mount — without this, a fresh
   // server refetch (e.g. router.refresh() after editing a player's roster
@@ -64,6 +81,12 @@ export function useAuctionSocket(
         }
       });
     }
+
+    // Auctioneer-only notice — deliberately not added to EVENT_TYPES/
+    // reduceAuctionEvent, which is mirrored verbatim with the mobile app.
+    socket.on("bid:contested", (payload: unknown) => {
+      onContestedBidRef.current?.(payload as ContestedBid);
+    });
 
     return () => {
       socket.disconnect();

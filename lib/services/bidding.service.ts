@@ -362,21 +362,40 @@ export async function placeBid(
     auctionPlayer.auction.lotTimerSeconds != null
       ? new Date(Date.now() + auctionPlayer.auction.lotTimerSeconds * 1000)
       : null;
-  const bid = await prisma.$transaction(async (tx) => {
-    const updateResult = await tx.auctionPlayer.updateMany({
-      where: { id: auctionPlayerId, status: "IN_BIDDING", currentBidAmount: currentBid },
-      data: {
-        currentBidAmount: amountDecimal,
-        currentBidderEntryId: teamAuctionEntryId,
-        bidCooldownUntil: cooldownUntil,
-        lotTimerDeadline,
-      },
+  let bid;
+  try {
+    bid = await prisma.$transaction(async (tx) => {
+      const updateResult = await tx.auctionPlayer.updateMany({
+        where: { id: auctionPlayerId, status: "IN_BIDDING", currentBidAmount: currentBid },
+        data: {
+          currentBidAmount: amountDecimal,
+          currentBidderEntryId: teamAuctionEntryId,
+          bidCooldownUntil: cooldownUntil,
+          lotTimerDeadline,
+        },
+      });
+      if (updateResult.count === 0) {
+        throw new ValidationError("Someone else just bid on this player — refresh and try again");
+      }
+      return tx.bid.create({ data: { auctionPlayerId, teamAuctionEntryId, amount: amountDecimal } });
     });
-    if (updateResult.count === 0) {
-      throw new ValidationError("Someone else just bid on this player — refresh and try again");
+  } catch (err) {
+    // This specific rejection means the compare-and-swap above lost a real
+    // race — two bids evaluated against the same stale currentBid snapshot —
+    // as opposed to the earlier validation branches, which reject a bid that
+    // was simply stale/too low. Only this case is a genuine near-tie the
+    // auctioneer might want to manually override.
+    if (err instanceof ValidationError && err.message.startsWith("Someone else just bid")) {
+      emitAuctionEvent(auctionId, "bid:contested", {
+        auctionPlayerId,
+        teamAuctionEntryId,
+        teamName: entry.team.name,
+        amount: amountDecimal.toString(),
+        attemptedAt: new Date().toISOString(),
+      });
     }
-    return tx.bid.create({ data: { auctionPlayerId, teamAuctionEntryId, amount: amountDecimal } });
-  });
+    throw err;
+  }
 
   emitAuctionEvent(auctionId, "bid:placed", {
     auctionPlayerId,
@@ -525,6 +544,27 @@ export async function removePlayerFromTeam(auctionId: string, auctionPlayerId: s
   });
 
   return { player: updatedPlayer, entry: updatedEntry };
+}
+
+/**
+ * Reassigns a just-sold player to a different team at a specified price —
+ * used when the auctioneer overrides which of two (or more) simultaneous
+ * bids should have won a race that placeBid's optimistic lock resolved
+ * arbitrarily by commit order (see the "bid:contested" event it emits).
+ * Composes the two existing allocation primitives; each already writes its
+ * own audit row, so this produces a two-row trail (removed from the
+ * original winner, assigned to the override target) with no new audit
+ * action needed.
+ */
+export async function overrideContestedBid(
+  auctionId: string,
+  auctionPlayerId: string,
+  teamAuctionEntryId: string,
+  price: number,
+  actorUserId: string
+) {
+  await removePlayerFromTeam(auctionId, auctionPlayerId, actorUserId);
+  return adminAssignPlayer(auctionId, auctionPlayerId, teamAuctionEntryId, price, actorUserId);
 }
 
 function assertAuctionCompleted(auction: { status: $Enums.AuctionStatus }) {

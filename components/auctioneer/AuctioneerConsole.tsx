@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import type { AuctionState } from "@/lib/services/auctionState.service";
-import { useAuctionSocket } from "@/hooks/useAuctionSocket";
+import { useAuctionSocket, type ContestedBid } from "@/hooks/useAuctionSocket";
 import { TeamBudgetBoard } from "@/components/auction/TeamBudgetBoard";
 import { SoldTicker } from "@/components/auction/SoldTicker";
 import { OnClockCard } from "@/components/auction/OnClockCard";
@@ -17,6 +17,7 @@ import {
   markUnsoldAction,
   concludeAuctionAction,
   removePlayerFromTeamAction,
+  overrideContestedBidAction,
 } from "@/lib/actions/bidding.actions";
 import { resetAuctionAction } from "@/lib/actions/auction.actions";
 import { computeMaxBid } from "@/lib/auction/maxBid";
@@ -33,7 +34,15 @@ export function AuctioneerConsole({
   readOnly?: boolean;
 }) {
   const router = useRouter();
-  const { state, connected, lastSale } = useAuctionSocket(initialState.id, initialState);
+  const [contestedNotices, setContestedNotices] = useState<ContestedBid[]>([]);
+  const { state, connected, lastSale } = useAuctionSocket(initialState.id, initialState, {
+    onContestedBid: (payload) => {
+      setContestedNotices((prev) => [
+        ...prev.filter((n) => n.teamAuctionEntryId !== payload.teamAuctionEntryId),
+        payload,
+      ]);
+    },
+  });
   const [selectedTeamId, setSelectedTeamId] = useState("");
   const [price, setPrice] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -45,9 +54,13 @@ export function AuctioneerConsole({
   // "record sale to leader" button below reads onClock.currentBid/currentBidderEntryId
   // directly instead of mirroring them into this form, so it's always accurate
   // even as bids keep coming in after the player was first put on the clock.
+  // Contested-bid notices are cleared too: placeBid only ever races bids
+  // against the player currently on the clock, so every notice necessarily
+  // belongs to the lot that's ending.
   useEffect(() => {
     setPrice("");
     setSelectedTeamId("");
+    setContestedNotices([]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onClock?.id]);
   const queue = state.players.filter(
@@ -224,6 +237,34 @@ export function AuctioneerConsole({
     router.refresh();
   }
 
+  async function handleOverrideContestedBid(notice: ContestedBid) {
+    if (
+      !window.confirm(
+        `Override the sale — reassign this player to ${notice.teamName} at ${notice.amount}? The current allocation will be reversed and refunded.`
+      )
+    )
+      return;
+    setLoading(true);
+    setError(null);
+    const result = await overrideContestedBidAction(
+      state.id,
+      notice.auctionPlayerId,
+      notice.teamAuctionEntryId,
+      Number(notice.amount)
+    );
+    setLoading(false);
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+    setContestedNotices((prev) => prev.filter((n) => n.teamAuctionEntryId !== notice.teamAuctionEntryId));
+    router.refresh();
+  }
+
+  function dismissContestedBid(teamAuctionEntryId: string) {
+    setContestedNotices((prev) => prev.filter((n) => n.teamAuctionEntryId !== teamAuctionEntryId));
+  }
+
   async function handleConclude() {
     if (!window.confirm("Conclude this auction? Remaining players will be marked unsold.")) return;
     setLoading(true);
@@ -389,6 +430,38 @@ export function AuctioneerConsole({
 
         <section className={`${card} p-3`}>
           <h2 className="text-base font-medium mb-2">On the clock</h2>
+          {contestedNotices.length > 0 && (
+            <div className="flex flex-col gap-2 mb-3">
+              {contestedNotices.map((notice) => (
+                <div
+                  key={notice.teamAuctionEntryId}
+                  className="flex items-center justify-between gap-2 flex-wrap rounded-md border border-amber-400/40 bg-amber-50 dark:bg-amber-500/10 px-3 py-2 text-sm"
+                >
+                  <span>
+                    ⚠ <span className="font-medium">{notice.teamName}</span> bid {notice.amount} but lost the
+                    race to the current leader
+                  </span>
+                  <div className="flex gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleOverrideContestedBid(notice)}
+                      disabled={loading || readOnly}
+                      className={`${buttonSecondary} px-2 py-1 text-xs`}
+                    >
+                      Override to {notice.teamName}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => dismissContestedBid(notice.teamAuctionEntryId)}
+                      className={`${buttonSecondary} px-2 py-1 text-xs`}
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
           <div className="flex flex-col gap-2 items-center">
             <OnClockCard
               player={onClock}
