@@ -223,6 +223,14 @@ export default async function ManagerTeamDetailPage({
                 Download roster card
               </a>
               {entry.auction.status === "COMPLETED" && (
+                <Link
+                  href={`/manager/auctions/${entry.auctionId}/rosters`}
+                  className="text-sm underline underline-offset-2"
+                >
+                  View all team rosters
+                </Link>
+              )}
+              {entry.auction.status === "COMPLETED" && (
                 <RosterCardLinkPanel
                   auctionId={entry.auctionId}
                   entryId={entry.id}

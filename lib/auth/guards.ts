@@ -129,6 +129,24 @@ export function assertCanAccessTeamEntry(
 }
 
 /**
+ * Who may see EVERY team's roster in one auction: a manager with a team in
+ * that auction, OR a league admin of its league, OR the site Admin — the
+ * same OR-of-independent-grants shape as assertCanAccessTeamEntry, so a
+ * manager in a different auction (or league) gets nothing. Pure — the caller
+ * supplies whether this user manages one of the auction's teams.
+ */
+export function assertCanViewAllTeamRosters(
+  session: Session,
+  auction: { tournament: { leagueId: string } },
+  managesTeamInAuction: boolean
+) {
+  if (managesTeamInAuction) return;
+  const adminLeagues = leagueIdsForRoles(session, "LEAGUE_ADMIN"); // null = site admin
+  if (adminLeagues === null || adminLeagues.includes(auction.tournament.leagueId)) return;
+  throw new AuthError("Not authorized to view this auction's team rosters");
+}
+
+/**
  * Same shape as assertCanAccessTeamEntry, but for a bare Team (no auction
  * entry required) — e.g. managing a team's sponsor picture, which a manager
  * should be able to do before their team has ever entered an auction.
