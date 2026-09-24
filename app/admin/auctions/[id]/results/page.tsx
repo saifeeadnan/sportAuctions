@@ -28,7 +28,7 @@ export default async function AuctionResultsPage({
       tournament: true,
       entries: {
         include: {
-          team: true,
+          team: { include: { sponsorImage: { select: { id: true } } } },
           playersWon: { include: { player: true, category: true }, orderBy: { player: { name: "asc" } } },
         },
         orderBy: { team: { name: "asc" } },
@@ -75,34 +75,50 @@ export default async function AuctionResultsPage({
         const totalSpent = entry.playersWon.reduce((sum, p) => sum + Number(p.soldPrice ?? 0), 0);
         return (
           <section key={entry.id}>
-            <h2 className="text-lg font-medium mb-1">{entry.team.name}</h2>
-            <p className="text-sm text-black/60 dark:text-white/60 mb-1">
-              Budget remaining: {String(entry.budgetRemaining)} &middot; Spent on{" "}
-              {entry.playersWon.length} player(s): {totalSpent} &middot; Slots {entry.slotsFilled}/
-              {entry.slotsTotal}
-            </p>
-            {auction.status === "COMPLETED" && !readOnly && (
-              <div className="mb-1">
-                <AssignTeamCaptainForm
-                  auctionId={auction.id}
-                  teamAuctionEntryId={entry.id}
-                  currentCaptainAuctionPlayerId={entry.captainAuctionPlayerId}
-                  players={entry.playersWon.map((ap) => ({ id: ap.id, name: ap.player.name }))}
+            {/* Logo spans two lines: the name with its actions, then the figures. */}
+            <div className="flex items-center gap-3 mb-3">
+              {entry.team.sponsorImage ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={`/api/teams/${entry.team.id}/sponsor-image`}
+                  alt={`${entry.team.name} logo`}
+                  className="h-14 w-14 shrink-0 rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-1.5"
                 />
+              ) : (
+                <div className="h-14 w-14 shrink-0 rounded border border-dashed border-black/10 dark:border-white/10 flex items-center justify-center text-[10px] text-black/30 dark:text-white/30">
+                  No logo
+                </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center flex-wrap gap-x-4 gap-y-1">
+                  <h2 className="text-lg font-medium">{entry.team.name}</h2>
+                  {auction.status === "COMPLETED" && (
+                    <div className="flex items-center flex-wrap gap-x-3 gap-y-1 sm:ml-auto">
+                      {!readOnly && (
+                        <AssignTeamCaptainForm
+                          auctionId={auction.id}
+                          teamAuctionEntryId={entry.id}
+                          currentCaptainAuctionPlayerId={entry.captainAuctionPlayerId}
+                          players={entry.playersWon.map((ap) => ({ id: ap.id, name: ap.player.name }))}
+                        />
+                      )}
+                      {/* Not gated on readOnly (unlike captain assignment) — sharing a
+                          past auction's final roster is fine for a closed league, same
+                          as the highlights link. */}
+                      <RosterCardLinkPanel
+                        auctionId={auction.id}
+                        entryId={entry.id}
+                        initialToken={entry.rosterCardToken}
+                      />
+                    </div>
+                  )}
+                </div>
+                <p className="text-sm text-black/60 dark:text-white/60">
+                  Budget left {String(entry.budgetRemaining)} &middot; Spent {totalSpent} on{" "}
+                  {entry.playersWon.length} player(s) &middot; Slots {entry.slotsFilled}/{entry.slotsTotal}
+                </p>
               </div>
-            )}
-            {/* Not gated on readOnly (unlike captain assignment) — sharing a
-                past auction's final roster is fine for a closed league, same
-                as the highlights link. */}
-            {auction.status === "COMPLETED" && (
-              <div className="mb-2">
-                <RosterCardLinkPanel
-                  auctionId={auction.id}
-                  entryId={entry.id}
-                  initialToken={entry.rosterCardToken}
-                />
-              </div>
-            )}
+            </div>
             {isCricket && (
               <div className="mb-3">
                 <TeamStrengthSummary

@@ -78,8 +78,8 @@ export default async function AdminAnalyticsPage({
                 <tbody>
                   {logins.items.map((event) => (
                     <tr key={event.id} className="border-b border-black/5 dark:border-white/5 last:border-0">
-                      <td className="py-2 pl-4 pr-4">
-                        {event.user.name} <span className="text-black/50 dark:text-white/50">({event.user.loginId})</span>
+                      <td className="py-2 pl-4 pr-4" title={event.user.loginId}>
+                        {event.user.name}
                       </td>
                       <td className="py-2 pr-4">
                         <Badge variant="info">{event.user.role}</Badge>
@@ -131,8 +131,8 @@ export default async function AdminAnalyticsPage({
                 <tbody>
                   {timeSpent.items.map((row) => (
                     <tr key={row.userId} className="border-b border-black/5 dark:border-white/5 last:border-0">
-                      <td className="py-2 pl-4 pr-4">
-                        {row.name} <span className="text-black/50 dark:text-white/50">({row.loginId})</span>
+                      <td className="py-2 pl-4 pr-4" title={row.loginId}>
+                        {row.name}
                       </td>
                       <td className="py-2 pr-4">
                         <Badge variant="info">{row.role}</Badge>

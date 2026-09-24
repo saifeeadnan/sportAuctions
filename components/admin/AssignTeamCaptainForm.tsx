@@ -24,8 +24,6 @@ export function AssignTeamCaptainForm({
 
   if (players.length === 0) return null;
 
-  const currentCaptainName = players.find((p) => p.id === currentCaptainAuctionPlayerId)?.name;
-
   if (!open) {
     return (
       <button
@@ -33,7 +31,7 @@ export function AssignTeamCaptainForm({
         onClick={() => setOpen(true)}
         className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline underline-offset-2"
       >
-        {currentCaptainName ? `Captain: ${currentCaptainName} (change)` : "No captain (assign)"}
+        {currentCaptainAuctionPlayerId ? "Change Captain" : "No captain (assign)"}
       </button>
     );
   }
