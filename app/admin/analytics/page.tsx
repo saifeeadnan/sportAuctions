@@ -109,6 +109,10 @@ export default async function AdminAnalyticsPage({
         <h2 className="text-lg font-medium mb-3">
           Time spent <span className="text-black/50 dark:text-white/50">({timeSpent.total} users)</span>
         </h2>
+        <p className="text-sm text-black/60 dark:text-white/60 mb-3">
+          Time counts only while a page is open and has been touched (mouse, keys, scroll or tap) within the
+          last 10 minutes. A login stays valid for weeks, so one login can cover many days.
+        </p>
         {timeSpent.items.length === 0 ? (
           <p className="text-sm text-black/60 dark:text-white/60">No session data recorded yet.</p>
         ) : (
@@ -120,7 +124,7 @@ export default async function AdminAnalyticsPage({
                     <th className="py-2 pl-4 pr-4">User</th>
                     <th className="py-2 pr-4">Role</th>
                     <th className="py-2 pr-4">League</th>
-                    <th className="py-2 pr-4">Sessions</th>
+                    <th className="py-2 pr-4">Logins</th>
                     <th className="py-2 pr-4">Total time</th>
                   </tr>
                 </thead>

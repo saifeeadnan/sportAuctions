@@ -2,6 +2,7 @@ import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 import { CredentialsSignin } from "next-auth";
 import { createAnalyticsSession, recordLogin } from "@/lib/services/analytics.service";
+import { clientIpFromHeaders, userAgentFromHeaders } from "@/lib/clientRequestInfo";
 
 // A distinct `code` (surfaced via the thrown error, not the generic "wrong
 // credentials" case) so the login page can show a specific message instead
@@ -63,8 +64,8 @@ export async function verifyCredentials(
   });
   await recordLogin({
     userId: user.id,
-    ipAddress: request.headers.get("x-forwarded-for") ?? undefined,
-    userAgent: request.headers.get("user-agent") ?? undefined,
+    ipAddress: clientIpFromHeaders(request.headers),
+    userAgent: userAgentFromHeaders(request.headers),
   }).catch((err) => console.error("[analytics] failed to record login:", err));
 
   return {

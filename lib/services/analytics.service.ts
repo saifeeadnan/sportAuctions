@@ -17,11 +17,12 @@ export async function createAnalyticsSession(userId: string) {
   return prisma.analyticsSession.create({ data: { userId } });
 }
 
-// Heartbeats ping every 45s (AnalyticsHeartbeat.tsx) while a tab is open and
-// visible — a gap larger than this means the tab was closed, backgrounded
-// past a missed ping, or the computer slept, so it shouldn't count as active
-// time even though the same session row keeps getting touched for as long as
-// the login's JWT stays valid (up to 30 days).
+// Heartbeats ping every 45s (AnalyticsHeartbeat.tsx) while a tab is visible
+// AND was interacted with recently (lib/analyticsActivity.ts) — a gap larger
+// than this means the tab was closed, backgrounded past a missed ping, idle,
+// or the computer slept, so it shouldn't count as active time even though the
+// same session row keeps getting touched for as long as the login's JWT stays
+// valid (up to 30 days).
 const MAX_GAP_MS = 2 * 60_000;
 
 export async function touchSession(sessionId: string) {

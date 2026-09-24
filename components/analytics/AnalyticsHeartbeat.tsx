@@ -1,23 +1,41 @@
 "use client";
 
 import { useEffect } from "react";
-
-const HEARTBEAT_INTERVAL_MS = 45_000;
+import { ACTIVITY_EVENTS, HEARTBEAT_INTERVAL_MS, shouldSendHeartbeat } from "@/lib/analyticsActivity";
 
 export function AnalyticsHeartbeat() {
   useEffect(() => {
+    // Opening the page counts as the first interaction.
+    let lastInteractionAt = Date.now();
+    const markActive = () => {
+      lastInteractionAt = Date.now();
+    };
+
     function ping() {
-      if (document.visibilityState !== "visible") return;
+      const visible = document.visibilityState === "visible";
+      if (!shouldSendHeartbeat({ visible, lastInteractionAt, now: Date.now() })) return;
       fetch("/api/analytics/heartbeat", { method: "POST", keepalive: true }).catch(() => {});
+    }
+
+    // Switching back to the tab is itself an interaction.
+    function onVisibilityChange() {
+      if (document.visibilityState === "visible") markActive();
+      ping();
     }
 
     ping();
     const interval = setInterval(ping, HEARTBEAT_INTERVAL_MS);
-    document.addEventListener("visibilitychange", ping);
+    for (const event of ACTIVITY_EVENTS) {
+      document.addEventListener(event, markActive, { passive: true, capture: true });
+    }
+    document.addEventListener("visibilitychange", onVisibilityChange);
 
     return () => {
       clearInterval(interval);
-      document.removeEventListener("visibilitychange", ping);
+      for (const event of ACTIVITY_EVENTS) {
+        document.removeEventListener(event, markActive, { capture: true });
+      }
+      document.removeEventListener("visibilitychange", onVisibilityChange);
     };
   }, []);
 
