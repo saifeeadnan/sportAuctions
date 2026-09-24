@@ -19,6 +19,12 @@ type Sponsor = {
   tier: SponsorTier;
 };
 
+// OBS captures whatever this page renders, so an operator control must be
+// invisible until hovered (OBS's Interact window, or a normal browser tab).
+// Literal class string — Tailwind only sees classes written out in source.
+const HOVER_REVEAL_BUTTON =
+  "rounded bg-black/70 px-2 py-1 text-xs text-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100";
+
 /** Sizes the on-clock photo off the *actual* viewport/OBS canvas height
  * instead of a fixed guess — a fixed pixel size that "looks right" on one
  * window height silently pushes the price/timer below the fold on a
@@ -90,6 +96,8 @@ function useCountdown(targetIso: string | null): number | null {
  * moments — before the next player is selected, or once the auction has
  * completed — filling what would otherwise be dead air without ever
  * competing with the live bid/timer for space while someone's on the clock.
+ * The one exception to "no controls" is the sponsor ribbon's hide/show
+ * toggle, which is invisible until hovered so it never appears in a capture.
  */
 export function BroadcastAuctionView({
   initialState,
@@ -109,6 +117,7 @@ export function BroadcastAuctionView({
   // scheduled time has served its purpose regardless of whether it's set.
   const countingDown = state.status !== "BIDDING" && state.status !== "COMPLETED";
   const msUntilStart = useCountdown(countingDown ? state.scheduledStartAt : null);
+  const [ribbonHidden, setRibbonHidden] = useState(false);
 
   return (
     // Always dark, regardless of the viewer's OS/browser preference — an
@@ -173,12 +182,34 @@ export function BroadcastAuctionView({
           )}
         </main>
 
-        <footer className="shrink-0 px-6 pb-3">
-          {/* zoom, unlike transform: scale, shrinks the layout box too, so the freed height goes back to the team grid. */}
-          <div style={{ zoom: 0.8 }}>
-            <SponsorRibbon sponsors={sponsors} />
-          </div>
-        </footer>
+        {sponsors.length > 0 &&
+          (ribbonHidden ? (
+            // Fixed, so the hidden state costs the layout nothing; the corner
+            // zone is what reveals the button, since it's invisible otherwise.
+            <div className="group fixed bottom-0 right-0 z-10 flex h-12 w-48 items-end justify-end p-2">
+              <button type="button" onClick={() => setRibbonHidden(false)} className={HOVER_REVEAL_BUTTON}>
+                Show sponsors
+              </button>
+            </div>
+          ) : (
+            <footer className="shrink-0 px-6 pb-3">
+              <div className="group relative">
+                <button
+                  type="button"
+                  onClick={() => setRibbonHidden(true)}
+                  aria-label="Hide sponsors"
+                  title="Hide sponsors"
+                  className={`absolute right-0 top-0 z-10 ${HOVER_REVEAL_BUTTON}`}
+                >
+                  Hide ×
+                </button>
+                {/* zoom, unlike transform: scale, shrinks the layout box too, so the freed height goes back to the team grid. */}
+                <div style={{ zoom: 0.8 }}>
+                  <SponsorRibbon sponsors={sponsors} />
+                </div>
+              </div>
+            </footer>
+          ))}
       </div>
     </div>
   );
