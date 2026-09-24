@@ -13,6 +13,7 @@ function grid(overrides: Partial<TeamRosterGrid> = {}): TeamRosterGrid {
   return {
     auctionName: "Season Auction",
     tournamentName: "Cup",
+    leagueName: "Test League",
     teams: [
       {
         entryId: "e1",

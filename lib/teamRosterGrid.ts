@@ -4,6 +4,7 @@ import Papa from "papaparse";
 export type TeamRosterGrid = {
   auctionName: string;
   tournamentName: string;
+  leagueName: string;
   /** One entry per team, in column order. */
   teams: {
     entryId: string;

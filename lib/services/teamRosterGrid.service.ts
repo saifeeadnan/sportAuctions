@@ -17,7 +17,7 @@ export async function loadTeamRosterGrid(session: Session, auctionId: string): P
   const auction = await prisma.auction.findUnique({
     where: { id: auctionId },
     include: {
-      tournament: { select: { name: true, leagueId: true } },
+      tournament: { select: { name: true, leagueId: true, league: { select: { name: true } } } },
       entries: {
         include: {
           team: { select: { name: true, managerId: true } },
@@ -56,5 +56,10 @@ export async function loadTeamRosterGrid(session: Session, auctionId: string): P
     }))
     .sort((a, b) => a.teamName.localeCompare(b.teamName));
 
-  return { auctionName: auction.name, tournamentName: auction.tournament.name, teams };
+  return {
+    auctionName: auction.name,
+    tournamentName: auction.tournament.name,
+    leagueName: auction.tournament.league.name,
+    teams,
+  };
 }

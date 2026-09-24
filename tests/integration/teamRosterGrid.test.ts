@@ -87,7 +87,7 @@ async function buildAuction({ conclude }: { conclude: boolean }) {
 
 describe("loadTeamRosterGrid", () => {
   it("lays out one column per team by name, each roster ordered by category price then name", async () => {
-    const { auction, teamByName, league } = await buildAuction({ conclude: true });
+    const { auction, teamByName, league, tournament } = await buildAuction({ conclude: true });
     const alphaManagerId = teamByName.get("Alpha")!.managerId!;
 
     const grid = await loadTeamRosterGrid(
@@ -96,6 +96,8 @@ describe("loadTeamRosterGrid", () => {
     );
 
     expect(grid.auctionName).toBe("Roster Grid Auction");
+    expect(grid.tournamentName).toBe(tournament.name);
+    expect(grid.leagueName).toBe(league.name);
     expect(grid.teams.map((t) => t.teamName)).toEqual(["Alpha", "Bravo", "Charlie"]);
     expect(grid.teams[0].members).toEqual([
       { name: "Bob Icon", categoryName: "Icon" },

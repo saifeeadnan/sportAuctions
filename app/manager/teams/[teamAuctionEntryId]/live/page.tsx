@@ -19,7 +19,7 @@ export default async function ManagerLivePage({
 
   const entry = await prisma.teamAuctionEntry.findUnique({
     where: { id: teamAuctionEntryId },
-    include: { team: true },
+    include: { team: { include: { tournament: { select: { league: { select: { name: true } } } } } } },
   });
   if (!entry || entry.team.managerId !== session!.user.id) notFound();
 
@@ -62,7 +62,10 @@ export default async function ManagerLivePage({
         sponsors={sponsors}
       />
       <h1 className="text-lg font-semibold mb-3">
-        {state.name} <span className="text-black/50 dark:text-white/50 font-normal">&middot; {state.tournamentName}</span>
+        <span className="text-black/50 dark:text-white/50 font-normal">
+          {entry.team.tournament.league.name} / {state.tournamentName} /{" "}
+        </span>
+        {state.name}
       </h1>
       <LiveAuctionView
         initialState={state}

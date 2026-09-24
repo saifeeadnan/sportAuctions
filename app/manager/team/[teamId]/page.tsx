@@ -78,70 +78,81 @@ export default async function ManagerTeamDetailPage({
   const canRename =
     !team.entries.some((e) => e.auction.status === "COMPLETED") &&
     !isLeagueReadOnly(team.tournament.league);
+  // Each auction is a collapsible section. With several on the page they all
+  // start closed; a lone auction has nothing to declutter, so it opens.
+  const openByDefault = previewAuctions.length + liveOrDoneEntries.length === 1;
+  // A team belongs to one tournament, so every auction on this page shares
+  // this League / Tournament prefix.
+  const hierarchy = `${team.tournament.league.name} / ${team.tournament.name}`;
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <div className="flex items-center gap-3 mb-1">
-          {team.sponsorImage && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={`/api/teams/${team.id}/sponsor-image`}
-              alt={`${team.name} sponsor`}
-              className="h-32 w-32 rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-1 shrink-0"
-            />
-          )}
-          <h1 className="text-xl font-semibold">{team.name}</h1>
-          {canRename && <RenameTeamForm teamId={team.id} name={team.name} />}
-        </div>
-        <p className="text-sm text-black/60 dark:text-white/60">{team.tournament.name}</p>
-      </div>
-
-      <section>
-        <details className={card}>
-          <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
-            Sponsor logo
-          </summary>
-          <div className="px-4 pb-4 flex flex-col gap-3 border-t border-black/[0.08] dark:border-white/10 pt-4">
-            {team.sponsorImage && <DeleteTeamSponsorImageButton teamId={team.id} />}
-            <UploadTeamSponsorImageForm teamId={team.id} />
+      {/* Logo on the left; the name, path and logo controls stacked beside it. */}
+      <div className="flex items-start gap-4">
+        {team.sponsorImage && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={`/api/teams/${team.id}/sponsor-image`}
+            alt={`${team.name} sponsor`}
+            className="h-32 w-32 rounded object-contain bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 p-1 shrink-0"
+          />
+        )}
+        <div className="min-w-0 flex-1 flex flex-col gap-3">
+          <div>
+            <div className="flex items-center flex-wrap gap-x-3 gap-y-1 mb-1">
+              <h1 className="text-xl font-semibold">{team.name}</h1>
+              {canRename && <RenameTeamForm teamId={team.id} name={team.name} />}
+            </div>
+            <p className="text-sm text-black/60 dark:text-white/60">{hierarchy}</p>
           </div>
-        </details>
-      </section>
+          <details className="w-full max-w-sm">
+            <summary className="cursor-pointer select-none text-sm font-medium">Sponsor logo</summary>
+            <div className="mt-2 flex items-center flex-wrap gap-x-3 gap-y-2 rounded-lg border border-black/[0.08] dark:border-white/10 p-2">
+              <UploadTeamSponsorImageForm teamId={team.id} compact />
+              {team.sponsorImage && <DeleteTeamSponsorImageButton teamId={team.id} />}
+            </div>
+          </details>
+        </div>
+      </div>
 
       {previewAuctions.map((auction) => {
         const entry = entryByAuctionId.get(auction.id);
         return (
-          <section key={auction.id}>
-            <div className="flex items-center gap-2 mb-1">
-              <h2 className="text-lg font-medium">{auction.name}</h2>
-              <Badge variant={entry?.status === "ALLOCATED_PRE_AUCTION" ? "warning" : "neutral"}>
-                {auction.status === "CREATED" ? "Not yet opened" : auction.status}
-              </Badge>
+          <details key={auction.id} open={openByDefault}>
+            <summary className={`${card} cursor-pointer select-none px-4 py-3`}>
+              <span className="text-sm text-black/50 dark:text-white/50">{hierarchy} / </span>
+              <span className="text-lg font-medium">{auction.name}</span>
+              <span className="ml-2 align-middle">
+                <Badge variant={entry?.status === "ALLOCATED_PRE_AUCTION" ? "warning" : "neutral"}>
+                  {auction.status === "CREATED" ? "Not yet opened" : auction.status}
+                </Badge>
+              </span>
+            </summary>
+            <div className="pt-3">
+              <p className="text-sm text-black/60 dark:text-white/60 mb-3">
+                Preview of the player pool — bidding hasn&apos;t started, so nothing here is final yet.
+              </p>
+              <PlayerPoolPreview
+                players={auction.auctionPlayers.map((ap) => ({
+                  id: ap.id,
+                  playerName: ap.player.name,
+                  photoUrl: ap.player.photoUrl,
+                  categoryName: ap.category.name,
+                  assignedTeamName: ap.soldToEntry?.team.name ?? null,
+                }))}
+              />
+              {entry && !auction.skipPreAuctionDraft && DRAFT_STATUSES.has(entry.status) && (
+                <div className="mt-2">
+                  <Link
+                    href={`/manager/teams/${entry.id}/draft`}
+                    className="text-sm underline underline-offset-2"
+                  >
+                    {entry.status === "ALLOCATED_PRE_AUCTION" ? "View draft results" : "Submit draft"}
+                  </Link>
+                </div>
+              )}
             </div>
-            <p className="text-sm text-black/60 dark:text-white/60 mb-3">
-              Preview of the player pool — bidding hasn&apos;t started, so nothing here is final yet.
-            </p>
-            <PlayerPoolPreview
-              players={auction.auctionPlayers.map((ap) => ({
-                id: ap.id,
-                playerName: ap.player.name,
-                photoUrl: ap.player.photoUrl,
-                categoryName: ap.category.name,
-                assignedTeamName: ap.soldToEntry?.team.name ?? null,
-              }))}
-            />
-            {entry && !auction.skipPreAuctionDraft && DRAFT_STATUSES.has(entry.status) && (
-              <div className="mt-2">
-                <Link
-                  href={`/manager/teams/${entry.id}/draft`}
-                  className="text-sm underline underline-offset-2"
-                >
-                  {entry.status === "ALLOCATED_PRE_AUCTION" ? "View draft results" : "Submit draft"}
-                </Link>
-              </div>
-            )}
-          </section>
+          </details>
         );
       })}
 
@@ -162,83 +173,88 @@ export default async function ManagerTeamDetailPage({
             categoryCaps[ap.category.name] = ap.category.maxPerTeam;
           }
           return (
-          <section key={entry.id}>
-            <div className="flex items-center gap-2 mb-1">
-              <h2 className="text-lg font-medium">{entry.auction.name}</h2>
-              <Badge variant={ENTRY_STATUS_VARIANT[entry.status] ?? "neutral"}>{entry.status}</Badge>
-            </div>
-            <p className="text-sm text-black/60 dark:text-white/60 mb-3">
-              Budget remaining: {String(entry.budgetRemaining)} &middot; Slots: {entry.slotsFilled}/
-              {entry.slotsTotal}
-            </p>
-            {Object.entries(categoryCaps).some(([, cap]) => cap != null) && (
-              <div className="flex flex-wrap gap-2 mb-3">
-                {Object.entries(categoryCaps)
-                  .filter(([, cap]) => cap != null)
-                  .map(([categoryName, cap]) => {
-                    const count = categoryCounts[categoryName] ?? 0;
-                    const atCap = isAtOrOverCap(count, cap);
-                    return (
-                      <Badge key={categoryName} variant={atCap ? "warning" : "neutral"}>
-                        {categoryName}: {count}/{cap}
-                      </Badge>
-                    );
-                  })}
-              </div>
-            )}
-            <ConfirmedRosterTable
-              players={entry.playersWon.map((ap) => ({
-                id: ap.id,
-                playerName: ap.player.name,
-                photoUrl: ap.player.photoUrl,
-                categoryName: ap.category.name,
-                soldPrice: ap.soldPrice != null ? String(ap.soldPrice) : null,
-                soldVia: ap.soldVia,
-                isCaptain: ap.id === entry.captainAuctionPlayerId,
-              }))}
-            />
-            <div className="flex items-center gap-4 mt-2 flex-wrap">
-              {LIVE_STATUSES.has(entry.status) && (
-                <Link
-                  href={`/manager/teams/${entry.id}/live`}
-                  className="text-sm underline underline-offset-2"
-                >
-                  View live
-                </Link>
-              )}
-              {entry.analyticsEnabled && (
-                <Link
-                  href={`/manager/teams/${entry.id}/analytics`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm underline underline-offset-2"
-                >
-                  Analytics dashboard
-                </Link>
-              )}
-              <a
-                href={`/api/auctions/${entry.auctionId}/teams/${entry.id}/roster-card`}
-                className="text-sm underline underline-offset-2"
-              >
-                Download roster card
-              </a>
-              {entry.auction.status === "COMPLETED" && (
-                <Link
-                  href={`/manager/auctions/${entry.auctionId}/rosters`}
-                  className="text-sm underline underline-offset-2"
-                >
-                  View all team rosters
-                </Link>
-              )}
-              {entry.auction.status === "COMPLETED" && (
-                <RosterCardLinkPanel
-                  auctionId={entry.auctionId}
-                  entryId={entry.id}
-                  initialToken={entry.rosterCardToken}
+            <details key={entry.id} open={openByDefault}>
+              <summary className={`${card} cursor-pointer select-none px-4 py-3`}>
+                <span className="text-sm text-black/50 dark:text-white/50">{hierarchy} / </span>
+                <span className="text-lg font-medium">{entry.auction.name}</span>
+                <span className="ml-2 align-middle">
+                  <Badge variant={ENTRY_STATUS_VARIANT[entry.status] ?? "neutral"}>{entry.status}</Badge>
+                </span>
+              </summary>
+              <div className="pt-3">
+                <p className="text-sm text-black/60 dark:text-white/60 mb-3">
+                  Budget remaining: {String(entry.budgetRemaining)} &middot; Slots: {entry.slotsFilled}/
+                  {entry.slotsTotal}
+                </p>
+                {Object.entries(categoryCaps).some(([, cap]) => cap != null) && (
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {Object.entries(categoryCaps)
+                      .filter(([, cap]) => cap != null)
+                      .map(([categoryName, cap]) => {
+                        const count = categoryCounts[categoryName] ?? 0;
+                        const atCap = isAtOrOverCap(count, cap);
+                        return (
+                          <Badge key={categoryName} variant={atCap ? "warning" : "neutral"}>
+                            {categoryName}: {count}/{cap}
+                          </Badge>
+                        );
+                      })}
+                  </div>
+                )}
+                <ConfirmedRosterTable
+                  players={entry.playersWon.map((ap) => ({
+                    id: ap.id,
+                    playerName: ap.player.name,
+                    photoUrl: ap.player.photoUrl,
+                    categoryName: ap.category.name,
+                    soldPrice: ap.soldPrice != null ? String(ap.soldPrice) : null,
+                    soldVia: ap.soldVia,
+                    isCaptain: ap.id === entry.captainAuctionPlayerId,
+                  }))}
                 />
-              )}
-            </div>
-          </section>
+                <div className="flex items-center gap-4 mt-2 flex-wrap">
+                  {LIVE_STATUSES.has(entry.status) && (
+                    <Link
+                      href={`/manager/teams/${entry.id}/live`}
+                      className="text-sm underline underline-offset-2"
+                    >
+                      View live
+                    </Link>
+                  )}
+                  {entry.analyticsEnabled && (
+                    <Link
+                      href={`/manager/teams/${entry.id}/analytics`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm underline underline-offset-2"
+                    >
+                      Analytics dashboard
+                    </Link>
+                  )}
+                  <a
+                    href={`/api/auctions/${entry.auctionId}/teams/${entry.id}/roster-card`}
+                    className="text-sm underline underline-offset-2"
+                  >
+                    Download roster card
+                  </a>
+                  {entry.auction.status === "COMPLETED" && (
+                    <Link
+                      href={`/manager/auctions/${entry.auctionId}/rosters`}
+                      className="text-sm underline underline-offset-2"
+                    >
+                      View all team rosters
+                    </Link>
+                  )}
+                  {entry.auction.status === "COMPLETED" && (
+                    <RosterCardLinkPanel
+                      auctionId={entry.auctionId}
+                      entryId={entry.id}
+                      initialToken={entry.rosterCardToken}
+                    />
+                  )}
+                </div>
+              </div>
+            </details>
           );
         })
       )}

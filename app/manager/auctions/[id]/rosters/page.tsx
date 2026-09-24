@@ -27,9 +27,14 @@ export default async function AllTeamRostersPage({ params }: { params: Promise<{
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <h1 className="text-xl font-semibold mb-1">{grid.auctionName}</h1>
+        <h1 className="text-xl font-semibold mb-1">
+          <span className="text-black/50 dark:text-white/50 font-normal">
+            {grid.leagueName} / {grid.tournamentName} /{" "}
+          </span>
+          {grid.auctionName}
+        </h1>
         <p className="text-sm text-black/60 dark:text-white/60">
-          {grid.tournamentName} &middot; Final rosters for all {grid.teams.length} teams
+          Final rosters for all {grid.teams.length} teams
         </p>
       </div>
 
