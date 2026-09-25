@@ -304,12 +304,12 @@ describe("cardStats", () => {
     const sections = [
       lone("CAREER - MOST RUNS", ["#", "Runs", "Matches"]),
       { table: 1, sheet: "Seasons", title: null, columns: ["2025", "2026"], fields: [{ label: "Runs", values: ["1", "2"] }] },
-      lone(null, ["Seasons", "Matches", "Runs"]),
+      lone(null, ["Matches", "Runs", "Highest"]),
     ];
     expect(cardStats(sections)).toEqual([
-      { label: "Seasons", value: "1" },
-      { label: "Matches", value: "2" },
-      { label: "Runs", value: "3" },
+      { label: "Matches", value: "1" },
+      { label: "Runs", value: "2" },
+      { label: "Highest", value: "3" },
     ]);
   });
 
@@ -323,9 +323,29 @@ describe("cardStats", () => {
   });
 
   it("shows a heading once even when two tables have it, and fills the space with the next fields instead", () => {
-    const stats = cardStats([lone(null, ["Seasons", "Matches", "Runs", "Wickets"]), lone(null, ["seasons", "Matches", "Rank", "Score"])], 6);
-    // three from each table first (the second's repeats skipped), then the leftover space is topped up from what remains
-    expect(stats.map((f) => f.label)).toEqual(["Seasons", "Matches", "Runs", "Rank", "Score", "Wickets"]);
+    const stats = cardStats([lone(null, ["Matches", "Runs", "Fours", "Sixes"]), lone(null, ["matches", "Rank", "Score"])], 6);
+    // three from each table first (the second's repeat skipped), then the leftover space is topped up from what remains
+    expect(stats.map((f) => f.label)).toEqual(["Matches", "Runs", "Fours", "Rank", "Score", "Sixes"]);
+  });
+
+  it("never shows seasons, innings or not-outs, from any table", () => {
+    const stats = cardStats([lone(null, ["Seasons", "Matches", "Innings", "Runs", "NO"]), lone(null, ["Rank", "Seasons", "Score"])], 12);
+    expect(stats.map((f) => f.label)).toEqual(["Matches", "Runs", "Rank", "Score"]);
+  });
+
+  it("always includes wickets, economy and dismissals, wherever they sit, keeping the table's column order", () => {
+    const career = ["Seasons", "Matches", "Innings", "Runs", "Highest", "NO", "Avg", "Strike rate", "Wickets", "Economy", "Catches", "Total dismissals"];
+    const mvp = ["Rank", "Seasons", "Matches", "Individual score", "Championships", "Finals played", "Team bonus", "MVP score", "Avg MVP per season"];
+    const stats = cardStats([lone(null, career), lone(null, mvp)], 12);
+    expect(stats.map((f) => f.label)).toEqual([
+      "Matches", "Runs", "Highest", "Wickets", "Economy", "Total dismissals",
+      "Rank", "Individual score", "Championships", "Finals played", "Team bonus", "MVP score",
+    ]);
+  });
+
+  it("keeps wickets, economy and dismissals even when the card is small, and matches the heading as a word", () => {
+    const stats = cardStats([lone(null, ["Matches", "Runs", "Best innings (wkts)", "Wickets", "Economy", "Total dismissals"])], 4);
+    expect(stats.map((f) => f.label)).toEqual(["Matches", "Wickets", "Economy", "Total dismissals"]);
   });
 
   it("falls back to leaderboard blocks when there is no profile table, and is empty when there is nothing lone", () => {

@@ -206,11 +206,18 @@ export function findExactPlayer(index: PlayerIndex, name: string): string | null
   return index.names.find((n) => norm(n) === key) ?? null;
 }
 
+// Headings the image never shows, and headings it always makes room for (a
+// "Total dismissals" column counts as dismissals).
+const CARD_LEFT_OUT = new Set(["seasons", "innings", "no"]);
+const CARD_ALWAYS = [/\bwickets?\b/, /\beconomy\b/, /\bdismissals?\b/];
+
 /**
  * The figures for a player's shareable image: the fields of their overall
- * profile tables — one lone row, no leaderboard title — in workbook order, a few
- * from each of the first two, up to `max` in all. If they have no such table
- * (only leaderboard blocks), it falls back to any single-row table.
+ * profile tables — one lone row, no leaderboard title — a few from each of the
+ * first two, up to `max` in all, always in workbook order. Wickets, economy and
+ * dismissals are always included wherever they sit in a table; seasons, innings
+ * and not-outs never are. If there is no such table (only leaderboard blocks),
+ * it falls back to any single-row table.
  */
 export function cardStats(sections: PlayerSection[], max = 12): { label: string; value: string }[] {
   const lone = sections.filter((s) => s.columns.length === 1);
@@ -222,15 +229,21 @@ export function cardStats(sections: PlayerSection[], max = 12): { label: string;
   const out: { label: string; value: string }[] = [];
   const seen = new Set<string>();
   const take = (section: PlayerSection, limit: number) => {
-    let taken = 0;
-    for (const field of section.fields) {
-      if (out.length >= max || taken >= limit) return;
-      // two tables often share a heading ("Seasons", "Matches"): show it once, from the first
+    // two tables often share a heading ("Matches"): show it once, from the first
+    const candidates = section.fields.filter((field) => {
       const key = field.label.trim().toLowerCase();
-      if (seen.has(key)) continue;
+      if (CARD_LEFT_OUT.has(key) || seen.has(key)) return false;
       seen.add(key);
-      out.push({ label: field.label, value: field.values[0] });
-      taken += 1;
+      return true;
+    });
+    const always = candidates.filter((f) => CARD_ALWAYS.some((re) => re.test(f.label.toLowerCase()))).slice(0, limit);
+    const rest = candidates.filter((f) => !always.includes(f)).slice(0, Math.max(0, limit - always.length));
+    const kept = new Set([...always, ...rest]);
+    for (const field of candidates) {
+      if (out.length >= max) return;
+      if (kept.has(field)) out.push({ label: field.label, value: field.values[0] });
+      // not taken now: free to be taken by the top-up pass below (or another table)
+      else seen.delete(field.label.trim().toLowerCase());
     }
   };
   // a few from each table first, then any space left is filled from what remains
