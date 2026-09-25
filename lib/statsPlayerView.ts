@@ -92,7 +92,7 @@ export type PlayerSection = {
  * A table where they have several rows (a row per season) gets a column per row,
  * headed by what tells the rows apart; the columns that did that (year, team)
  * are then in the headings, not repeated as fields. Fields that are blank in
- * every one of their rows are left out.
+ * every one of their rows are left out, and a "#" (position) column is shown as "Rank".
  */
 export function playerStats(index: PlayerIndex, name: string): PlayerSection[] {
   const key = norm(name);
@@ -118,8 +118,15 @@ export function playerStats(index: PlayerIndex, name: string): PlayerSection[] {
     });
 
     const skip = new Set([table.nameCol, ...(labelled ? table.labelCols : [])]);
+    // a "#" column is the row's position in its list: shown as "Rank", unless the table already has a Rank column
+    const hasRankColumn = table.header.some((h) => h.trim().toLowerCase() === "rank");
+    const heading = (label: string, c: number) => {
+      const shown = label.trim();
+      if (shown === "#") return hasRankColumn ? "#" : "Rank";
+      return shown || `Column ${c + 1}`;
+    };
     const fields = table.header
-      .map((label, c) => ({ c, label: label.trim() || `Column ${c + 1}`, values: matches.map((row) => (row[c] ?? "").trim()) }))
+      .map((label, c) => ({ c, label: heading(label, c), values: matches.map((row) => (row[c] ?? "").trim()) }))
       .filter((f) => !skip.has(f.c) && f.values.some((v) => v !== ""))
       .map(({ label, values }) => ({ label, values }));
     if (fields.length > 0) sections.push({ sheet: table.sheet, title: table.title, columns, fields });

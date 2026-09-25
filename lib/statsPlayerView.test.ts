@@ -158,8 +158,23 @@ describe("playerStats", () => {
     expect(playerStats(index, "Hashim").filter((s) => s.sheet === "Leaders").map((s) => s.title)).toEqual(["CAREER - MOST RUNS"]);
     const saifee = playerStats(index, "Adnan Saifee").filter((s) => s.sheet === "Leaders");
     expect(saifee.map((s) => s.title)).toEqual(["CAREER - MOST RUNS", "CAREER - MOST WICKETS"]);
-    // a lone row keeps every field but the name, including the rank
-    expect(saifee[1].fields).toEqual([{ label: "#", values: ["1"] }, { label: "Wickets", values: ["16"] }]);
+    // a lone row keeps every field but the name, and a "#" position column reads as "Rank"
+    expect(saifee[1].fields).toEqual([{ label: "Rank", values: ["1"] }, { label: "Wickets", values: ["16"] }]);
+  });
+
+  it("shows a # column as Rank, in single-row and per-season tables alike", () => {
+    const idx = buildPlayerIndex([
+      { name: "A", display: [["#", "Player", "Runs"], ["1", "Zed", "50"], ["2", "Other", "40"]] },
+      { name: "B", display: [["Year", "#", "Player", "Runs"], ["2025", "1", "Zed", "10"], ["2026", "3", "Zed", "20"], ["2026", "2", "Other", "5"]] },
+    ]);
+    const [single, seasons] = playerStats(idx, "Zed");
+    expect(single.fields).toEqual([{ label: "Rank", values: ["1"] }, { label: "Runs", values: ["50"] }]);
+    expect(seasons.fields).toEqual([{ label: "Rank", values: ["1", "3"] }, { label: "Runs", values: ["10", "20"] }]);
+  });
+
+  it("keeps a # column as # when the table already has a Rank column, so the two headings stay distinct", () => {
+    const idx = buildPlayerIndex([{ name: "A", display: [["#", "Player", "Rank"], ["1", "Zed", "1st"], ["2", "Other", "2nd"]] }]);
+    expect(playerStats(idx, "Zed")[0].fields.map((f) => f.label)).toEqual(["#", "Rank"]);
   });
 
   it("returns the sections in workbook order and skips tables the person is not in", () => {
