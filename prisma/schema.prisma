@@ -135,6 +135,7 @@ model User {
   auctionCorrections AuctionCorrectionLog[]
   auditLogs          AuditLog[]
   pointsUploads      FantasyPointsUpload[]
+  statsUploads       TournamentStatsUpload[]
   seedingWindowsCreated   PlayerSeedingWindow[]  @relation("SeedingWindowsCreated")
   seedingWindowsFinalized PlayerSeedingWindow[]  @relation("SeedingWindowsFinalized")
   seedSubmissions         PlayerSeedSubmission[]
@@ -198,8 +199,74 @@ model League {
   rosters     PlayerRoster[]
   tournaments Tournament[]
   logo        LeagueLogo?
+  statsUploads TournamentStatsUpload[]
+  statsShare   TournamentStatsShare?
 
   @@map("leagues")
+}
+
+/// One uploaded workbook (or CSV) of tournament statistics for a league. Only
+/// the sheets the admin ticked are kept as grids (TournamentStatsSheet); the
+/// original bytes are stored whole, purely for the admin's re-download — the
+/// server never parses them (SheetJS has unpatched advisories, so Excel is
+/// only ever read in the uploading admin's own browser).
+model TournamentStatsUpload {
+  id           String   @id @default(cuid())
+  leagueId     String
+  league       League   @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  uploadedAt   DateTime @default(now())
+  uploadedById String?
+  uploadedBy   User?    @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  label        String?
+  fileName     String
+  mimeType     String
+  fileData     Bytes
+
+  sheets       TournamentStatsSheet[]
+  // Set while this upload is the league's published one.
+  publishedIn  TournamentStatsShare?
+
+  @@index([leagueId, uploadedAt])
+  @@map("tournament_stats_uploads")
+}
+
+/// One loaded sheet — a tab. Stored as grids rather than header-keyed
+/// records because real sheets aren't all flat tables (stacked titled blocks,
+/// prose notes). `display` is the text as Excel shows it (what the public page
+/// renders); `values` keeps raw numbers for the admin-only pivot builder.
+model TournamentStatsSheet {
+  id          String                @id @default(cuid())
+  uploadId    String
+  upload      TournamentStatsUpload @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+  // Tab order — the order the sheets have in the workbook.
+  position    Int
+  name        String
+  // (string | number | null)[][] — every row the same length.
+  display     Json
+  values      Json
+  rowCount    Int
+  columnCount Int
+
+  @@unique([uploadId, position])
+  @@map("tournament_stats_sheets")
+}
+
+/// A league's public statistics link. A row existing means sharing is on; the
+/// token alone is the access credential to /stats/<token> (same model as the
+/// roster-card and highlights links, but revocable: delete the row, or rotate
+/// the token). uploadId is the published upload — re-publishing swaps it
+/// without changing the URL.
+model TournamentStatsShare {
+  id          String                 @id @default(cuid())
+  leagueId    String                 @unique
+  league      League                 @relation(fields: [leagueId], references: [id], onDelete: Cascade)
+  token       String                 @unique
+  uploadId    String?                @unique
+  upload      TournamentStatsUpload? @relation(fields: [uploadId], references: [id], onDelete: SetNull)
+  publishedAt DateTime?
+  createdAt   DateTime               @default(now())
+
+  @@map("tournament_stats_shares")
 }
 
 model PlayerRoster {

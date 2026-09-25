@@ -151,6 +151,7 @@ update "users" set "phone" = null where "phone" is not null;
 update "players" set "email" = null, "phone" = null where "email" is not null or "phone" is not null;
 update "auctions" set "highlightsToken" = null where "highlightsToken" is not null;
 update "team_auction_entries" set "rosterCardToken" = null where "rosterCardToken" is not null;
+delete from "tournament_stats_shares";
 update "login_events" set "ipAddress" = null, "userAgent" = null;
 update "audit_logs" set "before" = null, "after" = null where "entityType" = 'User';
 commit;`;
@@ -166,7 +167,8 @@ function scrub(db: string) {
      + (select count(*) from "users" where "phone" is not null)
      + (select count(*) from "players" where "email" is not null or "phone" is not null)
      + (select count(*) from "auctions" where "highlightsToken" is not null)
-     + (select count(*) from "team_auction_entries" where "rosterCardToken" is not null);`,
+     + (select count(*) from "team_auction_entries" where "rosterCardToken" is not null)
+     + (select count(*) from "tournament_stats_shares");`,
     { hash }
   );
   if (leftovers !== "0") fail(`Scrub left ${leftovers} sensitive value(s) behind — check the dev database.`);

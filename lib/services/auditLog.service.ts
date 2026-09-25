@@ -13,6 +13,8 @@ export type AuditEntityType =
   | "User"
   | "LeagueMembership"
   | "FantasyPointsUpload"
+  | "TournamentStatsUpload"
+  | "TournamentStatsShare"
   | "PlayerRoster"
   | "Player";
 
@@ -83,7 +85,12 @@ export type AuditAction =
   | "PLAYER_PHOTO_UPDATED_SELF"
   | "PLAYER_PHOTO_REMOVED_SELF"
   | "PLAYER_PHOTO_LINKED_TO_PROFILE_SELF"
-  | "PLAYER_PHOTO_UNLINKED_BY_ADMIN";
+  | "PLAYER_PHOTO_UNLINKED_BY_ADMIN"
+  | "STATS_UPLOADED"
+  | "STATS_UPLOAD_DELETED"
+  | "STATS_PUBLISHED"
+  | "STATS_SHARING_STOPPED"
+  | "STATS_LINK_ROTATED";
 
 /**
  * Writes one audit row. Always takes an explicit transaction client — never

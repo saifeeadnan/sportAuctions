@@ -28,8 +28,9 @@ export default async function AdminLayout({
         })
       : null;
 
+  // A page holding wide tables opts into more room by rendering a data-wide element.
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
+    <div className="mx-auto max-w-6xl has-[[data-wide]]:max-w-[96rem] px-4 py-8">
       <div className="flex flex-col sm:flex-row sm:items-start gap-4 sm:gap-8">
         {leagues && <AdminLeagueSidebar leagues={leagues} />}
         <div className="flex-1 min-w-0">

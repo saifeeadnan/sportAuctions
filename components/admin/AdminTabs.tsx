@@ -8,6 +8,7 @@ const TABS = [
   { href: "/admin/rosters", label: "Player rosters" },
   { href: "/admin/tournaments", label: "Tournaments" },
   { href: "/admin/fantasy-teams", label: "Fantasy Teams" },
+  { href: "/admin/tournament-analysis", label: "Tournament Analysis" },
   { href: "/admin/users", label: "Users" },
 ];
 

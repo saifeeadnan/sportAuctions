@@ -23,7 +23,7 @@ fantasy leagues, sponsor placements, and basic usage analytics — all scoped to
 | ORM | Prisma 7 (`prisma-client` generator, `@prisma/adapter-pg`) | Client generated into `app/generated/prisma` (not hand-edited) |
 | Auth | NextAuth v5 (beta), Credentials provider, JWT sessions | No OAuth providers — username/password only |
 | Real-time | Socket.IO 4, server-authoritative | Custom Node HTTP server (`server.ts`) wraps Next's request handler so Socket.IO can share the same port |
-| File parsing | PapaParse (CSV) | Roster and points *import* accept CSV only — deliberately, since the `xlsx` (SheetJS) parser has unpatched prototype-pollution/ReDoS advisories with no npm fix; `xlsx` is still used one-way for *exporting* roster data, which doesn't parse untrusted input |
+| File parsing | PapaParse (CSV) | Roster and points *import* accept CSV only — deliberately, since the `xlsx` (SheetJS) parser has unpatched prototype-pollution/ReDoS advisories with no npm fix; `xlsx` is still used one-way for *exporting* roster data, which doesn't parse untrusted input. The one exception is the Tournament Analysis upload, which reads Excel **in the uploading admin's own browser** (`lib/statsUpload/parseWorkbook.ts`, lazy-loaded) and sends the server plain grids to validate plus the original bytes to store untouched — the server itself still never runs SheetJS on uploaded bytes |
 | Validation | Zod (present in deps; most mutation validation is hand-written in the service layer) | |
 
 **Why a custom server:** Next.js's default `next start` has no place to attach a long-lived
