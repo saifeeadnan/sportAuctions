@@ -1,6 +1,8 @@
 import { cache } from "react";
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { notFound } from "next/navigation";
+import { publicOrigin } from "@/lib/siteOrigin";
 import { getPublicTournamentStats } from "@/lib/services/tournamentStats.service";
 import { SheetTabs } from "@/components/stats/SheetTabs";
 import { buildPlayerIndex, findExactPlayer } from "@/lib/statsPlayerView";
@@ -20,6 +22,7 @@ export async function generateMetadata({
   const { player: playerParam } = await searchParams;
   const stats = await loadStats(token);
   if (!stats) notFound();
+  const requestHeaders = await headers();
 
   // A link to one player previews as that player: their name and a card of their figures.
   const typed = Array.isArray(playerParam) ? playerParam[0] : playerParam;
@@ -32,7 +35,11 @@ export async function generateMetadata({
   const image = player ? [{ url: `/stats/${token}/card?player=${encodeURIComponent(player)}`, width: 1200, height: 630 }] : undefined;
   return {
     // Chat apps need an absolute address for the preview image.
-    metadataBase: new URL(process.env.NEXTAUTH_URL ?? "http://localhost:3000"),
+    metadataBase: publicOrigin({
+      envUrl: process.env.NEXTAUTH_URL,
+      host: requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host"),
+      proto: requestHeaders.get("x-forwarded-proto"),
+    }),
     title,
     description,
     // Chat-app link previews are the point of a share link.
