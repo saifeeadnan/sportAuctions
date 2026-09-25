@@ -1,11 +1,14 @@
 "use client";
 
-import { useRef, useState, useSyncExternalStore } from "react";
+import { useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { StatsGrid } from "@/lib/statsUpload/schema";
+import { buildPlayerIndex } from "@/lib/statsPlayerView";
 import { tabItem } from "@/lib/ui";
 import { SheetGrid } from "@/components/stats/SheetGrid";
+import { MyStats } from "@/components/stats/MyStats";
 
 const TAB_EVENT = "stats-sheet-tab";
+const MY_STATS = "My stats";
 
 function subscribe(onChange: () => void) {
   window.addEventListener("hashchange", onChange);
@@ -27,30 +30,37 @@ function decodeHash(hash: string): string {
 }
 
 /**
- * The sheets of a workbook as Excel-style tabs. The open tab lives in the URL
- * hash (#Sheet%20name), so a shared link can open on a particular sheet and a
- * refresh keeps the place. A sheet's tables are built the first time its tab is
- * opened and then kept, so sorting and filters survive switching tabs. Used by
- * the admin's preview and the public page.
+ * The sheets of a workbook as Excel-style tabs, plus a "My stats" tab when any
+ * sheet lists players. The open tab lives in the URL hash (#Sheet%20name), so a
+ * shared link can open on a particular tab and a refresh keeps the place. A
+ * tab's content is built the first time it is opened and then kept, so sorting,
+ * filters and a player search survive switching tabs. Used by the admin's
+ * preview and the public page.
  */
 export function SheetTabs({ sheets }: { sheets: { name: string; display: StatsGrid }[] }) {
+  const players = useMemo(() => buildPlayerIndex(sheets), [sheets]);
+  const tabs = useMemo(
+    () => [...sheets.map((s) => s.name), ...(players.names.length > 0 ? [MY_STATS] : [])],
+    [sheets, players]
+  );
+
   const hash = useSyncExternalStore(subscribe, getHash, getServerHash);
   const wanted = decodeHash(hash);
-  const found = sheets.findIndex((s) => s.name === wanted);
+  const found = tabs.indexOf(wanted);
   const active = found >= 0 ? found : 0;
   const [visited, setVisited] = useState<ReadonlySet<number>>(new Set());
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   function select(index: number, focus = false) {
     setVisited((prev) => new Set(prev).add(index));
-    const url = `${window.location.pathname}${window.location.search}#${encodeURIComponent(sheets[index].name)}`;
+    const url = `${window.location.pathname}${window.location.search}#${encodeURIComponent(tabs[index])}`;
     window.history.replaceState(null, "", url);
     window.dispatchEvent(new Event(TAB_EVENT));
     if (focus) tabRefs.current[index]?.focus();
   }
 
   function onKeyDown(e: React.KeyboardEvent, index: number) {
-    const last = sheets.length - 1;
+    const last = tabs.length - 1;
     const next =
       e.key === "ArrowRight" ? (index === last ? 0 : index + 1)
       : e.key === "ArrowLeft" ? (index === 0 ? last : index - 1)
@@ -62,7 +72,7 @@ export function SheetTabs({ sheets }: { sheets: { name: string; display: StatsGr
     select(next, true);
   }
 
-  if (sheets.length === 0) return null;
+  if (tabs.length === 0) return null;
 
   return (
     <div className="flex flex-col gap-3">
@@ -72,9 +82,9 @@ export function SheetTabs({ sheets }: { sheets: { name: string; display: StatsGr
         aria-label="Sheets"
         className="flex w-fit max-w-full flex-wrap gap-1 rounded-lg bg-black/[0.04] dark:bg-white/[0.06] p-1"
       >
-        {sheets.map((s, i) => (
+        {tabs.map((name, i) => (
           <button
-            key={s.name}
+            key={`${i}:${name}`}
             ref={(el) => {
               tabRefs.current[i] = el;
             }}
@@ -86,15 +96,17 @@ export function SheetTabs({ sheets }: { sheets: { name: string; display: StatsGr
             tabIndex={i === active ? 0 : -1}
             onClick={() => select(i)}
             onKeyDown={(e) => onKeyDown(e, i)}
-            className={tabItem(i === active)}
+            // "My stats" is not a sheet, so it sits a little apart from them
+            className={`${tabItem(i === active)} ${i >= sheets.length ? "ml-2" : ""}`}
           >
-            {s.name}
+            {name}
           </button>
         ))}
       </div>
-      {sheets.map((s, i) => (
-        <div key={s.name} role="tabpanel" id={`sheet-panel-${i}`} aria-labelledby={`sheet-tab-${i}`} hidden={i !== active}>
-          {(i === active || visited.has(i)) && <SheetGrid grid={s.display} />}
+      {tabs.map((name, i) => (
+        <div key={`${i}:${name}`} role="tabpanel" id={`sheet-panel-${i}`} aria-labelledby={`sheet-tab-${i}`} hidden={i !== active}>
+          {(i === active || visited.has(i)) &&
+            (i < sheets.length ? <SheetGrid grid={sheets[i].display} /> : <MyStats index={players} />)}
         </div>
       ))}
     </div>
