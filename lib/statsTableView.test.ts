@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { cellPasses, classifyColumns, columnWidths, compareCells, parseNumber, viewRows } from "@/lib/statsTableView";
+import { cellPasses, classifyColumns, columnWidths, compareCells, containsText, findInSections, normHeading, parseNumber, splitOnMatch, viewRows, visibleColumns } from "@/lib/statsTableView";
+import type { SheetSection } from "@/lib/statsSheetGrid";
 
 describe("parseNumber", () => {
   it("reads the numbers Excel displays", () => {
@@ -166,6 +167,79 @@ describe("viewRows", () => {
     const copy = JSON.stringify(rows);
     viewRows(rows, columns, ["", "Titans", "", ""], { column: 0, direction: "desc" });
     expect(JSON.stringify(rows)).toBe(copy);
+  });
+});
+
+describe("find in this sheet", () => {
+  it("matches text anywhere, ignoring case, and never matches an empty search", () => {
+    expect(containsText("Abdul Qadir Lashkarwala", "qadir")).toBe(true);
+    expect(containsText("Abdul Qadir", "  QADIR ")).toBe(true);
+    expect(containsText("Abdul", "zed")).toBe(false);
+    expect(containsText("Abdul", "")).toBe(false);
+    expect(containsText("Abdul", "   ")).toBe(false);
+  });
+
+  it("splits text into matching and other stretches, keeping the original spelling", () => {
+    expect(splitOnMatch("Abdul Qadir Abdullah", "abdul")).toEqual([
+      { text: "Abdul", hit: true },
+      { text: " Qadir ", hit: false },
+      { text: "Abdul", hit: true },
+      { text: "lah", hit: false },
+    ]);
+    expect(splitOnMatch("nothing here", "zed")).toEqual([{ text: "nothing here", hit: false }]);
+    expect(splitOnMatch("keep", "")).toEqual([{ text: "keep", hit: false }]);
+    expect(splitOnMatch("", "x")).toEqual([{ text: "", hit: false }]);
+    expect(splitOnMatch("aaa", "a").map((p) => p.text).join("")).toBe("aaa");
+  });
+
+  it("counts, per section, the rows of a table or lines of a note that contain the text", () => {
+    const sections: SheetSection[] = [
+      { kind: "table", title: "A", header: ["Player", "Team"], rows: [["Hashim", "Titans"], ["Saifee", "Knights"], ["Hashem", "Titans"]] },
+      { kind: "text", lines: ["Hashim is the captain", "Nothing else"] },
+      { kind: "table", title: "B", header: ["Player"], rows: [["Zed"]] },
+    ];
+    expect(findInSections(sections, "hash")).toEqual([2, 1, 0]);
+    expect(findInSections(sections, "titans")).toEqual([2, 0, 0]);
+    expect(findInSections(sections, "")).toEqual([0, 0, 0]);
+  });
+
+  it("limits a table's rows to those with the text in any cell, and still applies filters and sorting", () => {
+    const rows = [["Hashim", "Titans", "174"], ["Saifee", "Knights", "90"], ["Pindi", "Titans", "120"], ["Hashem", "Stallions", "7"]];
+    const cols = classifyColumns(rows, 3);
+    const names = (r: string[][]) => r.map((x) => x[0]);
+    expect(names(viewRows(rows, cols, ["", "", ""], null, "titans"))).toEqual(["Hashim", "Pindi"]);
+    expect(names(viewRows(rows, cols, ["", "", ""], null, "HASH"))).toEqual(["Hashim", "Hashem"]);
+    expect(names(viewRows(rows, cols, ["", "Titans", ""], { column: 2, direction: "asc" }, "i"))).toEqual(["Pindi", "Hashim"]);
+    expect(viewRows(rows, cols, ["", "", ""], null, "zzz")).toEqual([]);
+    expect(viewRows(rows, cols, ["", "", ""], null, "  ")).toEqual(rows);
+  });
+});
+
+describe("showing and hiding columns", () => {
+  it("compares headings ignoring case and surrounding space", () => {
+    expect(normHeading("  Bat INN ")).toBe("bat inn");
+  });
+
+  it("lists the columns left showing, in order, whatever the case of what was hidden", () => {
+    const header = ["Player", "Bat inn", "Runs", "Not outs"];
+    expect(visibleColumns(header, new Set())).toEqual([0, 1, 2, 3]);
+    expect(visibleColumns(header, new Set(["bat inn", "not outs"]))).toEqual([0, 2]);
+    expect(visibleColumns(header, new Set(["player", "bat inn", "runs", "not outs"]))).toEqual([]);
+    expect(visibleColumns(header, new Set(["no such heading"]))).toEqual([0, 1, 2, 3]);
+  });
+
+  it("searches only the columns that are showing, in a table and in the count", () => {
+    const rows = [["Hashim", "Titans", "174"], ["Saifee", "Knights", "90"], ["Pindi", "Titans", "120"]];
+    const cols = classifyColumns(rows, 3);
+    // "titans" only occurs in the Team column: hide it and nothing is found
+    expect(viewRows(rows, cols, ["", "", ""], null, "titans", [0, 2])).toEqual([]);
+    expect(viewRows(rows, cols, ["", "", ""], null, "titans", [0, 1, 2]).map((r) => r[0])).toEqual(["Hashim", "Pindi"]);
+    expect(viewRows(rows, cols, ["", "", ""], null, "titans").map((r) => r[0])).toEqual(["Hashim", "Pindi"]); // no list: every column
+
+    const sections: SheetSection[] = [{ kind: "table", title: null, header: ["Player", "Team", "Runs"], rows }];
+    expect(findInSections(sections, "titans")).toEqual([2]);
+    expect(findInSections(sections, "titans", new Set(["team"]))).toEqual([0]);
+    expect(findInSections(sections, "hashim", new Set(["team"]))).toEqual([1]);
   });
 });
 

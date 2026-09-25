@@ -1,61 +1,61 @@
 "use client";
 
 import { useMemo, useRef, useState, useSyncExternalStore } from "react";
-import type { StatsGrid } from "@/lib/statsUpload/schema";
+import { MY_STATS_TAB, type PublishedSheet } from "@/lib/statsPublish";
 import { buildPlayerIndex } from "@/lib/statsPlayerView";
 import { tabItem } from "@/lib/ui";
 import { SheetGrid } from "@/components/stats/SheetGrid";
 import { MyStats } from "@/components/stats/MyStats";
-
-const TAB_EVENT = "stats-sheet-tab";
-const MY_STATS = "My stats";
-
-function subscribe(onChange: () => void) {
-  window.addEventListener("hashchange", onChange);
-  window.addEventListener(TAB_EVENT, onChange);
-  return () => {
-    window.removeEventListener("hashchange", onChange);
-    window.removeEventListener(TAB_EVENT, onChange);
-  };
-}
-const getHash = () => window.location.hash;
-const getServerHash = () => "";
-
-function decodeHash(hash: string): string {
-  try {
-    return decodeURIComponent(hash.replace(/^#/, ""));
-  } catch {
-    return "";
-  }
-}
+import { decodeHash, getHash, getServerUrlPart, subscribeUrl, writeUrl } from "@/components/stats/urlState";
 
 /**
  * The sheets of a workbook as Excel-style tabs, plus a "My stats" tab when any
  * sheet lists players. The open tab lives in the URL hash (#Sheet%20name), so a
- * shared link can open on a particular tab and a refresh keeps the place. A
- * tab's content is built the first time it is opened and then kept, so sorting,
- * filters and a player search survive switching tabs. Used by the admin's
- * preview and the public page.
+ * shared link can open on a particular tab and a refresh keeps the place; with
+ * no hash the page opens on `landing`, else the first tab — and a link carrying
+ * ?player= opens on My stats. A tab's content is built the first time it is
+ * opened and then kept, so sorting, filters, a find and a player search survive
+ * switching tabs. Used by the admin's preview and the public page.
  */
-export function SheetTabs({ sheets }: { sheets: { name: string; display: StatsGrid }[] }) {
+export function SheetTabs({
+  sheets,
+  landing = null,
+  sharePath = null,
+  initialPlayer = null,
+  initialCompare = null,
+}: {
+  sheets: PublishedSheet[];
+  /** The tab to open when the URL doesn't ask for one: a tab name, or "My stats". */
+  landing?: string | null;
+  /** The public page's own path (/stats/<token>), so My stats can offer a link and an image; null when there isn't one. */
+  sharePath?: string | null;
+  /** ?player= and ?vs= from the address, as the server read them — so the server's HTML and the browser's first render agree. */
+  initialPlayer?: string | null;
+  initialCompare?: string | null;
+}) {
   const players = useMemo(() => buildPlayerIndex(sheets), [sheets]);
   const tabs = useMemo(
-    () => [...sheets.map((s) => s.name), ...(players.names.length > 0 ? [MY_STATS] : [])],
+    () => [...sheets.map((s) => s.name), ...(players.names.length > 0 ? [MY_STATS_TAB] : [])],
     [sheets, players]
   );
 
-  const hash = useSyncExternalStore(subscribe, getHash, getServerHash);
+  const hash = useSyncExternalStore(subscribeUrl, getHash, getServerUrlPart);
   const wanted = decodeHash(hash);
-  const found = tabs.indexOf(wanted);
+
+  let found = tabs.indexOf(wanted);
+  if (found < 0 && wanted === "") {
+    // nothing in the hash: a player link means My stats, otherwise the admin's chosen opening tab
+    if (initialPlayer && players.names.length > 0) found = tabs.indexOf(MY_STATS_TAB);
+    else if (landing) found = tabs.indexOf(landing);
+  }
   const active = found >= 0 ? found : 0;
+
   const [visited, setVisited] = useState<ReadonlySet<number>>(new Set());
   const tabRefs = useRef<(HTMLButtonElement | null)[]>([]);
 
   function select(index: number, focus = false) {
     setVisited((prev) => new Set(prev).add(index));
-    const url = `${window.location.pathname}${window.location.search}#${encodeURIComponent(tabs[index])}`;
-    window.history.replaceState(null, "", url);
-    window.dispatchEvent(new Event(TAB_EVENT));
+    writeUrl({ hash: tabs[index] });
     if (focus) tabRefs.current[index]?.focus();
   }
 
@@ -106,7 +106,11 @@ export function SheetTabs({ sheets }: { sheets: { name: string; display: StatsGr
       {tabs.map((name, i) => (
         <div key={`${i}:${name}`} role="tabpanel" id={`sheet-panel-${i}`} aria-labelledby={`sheet-tab-${i}`} hidden={i !== active}>
           {(i === active || visited.has(i)) &&
-            (i < sheets.length ? <SheetGrid grid={sheets[i].display} /> : <MyStats index={players} />)}
+            (i < sheets.length ? (
+              <SheetGrid sections={sheets[i].sections} />
+            ) : (
+              <MyStats index={players} sharePath={sharePath} initialPlayer={initialPlayer} initialCompare={initialCompare} />
+            ))}
         </div>
       ))}
     </div>

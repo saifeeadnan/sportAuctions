@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getPublicTournamentStats } from "@/lib/services/tournamentStats.service";
 import { SheetTabs } from "@/components/stats/SheetTabs";
+import { buildPlayerIndex, findExactPlayer } from "@/lib/statsPlayerView";
 import { formatDateTime } from "@/lib/dates";
 
 // Memoized per request so generateMetadata and the page share one query.
@@ -10,20 +11,33 @@ const loadStats = cache(getPublicTournamentStats);
 
 export async function generateMetadata({
   params,
+  searchParams,
 }: {
   params: Promise<{ token: string }>;
+  searchParams: Promise<{ player?: string | string[] }>;
 }): Promise<Metadata> {
   const { token } = await params;
+  const { player: playerParam } = await searchParams;
   const stats = await loadStats(token);
   if (!stats) notFound();
 
-  const title = `${stats.leagueName} — tournament statistics`;
-  const description = stats.label ?? `${stats.sheets.length} sheet${stats.sheets.length === 1 ? "" : "s"} of tournament statistics`;
+  // A link to one player previews as that player: their name and a card of their figures.
+  const typed = Array.isArray(playerParam) ? playerParam[0] : playerParam;
+  const player = typed ? findExactPlayer(buildPlayerIndex(stats.sheets), typed) : null;
+
+  const title = player ? `${player} — ${stats.leagueName}` : `${stats.leagueName} — tournament statistics`;
+  const description = player
+    ? `Tournament statistics${stats.label ? ` · ${stats.label}` : ""}`
+    : (stats.label ?? `${stats.sheets.length} sheet${stats.sheets.length === 1 ? "" : "s"} of tournament statistics`);
+  const image = player ? [{ url: `/stats/${token}/card?player=${encodeURIComponent(player)}`, width: 1200, height: 630 }] : undefined;
   return {
+    // Chat apps need an absolute address for the preview image.
+    metadataBase: new URL(process.env.NEXTAUTH_URL ?? "http://localhost:3000"),
     title,
     description,
     // Chat-app link previews are the point of a share link.
-    openGraph: { title, description },
+    openGraph: { title, description, ...(image ? { images: image } : {}) },
+    ...(image ? { twitter: { card: "summary_large_image", title, description, images: image } } : {}),
     // The token IS the access control — keep these URLs out of search
     // indexes should one ever leak.
     robots: { index: false, follow: false },
@@ -39,10 +53,14 @@ export async function generateMetadata({
  */
 export default async function TournamentStatsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ token: string }>;
+  searchParams: Promise<{ player?: string | string[]; vs?: string | string[] }>;
 }) {
   const { token } = await params;
+  const { player, vs } = await searchParams;
+  const first = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v) || null;
   const stats = await loadStats(token);
   if (!stats) notFound();
 
@@ -67,7 +85,13 @@ export default async function TournamentStatsPage({
         </div>
       </header>
 
-      <SheetTabs sheets={stats.sheets} />
+      <SheetTabs
+        sheets={stats.sheets}
+        landing={stats.landingTab}
+        sharePath={`/stats/${token}`}
+        initialPlayer={first(player)}
+        initialCompare={first(vs)}
+      />
     </div>
   );
 }

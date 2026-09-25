@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { buildPlayerIndex, findPlayers, groupSections, isCompactSection, isNameHeading, playerStats } from "@/lib/statsPlayerView";
+import { buildPlayerIndex as indexOfSections, cardStats, compareStats, findExactPlayer, findPlayers, groupSections, isCompactSection, isNameHeading, playerStats } from "@/lib/statsPlayerView";
+import { splitSheet } from "@/lib/statsSheetGrid";
 import type { StatsGrid } from "@/lib/statsUpload/schema";
+
+// The tests describe sheets as grids; visitors get them already split into sections.
+const buildPlayerIndex = (sheets: { name: string; display: StatsGrid }[]) =>
+  indexOfSections(sheets.map((s) => ({ name: s.name, sections: splitSheet(s.display) })));
 
 // A small workbook shaped like the real one: a per-person table, a per-season
 // table, a stacked leaderboard sheet, and a sheet with no people in it.
@@ -128,6 +133,7 @@ describe("playerStats", () => {
   it("gives a person's single row in a per-person table as a Value column, one field per column", () => {
     const [career] = playerStats(index, "Hashim");
     expect(career).toEqual({
+      table: 0,
       sheet: "Career",
       title: null,
       columns: ["Value"],
@@ -196,7 +202,7 @@ describe("playerStats", () => {
 });
 
 describe("groupSections", () => {
-  const section = (columns: string[]) => ({ sheet: "S", title: null, columns, fields: [{ label: "x", values: columns.map(() => "1") }] });
+  const section = (columns: string[]) => ({ table: 0, sheet: "S", title: null, columns, fields: [{ label: "x", values: columns.map(() => "1") }] });
 
   it("gathers each run of narrow sections into one group, keeping the order, and leaves wide ones alone", () => {
     const a = section(["Value"]);
@@ -218,5 +224,113 @@ describe("groupSections", () => {
 
   it("is empty for no sections", () => {
     expect(groupSections([])).toEqual([]);
+  });
+});
+
+describe("compareStats", () => {
+  const index = buildPlayerIndex(sheets);
+
+  it("puts two players side by side, a column each in a per-person table", () => {
+    const careerSection = compareStats(index, "Hashim", "Adnan Saifee").find((s) => s.sheet === "Career")!;
+    expect(careerSection.columns).toEqual([{ player: "Hashim", label: "Value" }, { player: "Adnan Saifee", label: "Value" }]);
+    expect(careerSection.fields).toEqual([
+      { label: "Seasons", values: ["4", "5"] },
+      { label: "Runs", values: ["174", "151"] },
+      { label: "Wickets", values: ["3", "16"] },
+    ]);
+  });
+
+  it("gives each player their own season columns in a per-season table", () => {
+    const section = compareStats(index, "Hashim", "Adnan Saifee").find((s) => s.sheet === "Season detail")!;
+    expect(section.columns).toEqual([
+      { player: "Hashim", label: "2025 · Titans" },
+      { player: "Hashim", label: "2026 · Stallions" },
+      { player: "Adnan Saifee", label: "2025 · Knights" },
+      { player: "Adnan Saifee", label: "2026 · Knights" },
+    ]);
+    // Result: Hashim was champion in 2025; Adnan had no result in either season, so his cells are blank, not missing
+    expect(section.fields).toEqual([
+      { label: "Runs", values: ["90", "84", "60", "91"] },
+      { label: "Result", values: ["Champion", "", "—", "—"] },
+    ]);
+  });
+
+  it("shows a dash column for a player who is not in a table the other is in", () => {
+    const section = compareStats(index, "Hashim", "Abdul Qadir Lashkarwala").find((s) => s.title === "CAREER - MOST RUNS");
+    expect(section).toBeDefined();
+    const wickets = compareStats(index, "Hashim", "Adnan Saifee").find((s) => s.title === "CAREER - MOST WICKETS")!;
+    expect(wickets.columns).toEqual([{ player: "Hashim", label: "—" }, { player: "Adnan Saifee", label: "Value" }]);
+    expect(wickets.fields.find((f) => f.label === "Wickets")!.values).toEqual(["—", "16"]);
+  });
+
+  it("lists a table once even when both players are in it, in workbook order, and none when neither is", () => {
+    const tables = compareStats(index, "Hashim", "Adnan Saifee").map((s) => s.table);
+    expect(tables).toEqual([...tables].sort((a, b) => a - b));
+    expect(new Set(tables).size).toBe(tables.length);
+    expect(compareStats(index, "Nobody", "Nobody Else")).toEqual([]);
+  });
+
+  it("keeps the first player's field order, then adds any field only the second has", () => {
+    const idx = buildPlayerIndex([
+      { name: "A", display: [["Player", "Runs", "Wickets"], ["One", "5", ""], ["Two", "7", "3"]] },
+    ]);
+    // One has only Runs (Wickets is blank for him), Two has both
+    const [section] = compareStats(idx, "One", "Two");
+    expect(section.fields.map((f) => f.label)).toEqual(["Runs", "Wickets"]);
+    expect(section.fields[1].values).toEqual(["—", "3"]);
+  });
+});
+
+describe("findExactPlayer", () => {
+  const index = buildPlayerIndex(sheets);
+
+  it("finds a player by name ignoring case and spacing, and returns the index's own spelling", () => {
+    expect(findExactPlayer(index, "  adnan   SAIFEE ")).toBe("Adnan Saifee");
+    expect(findExactPlayer(index, "Hashim")).toBe("Hashim");
+  });
+
+  it("does not guess from part of a name", () => {
+    expect(findExactPlayer(index, "Adnan")).toBeNull();
+    expect(findExactPlayer(index, "")).toBeNull();
+    expect(findExactPlayer(index, "Nobody")).toBeNull();
+  });
+});
+
+describe("cardStats", () => {
+  const field = (label: string, value: string) => ({ label, values: [value] });
+  const lone = (title: string | null, labels: string[]) => ({ table: 0, sheet: "S", title, columns: ["Value"], fields: labels.map((l, i) => field(l, String(i + 1))) });
+
+  it("takes fields from the overall profile tables and skips leaderboard blocks and per-season tables", () => {
+    const sections = [
+      lone("CAREER - MOST RUNS", ["#", "Runs", "Matches"]),
+      { table: 1, sheet: "Seasons", title: null, columns: ["2025", "2026"], fields: [{ label: "Runs", values: ["1", "2"] }] },
+      lone(null, ["Seasons", "Matches", "Runs"]),
+    ];
+    expect(cardStats(sections)).toEqual([
+      { label: "Seasons", value: "1" },
+      { label: "Matches", value: "2" },
+      { label: "Runs", value: "3" },
+    ]);
+  });
+
+  it("spreads the figures over the first two profile tables and stops at the maximum", () => {
+    const many = Array.from({ length: 20 }, (_, i) => `A${i}`);
+    const other = Array.from({ length: 20 }, (_, i) => `B${i}`);
+    const stats = cardStats([lone(null, many), lone(null, other), lone(null, ["Third", "Third2", "Third3"])], 12);
+    expect(stats).toHaveLength(12);
+    expect(stats.slice(0, 6).map((f) => f.label)).toEqual(["A0", "A1", "A2", "A3", "A4", "A5"]);
+    expect(stats.slice(6).map((f) => f.label)).toEqual(["B0", "B1", "B2", "B3", "B4", "B5"]);
+  });
+
+  it("shows a heading once even when two tables have it, and fills the space with the next fields instead", () => {
+    const stats = cardStats([lone(null, ["Seasons", "Matches", "Runs", "Wickets"]), lone(null, ["seasons", "Matches", "Rank", "Score"])], 6);
+    // three from each table first (the second's repeats skipped), then the leftover space is topped up from what remains
+    expect(stats.map((f) => f.label)).toEqual(["Seasons", "Matches", "Runs", "Rank", "Score", "Wickets"]);
+  });
+
+  it("falls back to leaderboard blocks when there is no profile table, and is empty when there is nothing lone", () => {
+    expect(cardStats([lone("CAREER - MOST RUNS", ["Runs", "Matches"])]).map((f) => f.label)).toEqual(["Runs", "Matches"]);
+    expect(cardStats([{ table: 0, sheet: "S", title: null, columns: ["a", "b"], fields: [{ label: "Runs", values: ["1", "2"] }] }])).toEqual([]);
+    expect(cardStats([])).toEqual([]);
   });
 });

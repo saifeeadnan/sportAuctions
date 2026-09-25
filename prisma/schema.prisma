@@ -221,6 +221,9 @@ model TournamentStatsUpload {
   fileName     String
   mimeType     String
   fileData     Bytes
+  // Which tab the public page opens on: a sheet's original name, or "@my-stats".
+  // Null = the first tab.
+  landingTab   String?
 
   sheets       TournamentStatsSheet[]
   // Set while this upload is the league's published one.
@@ -238,9 +241,15 @@ model TournamentStatsSheet {
   id          String                @id @default(cuid())
   uploadId    String
   upload      TournamentStatsUpload @relation(fields: [uploadId], references: [id], onDelete: Cascade)
-  // Tab order — the order the sheets have in the workbook.
+  // Tab order — the workbook's order until the admin rearranges it.
   position    Int
+  // The sheet's own name in the workbook; `label` is what the tab is called
+  // when the admin gave it a friendlier one.
   name        String
+  label       String?
+  // Table headings (string[]) removed from this sheet before anyone but the
+  // admin receives it — the public page never gets those columns.
+  hiddenColumns Json @default("[]")
   // (string | number | null)[][] — every row the same length.
   display     Json
   values      Json

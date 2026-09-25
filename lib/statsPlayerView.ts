@@ -1,6 +1,5 @@
-import { splitSheet } from "@/lib/statsSheetGrid";
+import type { SheetSection } from "@/lib/statsSheetGrid";
 import { classifyColumns } from "@/lib/statsTableView";
-import type { StatsGrid } from "@/lib/statsUpload/schema";
 
 // "My stats": find one player across every sheet and lay their rows out
 // transposed — each of a table's columns becomes a row — so a 27-column table
@@ -34,13 +33,13 @@ export type PlayerIndex = {
   names: string[];
 };
 
-/** Finds every table with a name column, and the names in them. */
-export function buildPlayerIndex(sheets: { name: string; display: StatsGrid }[]): PlayerIndex {
+/** Finds every table with a name column, and the names in them. Works from the sheets as visitors receive them (hidden columns already gone). */
+export function buildPlayerIndex(sheets: { name: string; sections: SheetSection[] }[]): PlayerIndex {
   const tables: IndexedTable[] = [];
   const seen = new Map<string, string>();
 
   for (const sheet of sheets) {
-    for (const section of splitSheet(sheet.display)) {
+    for (const section of sheet.sections) {
       if (section.kind !== "table") continue;
       const nameCol = section.header.findIndex((label) => isNameHeading(label));
       if (nameCol < 0) continue;
@@ -80,6 +79,8 @@ export function findPlayers(index: PlayerIndex, query: string, limit = Infinity)
 
 /** One table's worth of a player's data, transposed: a row per field, a column per matching row. */
 export type PlayerSection = {
+  /** Which table of the index this came from — how two players' sections are matched up. */
+  table: number;
   sheet: string;
   title: string | null;
   /** One heading per matching row — "2026 · Knights" for a season, "Value" for a lone row. */
@@ -99,7 +100,7 @@ export function playerStats(index: PlayerIndex, name: string): PlayerSection[] {
   if (key === "") return [];
   const sections: PlayerSection[] = [];
 
-  for (const table of index.tables) {
+  for (const [tableId, table] of index.tables.entries()) {
     const matches = table.rows.filter((row) => norm(row[table.nameCol] ?? "") === key);
     if (matches.length === 0) continue;
 
@@ -129,20 +130,20 @@ export function playerStats(index: PlayerIndex, name: string): PlayerSection[] {
       .map((label, c) => ({ c, label: heading(label, c), values: matches.map((row) => (row[c] ?? "").trim()) }))
       .filter((f) => !skip.has(f.c) && f.values.some((v) => v !== ""))
       .map(({ label, values }) => ({ label, values }));
-    if (fields.length > 0) sections.push({ sheet: table.sheet, title: table.title, columns, fields });
+    if (fields.length > 0) sections.push({ table: tableId, sheet: table.sheet, title: table.title, columns, fields });
   }
   return sections;
 }
 
 /** A table of a label and up to three values is narrow by nature: several fit side by side. A wider one needs the full width. */
-export const isCompactSection = (section: PlayerSection): boolean => section.columns.length <= 3;
+export const isCompactSection = (section: { columns: unknown[] }): boolean => section.columns.length <= 3;
 
 /**
  * Keeps the sections in order but gathers each run of compact ones into a group,
  * so a page of single-value leaderboard blocks reads as a grid, not one long column.
  */
-export function groupSections(sections: PlayerSection[]): { compact: boolean; sections: PlayerSection[] }[] {
-  const groups: { compact: boolean; sections: PlayerSection[] }[] = [];
+export function groupSections<T extends { columns: unknown[] }>(sections: T[]): { compact: boolean; sections: T[] }[] {
+  const groups: { compact: boolean; sections: T[] }[] = [];
   for (const section of sections) {
     const compact = isCompactSection(section);
     const last = groups[groups.length - 1];
@@ -150,4 +151,90 @@ export function groupSections(sections: PlayerSection[]): { compact: boolean; se
     else groups.push({ compact, sections: [section] });
   }
   return groups;
+}
+
+/** Two players' data for one table, side by side: a column per row of each, a shared row per field. */
+export type CompareSection = {
+  table: number;
+  sheet: string;
+  title: string | null;
+  /** In order: the first player's columns, then the second's. A player with nothing in this table gets one "—" column. */
+  columns: { player: string; label: string }[];
+  fields: { label: string; values: string[] }[];
+};
+
+const ABSENT = "—";
+
+/**
+ * Two players compared. Every table either appears in gets a section: fields
+ * are the union of both players' fields (the first player's order, then any the
+ * second has extra), and a cell is "—" where a player has no such field or no
+ * row in that table at all.
+ */
+export function compareStats(index: PlayerIndex, first: string, second: string): CompareSection[] {
+  const a = new Map(playerStats(index, first).map((s) => [s.table, s]));
+  const b = new Map(playerStats(index, second).map((s) => [s.table, s]));
+  const tables = [...new Set([...a.keys(), ...b.keys()])].sort((x, y) => x - y);
+
+  return tables.map((table) => {
+    const sa = a.get(table);
+    const sb = b.get(table);
+    const meta = (sa ?? sb)!;
+    const columnsOf = (player: string, section: PlayerSection | undefined) =>
+      section ? section.columns.map((label) => ({ player, label })) : [{ player, label: ABSENT }];
+    const cellsOf = (section: PlayerSection | undefined, label: string) => {
+      if (!section) return [ABSENT];
+      const field = section.fields.find((f) => f.label === label);
+      return field ? field.values : section.columns.map(() => ABSENT);
+    };
+
+    const labels = [...new Set([...(sa?.fields ?? []), ...(sb?.fields ?? [])].map((f) => f.label))];
+    return {
+      table,
+      sheet: meta.sheet,
+      title: meta.title,
+      columns: [...columnsOf(first, sa), ...columnsOf(second, sb)],
+      fields: labels.map((label) => ({ label, values: [...cellsOf(sa, label), ...cellsOf(sb, label)] })),
+    };
+  });
+}
+
+/** The index's own spelling of a name, if that player exists (ignoring case and spacing). */
+export function findExactPlayer(index: PlayerIndex, name: string): string | null {
+  const key = norm(name);
+  if (key === "") return null;
+  return index.names.find((n) => norm(n) === key) ?? null;
+}
+
+/**
+ * The figures for a player's shareable image: the fields of their overall
+ * profile tables — one lone row, no leaderboard title — in workbook order, a few
+ * from each of the first two, up to `max` in all. If they have no such table
+ * (only leaderboard blocks), it falls back to any single-row table.
+ */
+export function cardStats(sections: PlayerSection[], max = 12): { label: string; value: string }[] {
+  const lone = sections.filter((s) => s.columns.length === 1);
+  const profiles = lone.filter((s) => s.title === null && s.fields.length >= 3);
+  const chosen = (profiles.length > 0 ? profiles : lone).slice(0, 2);
+  if (chosen.length === 0) return [];
+
+  const perSection = Math.ceil(max / chosen.length);
+  const out: { label: string; value: string }[] = [];
+  const seen = new Set<string>();
+  const take = (section: PlayerSection, limit: number) => {
+    let taken = 0;
+    for (const field of section.fields) {
+      if (out.length >= max || taken >= limit) return;
+      // two tables often share a heading ("Seasons", "Matches"): show it once, from the first
+      const key = field.label.trim().toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({ label: field.label, value: field.values[0] });
+      taken += 1;
+    }
+  };
+  // a few from each table first, then any space left is filled from what remains
+  for (const section of chosen) take(section, perSection);
+  for (const section of chosen) take(section, Infinity);
+  return out;
 }

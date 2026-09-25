@@ -1,4 +1,4 @@
-import { looksNumeric } from "@/lib/statsSheetGrid";
+import { looksNumeric, type SheetSection } from "@/lib/statsSheetGrid";
 
 // Sorting, filtering and column sizing for one displayed table. Pure and
 // browser-safe: it works on the text Excel showed ("1,234", "12.5%"), which is
@@ -102,9 +102,76 @@ export function cellPasses(filter: FilterKind, value: string, cell: string): boo
   return filter === "select" ? shown === wanted : shown.includes(wanted);
 }
 
-/** The rows to show: those passing every column's filter, in the chosen order (ties keep their sheet order). */
-export function viewRows(rows: string[][], columns: ColumnInfo[], filters: string[], sort: SortState): string[][] {
-  const kept = rows.filter((row) => columns.every((col, c) => cellPasses(col.filter, filters[c] ?? "", row[c] ?? "")));
+// ---------------------------------------------------------------------------
+// "Find in this sheet"
+// ---------------------------------------------------------------------------
+
+/** Whether the text contains what was typed, ignoring case. Nothing typed matches nothing. */
+export function containsText(text: string, find: string): boolean {
+  const wanted = find.trim().toLowerCase();
+  return wanted !== "" && text.toLowerCase().includes(wanted);
+}
+
+/** Splits text into the stretches that match what was typed and those that don't, for highlighting. */
+export function splitOnMatch(text: string, find: string): { text: string; hit: boolean }[] {
+  const wanted = find.trim().toLowerCase();
+  if (wanted === "" || text === "") return [{ text, hit: false }];
+  const lower = text.toLowerCase();
+  const parts: { text: string; hit: boolean }[] = [];
+  let at = 0;
+  for (let i = lower.indexOf(wanted); i !== -1; i = lower.indexOf(wanted, at)) {
+    if (i > at) parts.push({ text: text.slice(at, i), hit: false });
+    parts.push({ text: text.slice(i, i + wanted.length), hit: true });
+    at = i + wanted.length;
+  }
+  if (at < text.length) parts.push({ text: text.slice(at), hit: false });
+  return parts;
+}
+
+/**
+ * How many rows (of a table) or lines (of a note) in each section contain what
+ * was typed. Works on the sections as they are, before any column filter or
+ * sort, so the count says what is in the sheet.
+ */
+export function findInSections(sections: SheetSection[], find: string, hidden: ReadonlySet<string> = new Set()): number[] {
+  return sections.map((section) => {
+    if (section.kind !== "table") return section.lines.filter((line) => containsText(line, find)).length;
+    const visible = visibleColumns(section.header, hidden);
+    return section.rows.filter((row) => visible.some((c) => containsText(row[c] ?? "", find))).length;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Showing and hiding columns
+// ---------------------------------------------------------------------------
+
+/** A heading as it is compared for hiding: ignoring case and surrounding space. */
+export const normHeading = (heading: string): string => heading.trim().toLowerCase();
+
+/** The indexes of the columns left showing when the headings in `hidden` (see normHeading) are hidden. */
+export function visibleColumns(header: string[], hidden: ReadonlySet<string>): number[] {
+  return header.flatMap((heading, c) => (hidden.has(normHeading(heading)) ? [] : [c]));
+}
+
+/**
+ * The rows to show: those containing the find text in any cell and passing
+ * every column's filter, in the chosen order (ties keep their sheet order).
+ */
+export function viewRows(
+  rows: string[][],
+  columns: ColumnInfo[],
+  filters: string[],
+  sort: SortState,
+  find = "",
+  /** Only these columns are searched by `find` (the ones showing); all of them when omitted. */
+  findColumns?: number[]
+): string[][] {
+  const kept = rows.filter(
+    (row) =>
+      (find.trim() === "" ||
+        (findColumns ? findColumns.some((c) => containsText(row[c] ?? "", find)) : row.some((cell) => containsText(cell, find)))) &&
+      columns.every((col, c) => cellPasses(col.filter, filters[c] ?? "", row[c] ?? ""))
+  );
   if (!sort) return kept;
   const { column, direction } = sort;
   return kept

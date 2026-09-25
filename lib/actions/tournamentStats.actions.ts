@@ -8,6 +8,8 @@ import {
   publishStatsUpload,
   rotateStatsLink,
   stopSharingStats,
+  updateStatsSettings,
+  type StatsSettingsInput,
 } from "@/lib/services/tournamentStats.service";
 
 // The league is an explicit argument checked with assertInScope on every
@@ -55,5 +57,18 @@ export async function rotateStatsLinkAction(leagueId: string): Promise<ActionRes
     const result = await rotateStatsLink(leagueId, actorId);
     revalidatePath(PAGE);
     return result;
+  });
+}
+
+/** Saves tab order and names, hidden columns and the opening tab for one upload. */
+export async function updateStatsSettingsAction(
+  leagueId: string,
+  uploadId: string,
+  input: StatsSettingsInput
+): Promise<ActionResult> {
+  return toActionResult(async () => {
+    const actorId = await adminFor(leagueId);
+    await updateStatsSettings(leagueId, uploadId, input, actorId);
+    revalidatePath(PAGE);
   });
 }

@@ -90,7 +90,8 @@ export type AuditAction =
   | "STATS_UPLOAD_DELETED"
   | "STATS_PUBLISHED"
   | "STATS_SHARING_STOPPED"
-  | "STATS_LINK_ROTATED";
+  | "STATS_LINK_ROTATED"
+  | "STATS_SETTINGS_UPDATED";
 
 /**
  * Writes one audit row. Always takes an explicit transaction client — never

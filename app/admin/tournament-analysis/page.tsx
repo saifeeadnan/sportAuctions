@@ -9,6 +9,9 @@ import {
 import { UploadStatsForm } from "@/components/admin/UploadStatsForm";
 import { StatsUploadHistory } from "@/components/admin/StatsUploadHistory";
 import { StatsSharePanel } from "@/components/admin/StatsSharePanel";
+import { StatsSettingsPanel } from "@/components/admin/StatsSettingsPanel";
+import { MY_STATS_LANDING, MY_STATS_TAB } from "@/lib/statsPublish";
+import { buildPlayerIndex } from "@/lib/statsPlayerView";
 import { SheetTabs } from "@/components/stats/SheetTabs";
 import { formatDateTime } from "@/lib/dates";
 import { card, cardInteractive } from "@/lib/ui";
@@ -16,9 +19,9 @@ import { card, cardInteractive } from "@/lib/ui";
 export default async function TournamentAnalysisPage({
   searchParams,
 }: {
-  searchParams: Promise<{ league?: string; upload?: string }>;
+  searchParams: Promise<{ league?: string; upload?: string; player?: string; vs?: string }>;
 }) {
-  const { league: selectedLeagueId, upload: requestedUploadId } = await searchParams;
+  const { league: selectedLeagueId, upload: requestedUploadId, player, vs } = await searchParams;
   const { leagueIds } = await resolveAdminScope(selectedLeagueId);
   // Statistics belong to one league, so this page needs exactly one — the
   // sidebar's filter, or a League Admin's only league. Otherwise ask.
@@ -69,6 +72,15 @@ export default async function TournamentAnalysisPage({
   const selected = selectedId ? await getStatsUploadForAdmin(leagueId, selectedId) : null;
   const published = uploads.find((u) => u.isPublished);
 
+  // The preview is exactly what visitors get: the admin's tab names and order, hidden columns already cut.
+  const tabNameOf = (s: { name: string; label: string | null }) => s.label?.trim() || s.name;
+  const tabs = selected?.sheets.map((s) => ({ name: tabNameOf(s), sections: s.sections })) ?? [];
+  const hasMyStats = buildPlayerIndex(tabs).names.length > 0;
+  const landingSheet = selected?.sheets.find((s) => s.name === selected.landingTab);
+  const landing = selected?.landingTab === MY_STATS_LANDING ? MY_STATS_TAB : landingSheet ? tabNameOf(landingSheet) : null;
+  // The public address My stats links and images point at — only once this upload is what the public link shows.
+  const sharePath = selected?.isPublished && share ? `/stats/${share.token}` : null;
+
   return (
     <div data-wide className="flex flex-col gap-6">
       <div>{intro}</div>
@@ -102,7 +114,23 @@ export default async function TournamentAnalysisPage({
               {selected.isPublished ? " · this is what the public link shows" : " · not published"}
             </p>
           </div>
-          <SheetTabs key={selected.id} sheets={selected.sheets} />
+          <StatsSettingsPanel
+            key={selected.id}
+            leagueId={leagueId}
+            uploadId={selected.id}
+            landingTab={selected.landingTab}
+            hasMyStats={hasMyStats}
+            sheets={selected.sheets.map((s) => ({ name: s.name, label: s.label, hiddenColumns: s.hiddenColumns, headings: s.headings }))}
+          />
+          {/* keyed by the settings too, so saving a new order or name rebuilds the tabs */}
+          <SheetTabs
+            key={`${selected.id}:${tabs.map((t) => t.name).join("|")}:${selected.sheets.map((s) => s.hiddenColumns.join(",")).join("|")}`}
+            sheets={tabs}
+            landing={landing}
+            sharePath={sharePath}
+            initialPlayer={player || null}
+            initialCompare={vs || null}
+          />
         </section>
       )}
     </div>

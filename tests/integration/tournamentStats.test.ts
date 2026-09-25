@@ -20,6 +20,7 @@ import {
   publishStatsUpload,
   rotateStatsLink,
   stopSharingStats,
+  updateStatsSettings,
   uploadTournamentStats,
 } from "@/lib/services/tournamentStats.service";
 import { STATS_LIMITS } from "@/lib/statsUpload/schema";
@@ -81,7 +82,7 @@ describe("uploadTournamentStats", () => {
     expect(row.sheets[0].values).toEqual([["Player", "Runs"], ["Hashim", 174], ["Saifee", 90]]);
 
     const log = await expectAuditLog({ entityType: "TournamentStatsUpload", entityId: id, action: "STATS_UPLOADED", actorUserId: admin.id });
-    expect(log.after).toEqual({ fileName: "stats.xlsx", label: "2022–2026 stats", sheets: ["Career", "Leaders"] });
+    expect(log.after).toEqual({ fileName: "stats.xlsx", label: "2022–2026 stats", sheets: ["Career", "Leaders"], inheritedSetup: false });
   });
 
   it("caps the label at 80 characters and treats a blank one as none", async () => {
@@ -163,7 +164,10 @@ describe("listing and reading uploads", () => {
 
     const view = await getStatsUploadForAdmin(league.id, id);
     expect(view!.sheets.map((s) => s.name)).toEqual(["Leaders", "Career"]);
-    expect(view!.sheets[1].display[1]).toEqual(["Hashim", "174"]);
+    // each sheet arrives already split into its tables: a header and its rows
+    expect(view!.sheets[1].sections[0]).toMatchObject({ kind: "table", header: ["Player", "Runs"] });
+    expect(view!.sheets[1].sections[0].kind === "table" && view!.sheets[1].sections[0].rows[0]).toEqual(["Hashim", "174"]);
+    expect(view!.sheets[1].headings).toEqual(["Player", "Runs"]);
     expect(await getStatsUploadForAdmin(other.id, id)).toBeNull();
   });
 });
@@ -212,8 +216,8 @@ describe("publishing and the public link", () => {
     const { token } = await publishStatsUpload(league.id, id, admin.id);
 
     const pub = await getPublicTournamentStats(token);
-    expect(Object.keys(pub!).sort()).toEqual(["hasLeagueLogo", "label", "leagueId", "leagueName", "publishedAt", "sheets"]);
-    expect(Object.keys(pub!.sheets[0]).sort()).toEqual(["display", "name"]);
+    expect(Object.keys(pub!).sort()).toEqual(["hasLeagueLogo", "label", "landingTab", "leagueId", "leagueName", "publishedAt", "sheets"]);
+    expect(Object.keys(pub!.sheets[0]).sort()).toEqual(["name", "sections"]);
     expect(pub!.label).toBe("Public label");
     expect(pub!.leagueName).toBe(league.name);
     expect(pub!.hasLeagueLogo).toBe(false);
@@ -326,5 +330,182 @@ describe("league scoping (what the routes and actions rely on)", () => {
     expect(() => assertInScope([league.id], league.id)).not.toThrow();
     expect(() => assertInScope([league.id], other.id)).toThrow(AuthError);
     expect(() => assertInScope(null, other.id)).not.toThrow(); // site admin: unrestricted
+  });
+});
+
+describe("presentation settings", () => {
+  async function published() {
+    const { league, admin } = await fixture();
+    const up = await upload(league.id, admin.id, {
+      sheets: [CAREER, LEADERS, sheet("Notes", [["Player", "Runs", "Wickets"], ["Zed", "1", "2"], ["Amy", "3", "4"]])],
+    });
+    const { token } = await publishStatsUpload(league.id, up.id, admin.id);
+    return { league, admin, up, token };
+  }
+  const settings = (over: Partial<Parameters<typeof updateStatsSettings>[2]> = {}) => ({
+    sheets: [
+      { name: "Notes", label: null as string | null, hiddenColumns: [] as string[] },
+      { name: "Career", label: null as string | null, hiddenColumns: [] as string[] },
+      { name: "Leaders", label: null as string | null, hiddenColumns: [] as string[] },
+    ],
+    landingTab: null as string | null,
+    ...over,
+  });
+
+  it("reorders the tabs, renames them and picks the opening tab, for the admin view and the public page alike", async () => {
+    const { league, admin, up, token } = await published();
+    await updateStatsSettings(
+      league.id,
+      up.id,
+      settings({
+        sheets: [
+          { name: "Notes", label: "Everyone", hiddenColumns: [] },
+          { name: "Career", label: null, hiddenColumns: [] },
+          { name: "Leaders", label: "Top lists", hiddenColumns: [] },
+        ],
+        landingTab: "Career",
+      }),
+      admin.id
+    );
+
+    const pub = (await getPublicTournamentStats(token))!;
+    expect(pub.sheets.map((s) => s.name)).toEqual(["Everyone", "Career", "Top lists"]);
+    expect(pub.landingTab).toBe("Career");
+
+    const forAdmin = (await getStatsUploadForAdmin(league.id, up.id))!;
+    expect(forAdmin.sheets.map((s) => [s.name, s.label])).toEqual([["Notes", "Everyone"], ["Career", null], ["Leaders", "Top lists"]]);
+    expect(forAdmin.landingTab).toBe("Career");
+    // the history and publish prompts name the tabs as visitors see them
+    expect((await listStatsUploads(league.id))[0].sheets.map((s) => s.name)).toEqual(["Everyone", "Career", "Top lists"]);
+
+    const log = await expectAuditLog({ entityType: "TournamentStatsUpload", entityId: up.id, action: "STATS_SETTINGS_UPDATED", actorUserId: admin.id });
+    expect(log.after).toMatchObject({ landingTab: "Career" });
+  });
+
+  it("names My stats as the opening tab, and reports no opening tab when none is chosen", async () => {
+    const { league, admin, up, token } = await published();
+    await updateStatsSettings(league.id, up.id, settings({ landingTab: "@my-stats" }), admin.id);
+    expect((await getPublicTournamentStats(token))!.landingTab).toBe("My stats");
+    await updateStatsSettings(league.id, up.id, settings({ landingTab: null }), admin.id);
+    expect((await getPublicTournamentStats(token))!.landingTab).toBeNull();
+  });
+
+  it("removes hidden columns on the server, so the public payload never contains them", async () => {
+    const { league, admin, up, token } = await published();
+    await updateStatsSettings(
+      league.id,
+      up.id,
+      settings({
+        sheets: [
+          { name: "Notes", label: null, hiddenColumns: ["Wickets"] },
+          { name: "Career", label: null, hiddenColumns: ["runs"] },
+          { name: "Leaders", label: null, hiddenColumns: [] },
+        ],
+      }),
+      admin.id
+    );
+
+    const pub = (await getPublicTournamentStats(token))!;
+    const notes = pub.sheets.find((s) => s.name === "Notes")!.sections[0];
+    expect(notes.kind === "table" && notes.header).toEqual(["Player", "Runs"]);
+    const career = pub.sheets.find((s) => s.name === "Career")!.sections[0];
+    expect(career.kind === "table" && career.header).toEqual(["Player"]);
+    // nothing of a hidden column is in what the page is sent (Leaders has a 174 of its own, so look at the sheets concerned)
+    expect(JSON.stringify(pub.sheets.find((s) => s.name === "Career"))).not.toContain("174");
+    expect(JSON.stringify(pub.sheets.find((s) => s.name === "Notes"))).not.toContain("Wickets");
+
+    // the admin still sees every heading, to be able to unhide them, and the stored grids are untouched
+    const forAdmin = (await getStatsUploadForAdmin(league.id, up.id))!;
+    expect(forAdmin.sheets.find((s) => s.name === "Career")!.headings).toEqual(["Player", "Runs"]);
+    expect(forAdmin.sheets.find((s) => s.name === "Career")!.hiddenColumns).toEqual(["runs"]);
+    const stored = await prisma.tournamentStatsSheet.findFirstOrThrow({ where: { uploadId: up.id, name: "Career" } });
+    expect(stored.display).toEqual([["Player", "Runs"], ["Hashim", "174"], ["Saifee", "90"]]);
+  });
+
+  it("rejects settings that do not fit the upload, and saves nothing", async () => {
+    const { league, admin, up } = await published();
+    const other = await createFixtureLeague();
+    const expectRejected = async (input: ReturnType<typeof settings>, message: RegExp) => {
+      await expect(updateStatsSettings(league.id, up.id, input, admin.id)).rejects.toThrow(message);
+    };
+
+    await expectRejected(settings({ sheets: settings().sheets.slice(1) }), /does not match this upload|doesn.t match this upload/);
+    await expectRejected(settings({ sheets: [...settings().sheets.slice(0, 2), { name: "Career", label: null, hiddenColumns: [] }] }), /match this upload/);
+    await expectRejected(settings({ sheets: [...settings().sheets.slice(0, 2), { name: "Nope", label: null, hiddenColumns: [] }] }), /match this upload/);
+    await expectRejected(settings({ sheets: settings().sheets.map((s) => ({ ...s, label: s.name === "Notes" ? "career" : s.label })) }), /Two tabs are both called/);
+    await expectRejected(settings({ sheets: settings().sheets.map((s) => ({ ...s, label: s.name === "Notes" ? "my STATS" : s.label })) }), /player-search tab/);
+    await expectRejected(settings({ landingTab: "Missing" }), /open first/);
+    await expect(updateStatsSettings(other.id, up.id, settings(), admin.id)).rejects.toThrow(/upload not found/i);
+
+    const view = (await getStatsUploadForAdmin(league.id, up.id))!;
+    expect(view.sheets.map((s) => s.name)).toEqual(["Career", "Leaders", "Notes"]); // still the workbook's order
+    expect(await prisma.auditLog.count({ where: { action: "STATS_SETTINGS_UPDATED" } })).toBe(0);
+  });
+
+  it("trims and caps a tab name, and treats a blank one as the sheet's own name", async () => {
+    const { league, admin, up } = await published();
+    await updateStatsSettings(
+      league.id,
+      up.id,
+      settings({ sheets: settings().sheets.map((s) => ({ ...s, label: s.name === "Notes" ? "  " : s.name === "Career" ? "x".repeat(100) : null })) }),
+      admin.id
+    );
+    const view = (await getStatsUploadForAdmin(league.id, up.id))!;
+    expect(view.sheets.find((s) => s.name === "Notes")!.label).toBeNull();
+    expect(view.sheets.find((s) => s.name === "Career")!.label).toHaveLength(60);
+  });
+
+  it("carries the setup onto a corrected upload of the same workbook", async () => {
+    const { league, admin, up, token } = await published();
+    await updateStatsSettings(
+      league.id,
+      up.id,
+      settings({
+        sheets: [
+          { name: "Notes", label: "Everyone", hiddenColumns: ["Wickets"] },
+          { name: "Career", label: null, hiddenColumns: [] },
+          { name: "Leaders", label: null, hiddenColumns: [] },
+        ],
+        landingTab: "Notes",
+      }),
+      admin.id
+    );
+
+    const next = await upload(league.id, admin.id, {
+      sheets: [CAREER, LEADERS, sheet("Notes", [["Player", "Runs", "Wickets"], ["Zed", "9", "9"]])],
+    });
+    await publishStatsUpload(league.id, next.id, admin.id);
+
+    const pub = (await getPublicTournamentStats(token))!;
+    expect(pub.sheets.map((s) => s.name)).toEqual(["Everyone", "Career", "Leaders"]); // order, label and all
+    const notes = pub.sheets[0].sections[0];
+    expect(notes.kind === "table" && notes.header).toEqual(["Player", "Runs"]); // Wickets still hidden
+    expect(pub.landingTab).toBe("Everyone");
+    const log = await prisma.auditLog.findFirstOrThrow({ where: { entityId: next.id, action: "STATS_UPLOADED" } });
+    expect(log.after).toMatchObject({ inheritedSetup: true });
+  });
+
+  it("inherits from the published upload rather than a newer one that is not published", async () => {
+    const { league, admin, up } = await published();
+    await updateStatsSettings(league.id, up.id, settings({ sheets: settings().sheets.map((s) => ({ ...s, label: s.name === "Career" ? "Published name" : null })) }), admin.id);
+    const draft = await upload(league.id, admin.id, { sheets: [CAREER, LEADERS] });
+    await updateStatsSettings(
+      league.id,
+      draft.id,
+      { sheets: [{ name: "Leaders", label: null, hiddenColumns: [] }, { name: "Career", label: "Draft name", hiddenColumns: [] }], landingTab: null },
+      admin.id
+    );
+
+    const third = await upload(league.id, admin.id, { sheets: [CAREER, LEADERS] });
+    const view = (await getStatsUploadForAdmin(league.id, third.id))!;
+    expect(view.sheets.find((s) => s.name === "Career")!.label).toBe("Published name");
+  });
+
+  it("starts a first upload with the workbook's own order and no settings", async () => {
+    const { league, admin } = await fixture();
+    const { id } = await upload(league.id, admin.id);
+    const view = (await getStatsUploadForAdmin(league.id, id))!;
+    expect(view.sheets.map((s) => [s.name, s.label, s.hiddenColumns])).toEqual([["Career", null, []], ["Leaders", null, []]]);
+    expect(view.landingTab).toBeNull();
   });
 });
