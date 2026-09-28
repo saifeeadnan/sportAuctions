@@ -9,6 +9,7 @@ const TABS = [
   { href: "/admin/tournaments", label: "Tournaments" },
   { href: "/admin/fantasy-teams", label: "Fantasy Teams" },
   { href: "/admin/tournament-analysis", label: "Tournament Analysis" },
+  { href: "/admin/pickleball", label: "Scoring" },
   { href: "/admin/users", label: "Users" },
 ];
 

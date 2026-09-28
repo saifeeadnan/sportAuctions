@@ -57,6 +57,16 @@ export async function loadScopedTeam(teamId: string, leagueIds: string[] | null)
   return team;
 }
 
+export async function loadScopedPickleballEvent(eventId: string, leagueIds: string[] | null) {
+  const event = await prisma.pickleballEvent.findUnique({
+    where: { id: eventId },
+    include: { tournament: true },
+  });
+  if (!event) throw new ValidationError("Pickleball event not found");
+  assertInScope(leagueIds, event.tournament.leagueId);
+  return event;
+}
+
 export async function loadScopedTournamentSponsor(sponsorId: string, leagueIds: string[] | null) {
   const sponsor = await prisma.tournamentSponsor.findUnique({
     where: { id: sponsorId },

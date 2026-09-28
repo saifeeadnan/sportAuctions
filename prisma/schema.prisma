@@ -66,7 +66,7 @@ enum AuctionCorrectionType {
 }
 
 enum FantasyPricingModel {
-  SOLD_PRICE       // default — every pick costs what it actually sold for (or category basePrice if unsold)
+  SOLD_PRICE // default — every pick costs what it actually sold for (or category basePrice if unsold)
   CATEGORY_AVERAGE // every pick costs the average soldPrice across every SOLD player in its category, this auction
 }
 
@@ -122,24 +122,27 @@ model User {
   photoMimeType String?
   photoData     Bytes?
 
-  memberships        LeagueMembership[]
-  createdRosters     PlayerRoster[]
-  managedTeams       Team[]
-  createdTournaments Tournament[]
-  createdAuctions    Auction[]
-  fantasyTeams       FantasyTeam[]
-  uploadedRulesDocs  TournamentDocument[]
-  loginEvents        LoginEvent[]
-  analyticsSessions  AnalyticsSession[]
-  sponsorClicks      SponsorClickEvent[]
-  auctionCorrections AuctionCorrectionLog[]
-  auditLogs          AuditLog[]
-  pointsUploads      FantasyPointsUpload[]
-  statsUploads       TournamentStatsUpload[]
-  seedingWindowsCreated   PlayerSeedingWindow[]  @relation("SeedingWindowsCreated")
-  seedingWindowsFinalized PlayerSeedingWindow[]  @relation("SeedingWindowsFinalized")
-  seedSubmissions         PlayerSeedSubmission[]
-  linkedPlayerPhotos      Player[]               @relation("PlayerLinkedPhoto")
+  memberships              LeagueMembership[]
+  createdRosters           PlayerRoster[]
+  managedTeams             Team[]
+  createdTournaments       Tournament[]
+  createdAuctions          Auction[]
+  fantasyTeams             FantasyTeam[]
+  uploadedRulesDocs        TournamentDocument[]
+  loginEvents              LoginEvent[]
+  analyticsSessions        AnalyticsSession[]
+  sponsorClicks            SponsorClickEvent[]
+  auctionCorrections       AuctionCorrectionLog[]
+  auditLogs                AuditLog[]
+  pointsUploads            FantasyPointsUpload[]
+  statsUploads             TournamentStatsUpload[]
+  pickleballEventsCreated  PickleballEvent[]       @relation("PickleballEventCreatedBy")
+  pickleballEventsUploaded PickleballEvent[]       @relation("PickleballEventUploadedBy")
+  pickleballGamesScored    PickleballGame[]
+  seedingWindowsCreated    PlayerSeedingWindow[]   @relation("SeedingWindowsCreated")
+  seedingWindowsFinalized  PlayerSeedingWindow[]   @relation("SeedingWindowsFinalized")
+  seedSubmissions          PlayerSeedSubmission[]
+  linkedPlayerPhotos       Player[]                @relation("PlayerLinkedPhoto")
 
   @@map("users")
 }
@@ -195,10 +198,10 @@ model League {
   mandatoryRosterFields    Json      @default("[\"email\",\"phone\"]")
   createdAt                DateTime  @default(now())
 
-  memberships LeagueMembership[]
-  rosters     PlayerRoster[]
-  tournaments Tournament[]
-  logo        LeagueLogo?
+  memberships  LeagueMembership[]
+  rosters      PlayerRoster[]
+  tournaments  Tournament[]
+  logo         LeagueLogo?
   statsUploads TournamentStatsUpload[]
   statsShare   TournamentStatsShare?
 
@@ -225,9 +228,9 @@ model TournamentStatsUpload {
   // Null = the first tab.
   landingTab   String?
 
-  sheets       TournamentStatsSheet[]
+  sheets      TournamentStatsSheet[]
   // Set while this upload is the league's published one.
-  publishedIn  TournamentStatsShare?
+  publishedIn TournamentStatsShare?
 
   @@index([leagueId, uploadedAt])
   @@map("tournament_stats_uploads")
@@ -238,23 +241,23 @@ model TournamentStatsUpload {
 /// prose notes). `display` is the text as Excel shows it (what the public page
 /// renders); `values` keeps raw numbers for the admin-only pivot builder.
 model TournamentStatsSheet {
-  id          String                @id @default(cuid())
-  uploadId    String
-  upload      TournamentStatsUpload @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+  id            String                @id @default(cuid())
+  uploadId      String
+  upload        TournamentStatsUpload @relation(fields: [uploadId], references: [id], onDelete: Cascade)
   // Tab order — the workbook's order until the admin rearranges it.
-  position    Int
+  position      Int
   // The sheet's own name in the workbook; `label` is what the tab is called
   // when the admin gave it a friendlier one.
-  name        String
-  label       String?
+  name          String
+  label         String?
   // Table headings (string[]) removed from this sheet before anyone but the
   // admin receives it — the public page never gets those columns.
-  hiddenColumns Json @default("[]")
+  hiddenColumns Json                  @default("[]")
   // (string | number | null)[][] — every row the same length.
-  display     Json
-  values      Json
-  rowCount    Int
-  columnCount Int
+  display       Json
+  values        Json
+  rowCount      Int
+  columnCount   Int
 
   @@unique([uploadId, position])
   @@map("tournament_stats_sheets")
@@ -339,10 +342,14 @@ model Player {
   auctionPlayers  AuctionPlayer[]
   seedSubmissions PlayerSeedSubmission[]
 
+  pickleballGamesAsT1P1 PickleballGame[] @relation("PickleballGameT1P1")
+  pickleballGamesAsT1P2 PickleballGame[] @relation("PickleballGameT1P2")
+  pickleballGamesAsT2P1 PickleballGame[] @relation("PickleballGameT2P1")
+  pickleballGamesAsT2P2 PickleballGame[] @relation("PickleballGameT2P2")
+
   @@index([rosterId])
   @@map("players")
 }
-
 
 // One rating window per roster. While open, members on the roster score every
 // other player 1 (best)..maxSeed; after it closes an admin turns the averages
@@ -402,10 +409,11 @@ model Tournament {
   league      League           @relation(fields: [leagueId], references: [id])
   createdAt   DateTime         @default(now())
 
-  teams         Team[]
-  auctions      Auction[]
-  rulesDocument TournamentDocument?
-  sponsors      TournamentSponsor[]
+  teams           Team[]
+  auctions        Auction[]
+  rulesDocument   TournamentDocument?
+  sponsors        TournamentSponsor[]
+  pickleballEvent PickleballEvent?
 
   @@index([rosterId])
   @@index([leagueId])
@@ -442,6 +450,116 @@ model TournamentSponsor {
 
   @@index([tournamentId])
   @@map("tournament_sponsors")
+}
+
+/// One pickleball side-event per Tournament — no upload history (unlike
+/// TournamentStatsUpload/Share's split): there is exactly one current
+/// schedule, and re-uploading after scoring has started is blocked in
+/// pickleballEvent.service.ts rather than versioned.
+model PickleballEvent {
+  id           String     @id @default(cuid())
+  tournamentId String     @unique
+  tournament   Tournament @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  // The completed Auction whose TeamAuctionEntry.playersWon is this event's
+  // roster source (per team). No onDelete override — deleting an Auction a
+  // pickleball event depends on must fail loudly, not orphan it.
+  auctionId    String
+  auction      Auction    @relation(fields: [auctionId], references: [id])
+  createdAt    DateTime   @default(now())
+  createdById  String?
+  createdBy    User?      @relation("PickleballEventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  // The uploaded schedule workbook, kept whole for admin re-download only —
+  // never parsed server-side. Null until the first upload.
+  fileName     String?
+  mimeType     String?
+  fileData     Bytes?
+  uploadedAt   DateTime?
+  uploadedById String?
+  uploadedBy   User?     @relation("PickleballEventUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  // Public link. Null token = never published.
+  token       String?   @unique
+  publishedAt DateTime?
+
+  teams   PickleballEventTeam[]
+  matches PickleballMatch[]
+
+  @@index([auctionId])
+  @@map("pickleball_events")
+}
+
+/// Which of the tournament's real Teams are in this event and their
+/// group/pool — explicit (not inferred from matches), so Standings can list
+/// a team with 0 matches played, per the upload's own group/team requirement.
+model PickleballEventTeam {
+  id      String          @id @default(cuid())
+  eventId String
+  event   PickleballEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  teamId  String
+  team    Team            @relation(fields: [teamId], references: [id])
+  group   String
+
+  @@unique([eventId, teamId])
+  @@index([eventId, group])
+  @@map("pickleball_event_teams")
+}
+
+/// One row per MATCH (best-of-`gamesToPlay`; decided at ceil(gamesToPlay/2)
+/// game wins — see lib/pickleball/standings.ts). V1: a match's `group` always
+/// equals both teams' own PickleballEventTeam.group (pure round-robin within
+/// a pool, matching the source workbook exactly) — kept as its own field
+/// rather than derived, so a future cross-pool/playoff match is representable
+/// without a schema change, but v1's upload validator rejects a mismatch.
+model PickleballMatch {
+  id          String          @id @default(cuid())
+  eventId     String
+  event       PickleballEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  matchNumber Int
+  round       String
+  court       String?
+  group       String
+  team1Id     String
+  team1       Team            @relation("PickleballMatchTeam1", fields: [team1Id], references: [id])
+  team2Id     String
+  team2       Team            @relation("PickleballMatchTeam2", fields: [team2Id], references: [id])
+  gamesToPlay Int
+  createdAt   DateTime        @default(now())
+
+  games PickleballGame[]
+
+  @@unique([eventId, matchNumber])
+  @@index([eventId, group])
+  @@map("pickleball_matches")
+}
+
+/// One row per GAME within a match. Player slots are nullable (blank until
+/// the scorer fills them in) and FK to Player.id — the same identity
+/// rosterCardShare.service.ts's playersWon.player already treats as a team's
+/// roster. No onDelete override on the player FKs — a player who has already
+/// played a scored game can't be silently orphaned by a roster deletion
+/// elsewhere.
+model PickleballGame {
+  id             String          @id @default(cuid())
+  matchId        String
+  match          PickleballMatch @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  gameNumber     Int
+  team1Player1Id String?
+  team1Player1   Player?         @relation("PickleballGameT1P1", fields: [team1Player1Id], references: [id])
+  team1Player2Id String?
+  team1Player2   Player?         @relation("PickleballGameT1P2", fields: [team1Player2Id], references: [id])
+  team2Player1Id String?
+  team2Player1   Player?         @relation("PickleballGameT2P1", fields: [team2Player1Id], references: [id])
+  team2Player2Id String?
+  team2Player2   Player?         @relation("PickleballGameT2P2", fields: [team2Player2Id], references: [id])
+  team1Score     Int?
+  team2Score     Int?
+  scoredById     String?
+  scoredBy       User?           @relation(fields: [scoredById], references: [id], onDelete: SetNull)
+  scoredAt       DateTime?
+
+  @@unique([matchId, gameNumber])
+  @@map("pickleball_games")
 }
 
 model TeamSponsorImage {
@@ -494,78 +612,83 @@ model Team {
   entries      TeamAuctionEntry[]
   sponsorImage TeamSponsorImage?
 
+  pickleballEventEntries   PickleballEventTeam[]
+  pickleballMatchesAsTeam1 PickleballMatch[]     @relation("PickleballMatchTeam1")
+  pickleballMatchesAsTeam2 PickleballMatch[]     @relation("PickleballMatchTeam2")
+
   @@unique([tournamentId, name])
   @@index([managerId])
   @@map("teams")
 }
 
 model Auction {
-  id           String        @id @default(cuid())
-  tournamentId String
-  tournament   Tournament    @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
-  name         String
-  teamBudget   Decimal       @db.Decimal(12, 2)
-  status       AuctionStatus @default(CREATED)
-  auctionType  AuctionType   @default(LIVE)
-  createdById  String
-  createdBy    User          @relation(fields: [createdById], references: [id])
-  createdAt    DateTime      @default(now())
-  startedAt    DateTime?
-  completedAt  DateTime?
+  id                       String              @id @default(cuid())
+  tournamentId             String
+  tournament               Tournament          @relation(fields: [tournamentId], references: [id], onDelete: Cascade)
+  name                     String
+  teamBudget               Decimal             @db.Decimal(12, 2)
+  status                   AuctionStatus       @default(CREATED)
+  auctionType              AuctionType         @default(LIVE)
+  createdById              String
+  createdBy                User                @relation(fields: [createdById], references: [id])
+  createdAt                DateTime            @default(now())
+  startedAt                DateTime?
+  completedAt              DateTime?
   // Admin/League-Admin-set target time for the OBS broadcast countdown —
   // purely advisory, never enforced (bidding still only actually starts via
   // startBidding/startBiddingDirect). Null = no countdown shown. Editable
   // any time via updateScheduledStartAt, not write-once, same posture as
   // fantasyLockDate.
-  scheduledStartAt DateTime?
+  scheduledStartAt         DateTime?
   // When true, this auction skips the pre-auction draft phase entirely —
   // startBiddingDirect takes it straight from CREATED to BIDDING.
-  skipPreAuctionDraft  Boolean         @default(false)
-  onClockTemplate      OnClockTemplate @default(CLASSIC)
+  skipPreAuctionDraft      Boolean             @default(false)
+  onClockTemplate          OnClockTemplate     @default(CLASSIC)
   // Keys into lib/onClockDisplay.ts's ON_CLOCK_FIELD_KEYS — which optional
   // Player fields show on the "On the clock" card, validated in the service
   // layer against that same list.
-  onClockVisibleFields String[]        @default(["photoUrl", "previousTeam"])
+  onClockVisibleFields     String[]            @default(["photoUrl", "previousTeam"])
   // Visual-only lot countdown shown during live bidding — resets on every
   // bid, never auto-resolves anything. Null = no timer for this auction.
   // Write-once at creation, same posture as skipPreAuctionDraft.
   lotTimerSeconds          Int?
   // Lets an UNSOLD player be re-offered later at a reduced price. Write-once
   // at creation; reAuctionDiscountPercent is only meaningful when this is true.
-  reAuctionEnabled         Boolean         @default(false)
+  reAuctionEnabled         Boolean             @default(false)
   reAuctionDiscountPercent Int?
   // Set only via getOrCreateHighlightsToken, once an admin explicitly
   // requests a public recap link for this COMPLETED auction. Nullable —
   // most auctions never get one; not backfilled for existing rows (same
   // posture as User.email above).
-  highlightsToken String? @unique
+  highlightsToken          String?             @unique
   // Admin/League-Admin-editable override for when fantasy team picks
   // finalize — null falls back to the tournament's startDate (the original,
   // always-on behavior), preserving every existing auction unchanged.
   // Editable any time via updateFantasyLockDate, not write-once.
-  fantasyLockDate DateTime?
+  fantasyLockDate          DateTime?
   // Editable any time via updateFantasySettings, not write-once — same
   // posture as fantasyLockDate. Defaults preserve every existing auction's
   // current behavior unchanged: real sold price, self-pick forced in, one
   // team per user. See lib/services/fantasyTeam.service.ts's fantasyPrice()
   // for exactly how these three combine.
-  fantasyPricingModel     FantasyPricingModel @default(SOLD_PRICE)
-  fantasySelfPickRequired Boolean             @default(true)
-  fantasyMaxTeamsPerUser  Int                 @default(1)
+  fantasyPricingModel      FantasyPricingModel @default(SOLD_PRICE)
+  fantasySelfPickRequired  Boolean             @default(true)
+  fantasyMaxTeamsPerUser   Int                 @default(1)
   // Fantasy teams default to a viewer/spectator feature — a user whose role
   // in this auction's own league is TEAM_MANAGER can't build one unless an
   // admin opts this auction in. Existing manager-built teams (from before
   // this setting existed) are never touched — only future create/edit
   // attempts are gated, same "grandfather existing rows" posture as
   // fantasyMaxTeamsPerUser being lowered.
-  fantasyManagersAllowed  Boolean             @default(false)
+  fantasyManagersAllowed   Boolean             @default(false)
 
-  categories     AuctionCategory[]
-  auctionPlayers AuctionPlayer[]
-  entries        TeamAuctionEntry[]
-  fantasyTeams   FantasyTeam[]
-  correctionLogs AuctionCorrectionLog[]
-  pointsUploads  FantasyPointsUpload[]
+  categories       AuctionCategory[]
+  auctionPlayers   AuctionPlayer[]
+  entries          TeamAuctionEntry[]
+  fantasyTeams     FantasyTeam[]
+  correctionLogs   AuctionCorrectionLog[]
+  pointsUploads    FantasyPointsUpload[]
+  pickleballEvents PickleballEvent[]
 
   @@index([tournamentId])
   @@map("auctions")
@@ -653,25 +776,25 @@ model AuctionCategory {
 }
 
 model AuctionPlayer {
-  id                   String              @id @default(cuid())
-  auctionId            String
-  auction              Auction             @relation(fields: [auctionId], references: [id], onDelete: Cascade)
-  playerId             String
-  player               Player              @relation(fields: [playerId], references: [id])
-  categoryId           String
-  category             AuctionCategory     @relation(fields: [categoryId], references: [id])
-  status               AuctionPlayerStatus @default(AVAILABLE)
-  soldVia              SoldVia?
-  soldToEntryId        String?
-  soldToEntry          TeamAuctionEntry?   @relation("SoldPlayers", fields: [soldToEntryId], references: [id])
-  soldPrice            Decimal?            @db.Decimal(12, 2)
-  soldAt               DateTime?
-  biddingOrder         Int?
-  points               Decimal?            @db.Decimal(10, 2)
-  currentBidAmount     Decimal?            @db.Decimal(12, 2)
-  currentBidderEntryId String?
-  currentBidderEntry   TeamAuctionEntry?   @relation("CurrentBidder", fields: [currentBidderEntryId], references: [id])
-  bidCooldownUntil     DateTime?
+  id                    String              @id @default(cuid())
+  auctionId             String
+  auction               Auction             @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  playerId              String
+  player                Player              @relation(fields: [playerId], references: [id])
+  categoryId            String
+  category              AuctionCategory     @relation(fields: [categoryId], references: [id])
+  status                AuctionPlayerStatus @default(AVAILABLE)
+  soldVia               SoldVia?
+  soldToEntryId         String?
+  soldToEntry           TeamAuctionEntry?   @relation("SoldPlayers", fields: [soldToEntryId], references: [id])
+  soldPrice             Decimal?            @db.Decimal(12, 2)
+  soldAt                DateTime?
+  biddingOrder          Int?
+  points                Decimal?            @db.Decimal(10, 2)
+  currentBidAmount      Decimal?            @db.Decimal(12, 2)
+  currentBidderEntryId  String?
+  currentBidderEntry    TeamAuctionEntry?   @relation("CurrentBidder", fields: [currentBidderEntryId], references: [id])
+  bidCooldownUntil      DateTime?
   // Mirrors bidCooldownUntil's shape: set in selectNextPlayer and on every
   // placeBid, cleared on sale/unsold/reset. Purely cosmetic — nothing reads
   // this to auto-resolve the lot.
@@ -680,9 +803,9 @@ model AuctionPlayer {
   // player's new effective base price for every future re-offer and never
   // changes again. A per-row snapshot, not a live formula — same reasoning
   // as updateAuctionPlayerCategory's categoryId snapshot.
-  discountedBasePrice   Decimal?  @db.Decimal(12, 2)
+  discountedBasePrice   Decimal?            @db.Decimal(12, 2)
   // Authoritative "already used its one reduced-price attempt" flag.
-  reAuctionDiscountUsed Boolean   @default(false)
+  reAuctionDiscountUsed Boolean             @default(false)
 
   // Mandatory back-reference for TeamAuctionEntry.captainAuctionPlayerId's
   // "TeamCaptain" relation (distinct from "SoldPlayers" below, which already
@@ -753,28 +876,28 @@ model FantasyTeamPlayer {
 }
 
 model TeamAuctionEntry {
-  id                   String                 @id @default(cuid())
-  teamId               String
-  team                 Team                   @relation(fields: [teamId], references: [id], onDelete: Cascade)
-  auctionId            String
-  auction              Auction                @relation(fields: [auctionId], references: [id], onDelete: Cascade)
-  status               TeamAuctionEntryStatus @default(CREATED)
-  budgetRemaining      Decimal                @db.Decimal(12, 2)
-  managerPriceOverride Decimal?               @db.Decimal(10, 2)
-  slotsFilled          Int                    @default(0)
-  slotsTotal           Int
-  analyticsEnabled     Boolean                @default(false)
+  id                     String                 @id @default(cuid())
+  teamId                 String
+  team                   Team                   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  auctionId              String
+  auction                Auction                @relation(fields: [auctionId], references: [id], onDelete: Cascade)
+  status                 TeamAuctionEntryStatus @default(CREATED)
+  budgetRemaining        Decimal                @db.Decimal(12, 2)
+  managerPriceOverride   Decimal?               @db.Decimal(10, 2)
+  slotsFilled            Int                    @default(0)
+  slotsTotal             Int
+  analyticsEnabled       Boolean                @default(false)
   // Set only via getOrCreateRosterCardToken, once an admin or the team's
   // manager requests a public roster-card link for this COMPLETED auction.
   // Nullable — most entries never get one; not backfilled.
-  rosterCardToken      String?                @unique
+  rosterCardToken        String?                @unique
   // Settable only once the auction is COMPLETED, and only to a player this
   // entry actually won (soldToEntryId === this entry's id) — enforced in
   // teamCaptain.service.ts, not at the DB level. Nullable = no captain
   // designated. No vice-captain concept. Freely re-assignable/clearable at
   // any time post-completion, not a one-shot action.
-  captainAuctionPlayerId String?              @unique
-  captainAuctionPlayer   AuctionPlayer?       @relation("TeamCaptain", fields: [captainAuctionPlayerId], references: [id])
+  captainAuctionPlayerId String?                @unique
+  captainAuctionPlayer   AuctionPlayer?         @relation("TeamCaptain", fields: [captainAuctionPlayerId], references: [id])
 
   draftSubmissions       PreAuctionSubmission[]
   playersWon             AuctionPlayer[]               @relation("SoldPlayers")

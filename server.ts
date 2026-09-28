@@ -6,6 +6,7 @@ import { getToken } from "next-auth/jwt";
 import { setIO } from "./server/ws/broadcaster";
 import { prisma } from "./lib/prisma";
 import { decodeMobileToken } from "./lib/auth/mobileToken";
+import { getPickleballEventIdForToken } from "./lib/services/pickleballEvent.service";
 
 const dev = process.env.NODE_ENV !== "production";
 const port = Number(process.env.PORT) || 3000;
@@ -18,23 +19,18 @@ app.prepare().then(() => {
 
   const io = new Server(httpServer, { path: "/socket.io" });
   io.on("connection", (socket) => {
-    // Mirrors the same role/league scoping every other read path enforces
-    // (lib/auth/scope.ts's assertInScope) — without this, anyone who can
-    // open a raw Socket.IO connection and knows/guesses an auctionId could
-    // listen in on another league's live bids and budgets.
-    socket.on("join", async (auctionId: string) => {
-      if (typeof auctionId !== "string" || !auctionId) return;
-
-      // Which cookie name NextAuth used (__Secure-authjs.session-token vs
-      // plain) depends on whether the browser sees the site as HTTPS — true
-      // when this dev server is reached through the Cloudflare tunnel, even
-      // though NODE_ENV still says "development". Reading it off the actual
-      // cookie header (rather than guessing from NODE_ENV) works in every
-      // setup: plain localhost dev, tunneled dev, and a real prod deploy.
-      // Mobile clients can't attach a browser-style cookie, so they pass
-      // their bearer token via socket.io's own `auth` payload
-      // (`io(url, { auth: { token } })`) instead of a header — checked
-      // first since it's cheap and unambiguous when present.
+    // Which cookie name NextAuth used (__Secure-authjs.session-token vs
+    // plain) depends on whether the browser sees the site as HTTPS — true
+    // when this dev server is reached through the Cloudflare tunnel, even
+    // though NODE_ENV still says "development". Reading it off the actual
+    // cookie header (rather than guessing from NODE_ENV) works in every
+    // setup: plain localhost dev, tunneled dev, and a real prod deploy.
+    // Mobile clients can't attach a browser-style cookie, so they pass
+    // their bearer token via socket.io's own `auth` payload
+    // (`io(url, { auth: { token } })`) instead of a header — checked
+    // first since it's cheap and unambiguous when present. Shared by every
+    // authenticated join handler below.
+    async function resolveSocketSession(): Promise<{ isSiteAdmin?: boolean; memberships?: { leagueId: string; role: string }[] } | null> {
       const bearerToken = (socket.handshake.auth as { token?: unknown }).token;
       let token: Record<string, unknown> | null =
         typeof bearerToken === "string" ? await decodeMobileToken(bearerToken) : null;
@@ -49,6 +45,16 @@ app.prepare().then(() => {
           secureCookie,
         }).catch(() => null);
       }
+      return token as { isSiteAdmin?: boolean; memberships?: { leagueId: string; role: string }[] } | null;
+    }
+
+    // Mirrors the same role/league scoping every other read path enforces
+    // (lib/auth/scope.ts's assertInScope) — without this, anyone who can
+    // open a raw Socket.IO connection and knows/guesses an auctionId could
+    // listen in on another league's live bids and budgets.
+    socket.on("join", async (auctionId: string) => {
+      if (typeof auctionId !== "string" || !auctionId) return;
+      const token = await resolveSocketSession();
       if (!token) return;
 
       const auction = await prisma.auction.findUnique({
@@ -61,8 +67,8 @@ app.prepare().then(() => {
       // the multi-league-users migration — a session now carries isSiteAdmin
       // + a memberships array (lib/auth/guards.ts's allLeagueIds/assertInScope
       // pattern), which this check missed updating at the time.
-      const isSiteAdmin = token.isSiteAdmin as boolean | undefined;
-      const memberships = token.memberships as { leagueId: string; role: string }[] | undefined;
+      const isSiteAdmin = token.isSiteAdmin;
+      const memberships = token.memberships;
       const inScope =
         !!isSiteAdmin || (memberships ?? []).some((m) => m.leagueId === auction.tournament.leagueId);
       if (!inScope) return;
@@ -82,6 +88,38 @@ app.prepare().then(() => {
       const auction = await prisma.auction.findUnique({ where: { id: auctionId }, select: { id: true } });
       if (!auction) return;
       socket.join(`auction:${auctionId}`);
+    });
+
+    // Admin/League-Admin scoring console — same shape as "join" above, scoped
+    // by the event's tournament's league, so two scorers entering games
+    // concurrently see each other's saves live.
+    socket.on("pickleball:join", async (eventId: string) => {
+      if (typeof eventId !== "string" || !eventId) return;
+      const token = await resolveSocketSession();
+      if (!token) return;
+
+      const event = await prisma.pickleballEvent.findUnique({
+        where: { id: eventId },
+        select: { tournament: { select: { leagueId: true } } },
+      });
+      if (!event) return;
+
+      const inScope =
+        !!token.isSiteAdmin || (token.memberships ?? []).some((m) => m.leagueId === event.tournament.leagueId);
+      if (!inScope) return;
+
+      socket.join(`pickleball:${eventId}`);
+    });
+
+    // Public, unauthenticated join for the /pickleball/[token] and
+    // /pickleball/[token]/obs pages — same posture as auction "join:public"
+    // above. Resolves the token itself (never trusts a raw eventId from the
+    // client) and only joins when the event is actually published.
+    socket.on("pickleball:join:public", async (token: string) => {
+      if (typeof token !== "string" || !token) return;
+      const eventId = await getPickleballEventIdForToken(token);
+      if (!eventId) return;
+      socket.join(`pickleball:${eventId}`);
     });
   });
   setIO(io);

@@ -16,7 +16,9 @@ export type AuditEntityType =
   | "TournamentStatsUpload"
   | "TournamentStatsShare"
   | "PlayerRoster"
-  | "Player";
+  | "Player"
+  | "PickleballEvent"
+  | "PickleballGame";
 
 /** Every audited business action, as a semantic label — never a raw CRUD
  * verb. One entry per mutation actually hooked up; see the audit-log plan
@@ -91,7 +93,16 @@ export type AuditAction =
   | "STATS_PUBLISHED"
   | "STATS_SHARING_STOPPED"
   | "STATS_LINK_ROTATED"
-  | "STATS_SETTINGS_UPDATED";
+  | "STATS_SETTINGS_UPDATED"
+  | "PICKLEBALL_EVENT_CREATED"
+  | "PICKLEBALL_SCHEDULE_UPLOADED"
+  | "PICKLEBALL_GAME_SCORED"
+  | "PICKLEBALL_GAME_SCORE_CLEARED"
+  | "PICKLEBALL_PUBLISHED"
+  | "PICKLEBALL_SHARING_STOPPED"
+  | "PICKLEBALL_LINK_ROTATED"
+  | "PICKLEBALL_EVENT_DELETED"
+  | "PICKLEBALL_SCORES_RESET";
 
 /**
  * Writes one audit row. Always takes an explicit transaction client — never

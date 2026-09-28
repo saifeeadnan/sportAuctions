@@ -9,3 +9,9 @@
 export function isCricketLeague(leagueType: string | null | undefined): boolean {
   return (leagueType ?? "").trim().toLowerCase() === "cricket";
 }
+
+/** Same free-text convention as isCricketLeague — gates the Pickleball admin
+ * pages to tournaments whose league's sport is actually Pickleball. */
+export function isPickleballLeague(leagueType: string | null | undefined): boolean {
+  return (leagueType ?? "").trim().toLowerCase() === "pickleball";
+}

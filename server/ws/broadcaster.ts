@@ -9,3 +9,7 @@ export function setIO(io: IOServer) {
 export function emitAuctionEvent(auctionId: string, event: string, payload: unknown) {
   globalForIO.io?.to(`auction:${auctionId}`).emit(event, payload);
 }
+
+export function emitPickleballEvent(eventId: string, event: string, payload: unknown) {
+  globalForIO.io?.to(`pickleball:${eventId}`).emit(event, payload);
+}
