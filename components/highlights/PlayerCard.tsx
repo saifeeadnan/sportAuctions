@@ -19,6 +19,7 @@ export function PlayerCard({
   emphasizeTeamName = false,
   showPrice = true,
   isCaptain = false,
+  compact = false,
 }: {
   playerName: string;
   photoUrl: string | null;
@@ -45,6 +46,10 @@ export function PlayerCard({
    * the captain color everywhere else (Badge variant="warning"). Takes the
    * slot teamName would otherwise use. */
   isCaptain?: boolean;
+  /** ~10% smaller padding and text than the default (non-featured) size —
+   * for a page whose whole squad grid needs to fit without scrolling (the
+   * roster card). Has no effect when `featured` is set. */
+  compact?: boolean;
 }) {
   return (
     <div
@@ -70,16 +75,24 @@ export function PlayerCard({
       </div>
 
       {/* Compact stat block — three tight rows, no separately-spaced blocks. */}
-      <div className={`flex flex-col gap-1 ${featured ? "p-3" : "p-2"}`}>
-        <p className={`font-semibold leading-tight truncate ${featured ? "text-base" : "text-sm"}`}>{playerName}</p>
+      <div className={`flex flex-col gap-1 ${featured ? "p-3" : compact ? "p-1.5" : "p-2"}`}>
+        <p className={`font-semibold leading-tight truncate ${featured ? "text-base" : compact ? "text-xs" : "text-sm"}`}>
+          {playerName}
+        </p>
         <div className="flex items-center justify-between gap-2">
           <span
-            className={`inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide shrink-0 ${accent.chipSoft}`}
+            className={`inline-flex items-center rounded-full font-semibold uppercase tracking-wide shrink-0 ${accent.chipSoft} ${
+              compact ? "px-1 py-0.5 text-[8px]" : "px-1.5 py-0.5 text-[9px]"
+            }`}
           >
             {categoryName}
           </span>
           {isCaptain ? (
-            <span className="inline-flex items-center rounded-full px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide shrink-0 bg-amber-500/15 text-amber-300">
+            <span
+              className={`inline-flex items-center rounded-full font-semibold uppercase tracking-wide shrink-0 bg-amber-500/15 text-amber-300 ${
+                compact ? "px-1 py-0.5 text-[8px]" : "px-1.5 py-0.5 text-[9px]"
+              }`}
+            >
               Captain
             </span>
           ) : teamName != null ? (

@@ -30,16 +30,19 @@ const TIER_CAPTION_WIDTH: Record<SponsorTier, string> = {
 };
 // "compact" — for a page with little vertical room to spare (the roster
 // card), not the broadcast/celebratory pages this ribbon was originally
-// sized for.
+// sized for. Sized 20% up from an earlier, tighter pass that cut off logos
+// and names (h-14/12/10 -> h-17/14/12; Tailwind v4's spacing scale is
+// unitless multiples of 0.25rem, so h-17 is a real, exact utility, not an
+// arbitrary value).
 const TIER_LOGO_SIZE_COMPACT: Record<SponsorTier, string> = {
-  TITLE: "h-14 w-14",
-  MARQUEE: "h-12 w-12",
-  COMMUNITY: "h-10 w-10",
+  TITLE: "h-17 w-17",
+  MARQUEE: "h-14 w-14",
+  COMMUNITY: "h-12 w-12",
 };
 const TIER_CAPTION_WIDTH_COMPACT: Record<SponsorTier, string> = {
-  TITLE: "max-w-14",
-  MARQUEE: "max-w-12",
-  COMMUNITY: "max-w-10",
+  TITLE: "max-w-17",
+  MARQUEE: "max-w-14",
+  COMMUNITY: "max-w-12",
 };
 const TIER_ROTATION_WEIGHT: Record<SponsorTier, number> = { TITLE: 3, MARQUEE: 2, COMMUNITY: 1 };
 
@@ -158,7 +161,7 @@ export function SponsorRibbon({
       <p className={`text-xs text-black/50 dark:text-white/50 ${compact ? "mb-1" : "mb-2"}`}>
         {sponsors.length === 1 ? "Exclusive Sponsor" : "Sponsors"}
       </p>
-      <div className={`flex flex-nowrap items-center justify-center overflow-x-auto ${compact ? "gap-2 pb-1" : "gap-4 pb-2"}`}>
+      <div className={`flex flex-nowrap items-center justify-center overflow-x-auto ${compact ? "gap-3 pb-1" : "gap-4 pb-2"}`}>
         {orderedSponsors.map((sponsor, i) => {
           const isFeatured = i === rotationSequence[featuredStep];
           const logo = (

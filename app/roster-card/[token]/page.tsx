@@ -89,7 +89,7 @@ export default async function RosterCardPage({
               </div>
             )}
             <h1
-              className={`${displayFont.className} text-3xl sm:text-4xl leading-none tracking-wide text-white drop-shadow-[0_2px_20px_rgba(99,102,241,0.35)]`}
+              className={`${displayFont.className} text-lg sm:text-xl leading-none tracking-wide text-white drop-shadow-[0_2px_20px_rgba(99,102,241,0.35)]`}
             >
               {card.teamName}
             </h1>
@@ -102,7 +102,7 @@ export default async function RosterCardPage({
             {card.players.length === 0 ? (
               <p className="text-center text-sm text-white/50">No players on this roster.</p>
             ) : (
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3">
                 {card.players.map((p) => (
                   <PlayerCard
                     key={p.id}
@@ -112,6 +112,7 @@ export default async function RosterCardPage({
                     accent={accentByCategory.get(p.categoryName)!}
                     isCaptain={p.isCaptain}
                     showPrice={false}
+                    compact
                   />
                 ))}
               </div>
