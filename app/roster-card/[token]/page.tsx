@@ -21,7 +21,7 @@ export async function generateMetadata({
   if (!card) notFound();
 
   const count = card.players.length;
-  const title = `${card.teamName} — ${card.tournamentName}`;
+  const title = card.teamName;
   const description = `${count} player${count === 1 ? "" : "s"}`;
   return {
     title,
@@ -67,36 +67,32 @@ export default async function RosterCardPage({
           className="pointer-events-none absolute top-40 right-0 h-[360px] w-[360px] rounded-full bg-amber-500/10 blur-[100px]"
         />
 
-        <div className="relative mx-auto max-w-4xl px-4 py-12 flex flex-col gap-12">
-          <SponsorRibbon sponsors={sponsors} showTopBorder={false} />
+        <div className="relative mx-auto max-w-4xl px-4 py-6 flex flex-col gap-6">
+          <SponsorRibbon sponsors={sponsors} showTopBorder={false} size="compact" />
 
           {/* Team identity — image AND name, deliberately unlike the PNG
               roster card (which swaps the name out for the image): a web page
               has the room, and the name is what a link recipient is looking
-              for. */}
-          <div className="flex flex-col items-center text-center gap-4">
+              for. Kept compact (a smaller logo, no subtitle) so the squad
+              grid below doesn't need a vertical scroll on a phone. */}
+          <div className="flex flex-col items-center text-center gap-2">
             {card.hasTeamImage ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={`/api/teams/${card.teamId}/sponsor-image`}
                 alt={`${card.teamName} logo`}
-                className="h-24 w-24 rounded-2xl object-contain bg-white p-2 border border-white/10"
+                className="h-14 w-14 rounded-xl object-contain bg-white p-1.5 border border-white/10"
               />
             ) : (
-              <div
-                className={`flex h-24 w-24 items-center justify-center rounded-2xl ${teamAccent.avatarGradient}`}
-              >
-                <span className="text-4xl font-bold text-white/90">{initials(card.teamName)}</span>
+              <div className={`flex h-14 w-14 items-center justify-center rounded-xl ${teamAccent.avatarGradient}`}>
+                <span className="text-xl font-bold text-white/90">{initials(card.teamName)}</span>
               </div>
             )}
-            <div className="flex flex-col gap-2">
-              <h1
-                className={`${displayFont.className} text-4xl sm:text-5xl leading-none tracking-wide text-white drop-shadow-[0_2px_20px_rgba(99,102,241,0.35)]`}
-              >
-                {card.teamName}
-              </h1>
-              <p className="text-sm text-white/50">{card.tournamentName}</p>
-            </div>
+            <h1
+              className={`${displayFont.className} text-3xl sm:text-4xl leading-none tracking-wide text-white drop-shadow-[0_2px_20px_rgba(99,102,241,0.35)]`}
+            >
+              {card.teamName}
+            </h1>
           </div>
 
           <section className="flex flex-col gap-4">

@@ -28,6 +28,19 @@ const TIER_CAPTION_WIDTH: Record<SponsorTier, string> = {
   MARQUEE: "max-w-32",
   COMMUNITY: "max-w-28", // unchanged
 };
+// "compact" — for a page with little vertical room to spare (the roster
+// card), not the broadcast/celebratory pages this ribbon was originally
+// sized for.
+const TIER_LOGO_SIZE_COMPACT: Record<SponsorTier, string> = {
+  TITLE: "h-14 w-14",
+  MARQUEE: "h-12 w-12",
+  COMMUNITY: "h-10 w-10",
+};
+const TIER_CAPTION_WIDTH_COMPACT: Record<SponsorTier, string> = {
+  TITLE: "max-w-14",
+  MARQUEE: "max-w-12",
+  COMMUNITY: "max-w-10",
+};
 const TIER_ROTATION_WEIGHT: Record<SponsorTier, number> = { TITLE: 3, MARQUEE: 2, COMMUNITY: 1 };
 
 // Deterministic PRNG (mulberry32) — the same seed always produces the same
@@ -96,13 +109,19 @@ function buildRotationSequence(orderedSponsors: Sponsor[], seed: number): number
 export function SponsorRibbon({
   sponsors,
   showTopBorder = true,
+  size = "default",
 }: {
   sponsors: Sponsor[];
   /** False when this ribbon leads a page's content rather than trailing it
    * (e.g. the highlights recap, which puts sponsors first) — the default
    * top rule/margin only makes sense as a separator from something above. */
   showTopBorder?: boolean;
+  /** "compact" shrinks the logos and their gaps for a page with little
+   * vertical room to spare, e.g. the roster card. */
+  size?: "default" | "compact";
 }) {
+  const logoSize = size === "compact" ? TIER_LOGO_SIZE_COMPACT : TIER_LOGO_SIZE;
+  const captionWidth = size === "compact" ? TIER_CAPTION_WIDTH_COMPACT : TIER_CAPTION_WIDTH;
   const [featuredStep, setFeaturedStep] = useState(0);
   // Starts in the server-rendered order (already tier-sorted) so hydration
   // matches exactly, then reorders once on the client via the session's
@@ -132,12 +151,14 @@ export function SponsorRibbon({
 
   if (sponsors.length === 0) return null;
 
+  const compact = size === "compact";
+
   return (
     <div className={showTopBorder ? "mt-4 pt-4 border-t border-black/[0.08] dark:border-white/10" : ""}>
-      <p className="text-xs text-black/50 dark:text-white/50 mb-2">
+      <p className={`text-xs text-black/50 dark:text-white/50 ${compact ? "mb-1" : "mb-2"}`}>
         {sponsors.length === 1 ? "Exclusive Sponsor" : "Sponsors"}
       </p>
-      <div className="flex flex-nowrap items-center justify-center gap-4 overflow-x-auto pb-2">
+      <div className={`flex flex-nowrap items-center justify-center overflow-x-auto ${compact ? "gap-2 pb-1" : "gap-4 pb-2"}`}>
         {orderedSponsors.map((sponsor, i) => {
           const isFeatured = i === rotationSequence[featuredStep];
           const logo = (
@@ -147,14 +168,14 @@ export function SponsorRibbon({
                 src={sponsor.logoUrl ?? `/api/tournament-sponsors/${sponsor.id}`}
                 alt={sponsor.name}
                 title={sponsor.name}
-                className={`${TIER_LOGO_SIZE[sponsor.tier]} rounded object-contain bg-white dark:bg-white/10 border p-2 transition-all duration-700 ${
+                className={`${logoSize[sponsor.tier]} rounded object-contain bg-white dark:bg-white/10 border ${compact ? "p-1" : "p-2"} transition-all duration-700 ${
                   isFeatured
                     ? "border-indigo-400 dark:border-indigo-500 shadow-[0_0_0_4px_rgba(99,102,241,0.25)] scale-[1.08]"
                     : "border-black/10 dark:border-white/10"
                 }`}
               />
               <span
-                className={`text-xs text-center ${TIER_CAPTION_WIDTH[sponsor.tier]} truncate transition-opacity duration-300 ${
+                className={`text-xs text-center ${captionWidth[sponsor.tier]} truncate transition-opacity duration-300 ${
                   isFeatured ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                 }`}
               >
