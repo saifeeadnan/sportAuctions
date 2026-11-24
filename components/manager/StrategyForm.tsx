@@ -105,11 +105,6 @@ export function StrategyForm({
     <div className="flex flex-col gap-5">
       <section className="flex flex-col gap-2">
         <h4 className="text-sm font-medium">Budget target per category</h4>
-        <p className="text-xs text-black/60 dark:text-white/60">
-          How much you&apos;d like to spend, on average, per player in each category. The guidance
-          above uses this to cap what it suggests bidding — leave a category blank to just see
-          your legal max instead.
-        </p>
         <div className={`${card} p-4 grid grid-cols-1 sm:grid-cols-3 gap-3`}>
           {categories.map((cat) => (
             <label key={cat.id} className="flex flex-col gap-1 text-sm">

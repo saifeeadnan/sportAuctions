@@ -3,9 +3,14 @@ import { ValidationError } from "@/lib/errors";
 import { writeAuditLog } from "@/lib/services/auditLog.service";
 
 export type PredictionEntry = {
-  predictedWinnerEntryId: string;
-  /** This manager's own guess at what the winner would pay — optional. */
+  /** Null when the manager guessed a price without naming a team. */
+  predictedWinnerEntryId: string | null;
+  /** This manager's own guess at what the winner would pay — optional.
+   * Acts as a max price in the Simulate tab. */
   predictedAmount: string | null;
+  /** The low end of the guess — optional. Acts as a min price (floor) in
+   * the Simulate tab. */
+  predictedMinAmount: string | null;
 };
 
 /** auctionPlayerId -> prediction, for the calling team only — predictions
@@ -15,7 +20,7 @@ export async function getPredictionsForEntry(
 ): Promise<Record<string, PredictionEntry>> {
   const predictions = await prisma.auctionPlayerPrediction.findMany({
     where: { teamAuctionEntryId },
-    select: { auctionPlayerId: true, predictedWinnerEntryId: true, predictedAmount: true },
+    select: { auctionPlayerId: true, predictedWinnerEntryId: true, predictedAmount: true, predictedMinAmount: true },
   });
   return Object.fromEntries(
     predictions.map((p) => [
@@ -23,6 +28,7 @@ export async function getPredictionsForEntry(
       {
         predictedWinnerEntryId: p.predictedWinnerEntryId,
         predictedAmount: p.predictedAmount != null ? String(p.predictedAmount) : null,
+        predictedMinAmount: p.predictedMinAmount != null ? String(p.predictedMinAmount) : null,
       },
     ])
   );
@@ -31,27 +37,39 @@ export async function getPredictionsForEntry(
 export async function savePrediction(
   teamAuctionEntryId: string,
   auctionPlayerId: string,
-  predictedWinnerEntryId: string,
+  predictedWinnerEntryId: string | null,
   predictedAmount: number | null,
+  predictedMinAmount: number | null,
   actorUserId: string
 ) {
+  if (predictedWinnerEntryId == null && predictedAmount == null && predictedMinAmount == null) {
+    throw new ValidationError("A prediction needs at least a team or an amount");
+  }
   if (predictedWinnerEntryId === teamAuctionEntryId) {
     throw new ValidationError("You cannot predict your own team as the winner");
   }
   if (predictedAmount != null && predictedAmount <= 0) {
     throw new ValidationError("Predicted amount must be greater than 0");
   }
+  if (predictedMinAmount != null && predictedMinAmount <= 0) {
+    throw new ValidationError("Minimum amount must be greater than 0");
+  }
+  if (predictedMinAmount != null && predictedAmount != null && predictedMinAmount > predictedAmount) {
+    throw new ValidationError("Minimum amount cannot be greater than the predicted amount");
+  }
 
   const [entry, auctionPlayer, winnerEntry] = await Promise.all([
     prisma.teamAuctionEntry.findUnique({ where: { id: teamAuctionEntryId } }),
     prisma.auctionPlayer.findUnique({ where: { id: auctionPlayerId }, include: { player: true } }),
-    prisma.teamAuctionEntry.findUnique({ where: { id: predictedWinnerEntryId } }),
+    predictedWinnerEntryId != null
+      ? prisma.teamAuctionEntry.findUnique({ where: { id: predictedWinnerEntryId } })
+      : null,
   ]);
   if (!entry) throw new ValidationError("Team auction entry not found");
   if (!auctionPlayer || auctionPlayer.auctionId !== entry.auctionId) {
     throw new ValidationError("Player not found in this auction");
   }
-  if (!winnerEntry || winnerEntry.auctionId !== entry.auctionId) {
+  if (predictedWinnerEntryId != null && (!winnerEntry || winnerEntry.auctionId !== entry.auctionId)) {
     throw new ValidationError("Predicted team is not part of this auction");
   }
   // Predictions are only meaningful for players reality hasn't already
@@ -66,8 +84,8 @@ export async function savePrediction(
     });
     await tx.auctionPlayerPrediction.upsert({
       where: { teamAuctionEntryId_auctionPlayerId: { teamAuctionEntryId, auctionPlayerId } },
-      create: { teamAuctionEntryId, auctionPlayerId, predictedWinnerEntryId, predictedAmount },
-      update: { predictedWinnerEntryId, predictedAmount },
+      create: { teamAuctionEntryId, auctionPlayerId, predictedWinnerEntryId, predictedAmount, predictedMinAmount },
+      update: { predictedWinnerEntryId, predictedAmount, predictedMinAmount },
     });
     await writeAuditLog(tx, {
       entityType: "TeamAuctionEntry",
@@ -80,12 +98,14 @@ export async function savePrediction(
             playerName: auctionPlayer.player.name,
             predictedWinnerEntryId: existing.predictedWinnerEntryId,
             predictedAmount: existing.predictedAmount?.toString() ?? null,
+            predictedMinAmount: existing.predictedMinAmount?.toString() ?? null,
           }
         : null,
       after: {
         playerName: auctionPlayer.player.name,
         predictedWinnerEntryId,
         predictedAmount: predictedAmount?.toString() ?? null,
+        predictedMinAmount: predictedMinAmount?.toString() ?? null,
       },
     });
   });
@@ -113,6 +133,7 @@ export async function removePrediction(teamAuctionEntryId: string, auctionPlayer
         playerName: existing.auctionPlayer.player.name,
         predictedWinnerEntryId: existing.predictedWinnerEntryId,
         predictedAmount: existing.predictedAmount?.toString() ?? null,
+        predictedMinAmount: existing.predictedMinAmount?.toString() ?? null,
       },
     });
   });

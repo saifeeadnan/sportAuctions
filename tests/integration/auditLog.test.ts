@@ -341,7 +341,7 @@ describe("audit log — analytics dashboard", () => {
     const fx = await buildAnalyticsFixture();
     const actorId = fx.entry1.team.managerId!;
 
-    await savePrediction(fx.entry1.id, fx.playerOne.id, fx.entry2.id, 250, actorId);
+    await savePrediction(fx.entry1.id, fx.playerOne.id, fx.entry2.id, 250, null, actorId);
     const saved = await expectAuditLog({
       entityType: "TeamAuctionEntry",
       entityId: fx.entry1.id,
@@ -359,6 +359,48 @@ describe("audit log — analytics dashboard", () => {
       actorUserId: actorId,
     });
     expect((removed.before as { predictedAmount?: string })?.predictedAmount).toBe("250");
+  });
+
+  it("savePrediction allows a price guess with no team, writing PREDICTION_SAVED with a null winner", async () => {
+    const fx = await buildAnalyticsFixture();
+    const actorId = fx.entry1.team.managerId!;
+
+    await savePrediction(fx.entry1.id, fx.playerOne.id, null, 90, null, actorId);
+    const saved = await expectAuditLog({
+      entityType: "TeamAuctionEntry",
+      entityId: fx.entry1.id,
+      action: "PREDICTION_SAVED",
+      actorUserId: actorId,
+    });
+    expect((saved.after as { predictedWinnerEntryId?: string | null })?.predictedWinnerEntryId).toBeNull();
+    expect((saved.after as { predictedAmount?: string })?.predictedAmount).toBe("90");
+  });
+
+  it("savePrediction allows a min amount alone, and rejects a min greater than the predicted amount", async () => {
+    const fx = await buildAnalyticsFixture();
+    const actorId = fx.entry1.team.managerId!;
+
+    await savePrediction(fx.entry1.id, fx.playerOne.id, null, null, 30, actorId);
+    const saved = await expectAuditLog({
+      entityType: "TeamAuctionEntry",
+      entityId: fx.entry1.id,
+      action: "PREDICTION_SAVED",
+      actorUserId: actorId,
+    });
+    expect((saved.after as { predictedMinAmount?: string })?.predictedMinAmount).toBe("30");
+
+    await expect(savePrediction(fx.entry1.id, fx.playerOne.id, null, 50, 60, actorId)).rejects.toThrow(
+      "Minimum amount cannot be greater than the predicted amount"
+    );
+  });
+
+  it("savePrediction rejects a prediction with neither a team, an amount, nor a minimum", async () => {
+    const fx = await buildAnalyticsFixture();
+    const actorId = fx.entry1.team.managerId!;
+
+    await expect(savePrediction(fx.entry1.id, fx.playerOne.id, null, null, null, actorId)).rejects.toThrow(
+      "A prediction needs at least a team or an amount"
+    );
   });
 
   it("upsertRivalCategoryEstimate writes RIVAL_ESTIMATE_SAVED, then RIVAL_ESTIMATE_REMOVED when cleared", async () => {

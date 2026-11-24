@@ -13,11 +13,13 @@ export async function loadAuctionAnalyticsSnapshot(
   auctionId: string,
   selfTeamEntryId: string
 ): Promise<AuctionAnalyticsSnapshot | null> {
-  const [state, categories, preferences, rivalEstimates] = await Promise.all([
+  const [state, categories, preferences, rivalEstimates, predictions, budgetTargets] = await Promise.all([
     getAuctionState(auctionId),
     prisma.auctionCategory.findMany({ where: { auctionId } }),
     prisma.auctionPlayerPreference.findMany({ where: { teamAuctionEntryId: selfTeamEntryId } }),
     prisma.rivalCategoryBudgetEstimate.findMany({ where: { teamAuctionEntryId: selfTeamEntryId } }),
+    prisma.auctionPlayerPrediction.findMany({ where: { teamAuctionEntryId: selfTeamEntryId } }),
+    prisma.auctionCategoryBudgetTarget.findMany({ where: { teamAuctionEntryId: selfTeamEntryId } }),
   ]);
   if (!state) return null;
 
@@ -39,6 +41,7 @@ export async function loadAuctionAnalyticsSnapshot(
       id: c.id,
       name: c.name,
       basePrice: Number(c.basePrice),
+      bidIncrement: c.bidIncrement != null ? Number(c.bidIncrement) : null,
     })),
     players: state.players.map((p) => ({
       id: p.id,
@@ -68,6 +71,19 @@ export async function loadAuctionAnalyticsSnapshot(
       targetTeamId: e.targetEntryId,
       categoryId: e.categoryId,
       estimatedBudget: Number(e.estimatedBudget),
+    })),
+    // Rows may include stale predictions/targets for players/categories no
+    // longer relevant (e.g. the predicted player has since sold) — harmless,
+    // since consumers only ever look one up for a player still in play.
+    predictions: predictions.map((p) => ({
+      playerId: p.auctionPlayerId,
+      predictedWinnerTeamId: p.predictedWinnerEntryId,
+      predictedAmount: p.predictedAmount != null ? Number(p.predictedAmount) : null,
+      predictedMinAmount: p.predictedMinAmount != null ? Number(p.predictedMinAmount) : null,
+    })),
+    budgetTargets: budgetTargets.map((t) => ({
+      categoryId: t.categoryId,
+      targetAvgPrice: Number(t.targetAvgPrice),
     })),
   };
 }

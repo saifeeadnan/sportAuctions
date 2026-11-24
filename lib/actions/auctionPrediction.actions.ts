@@ -29,12 +29,20 @@ async function requireOwnedAnalyticsEntry(teamAuctionEntryId: string): Promise<s
 export async function savePredictionAction(
   teamAuctionEntryId: string,
   auctionPlayerId: string,
-  predictedWinnerEntryId: string,
-  predictedAmount: number | null
+  predictedWinnerEntryId: string | null,
+  predictedAmount: number | null,
+  predictedMinAmount: number | null
 ): Promise<ActionResult> {
   return toActionResult(async () => {
     const actorUserId = await requireOwnedAnalyticsEntry(teamAuctionEntryId);
-    await savePrediction(teamAuctionEntryId, auctionPlayerId, predictedWinnerEntryId, predictedAmount, actorUserId);
+    await savePrediction(
+      teamAuctionEntryId,
+      auctionPlayerId,
+      predictedWinnerEntryId,
+      predictedAmount,
+      predictedMinAmount,
+      actorUserId
+    );
   });
 }
 

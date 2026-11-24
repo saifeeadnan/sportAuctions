@@ -80,7 +80,7 @@ const p3 = player({
 });
 
 const predictions: Record<string, PlayerPrediction> = {
-  p2: { teamId: "teamB", amount: 50 },
+  p2: { teamId: "teamB", amount: 50, minAmount: null },
 };
 
 describe("computeProjectedStandings", () => {

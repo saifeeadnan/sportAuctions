@@ -7,9 +7,9 @@ function team(budgetRemaining: number): AnalyticsTeam[] {
 }
 
 const CATEGORIES: AnalyticsCategory[] = [
-  { id: "platinum", name: "Platinum", basePrice: 10 },
-  { id: "gold", name: "Gold", basePrice: 5 },
-  { id: "silver", name: "Silver", basePrice: 2 },
+  { id: "platinum", name: "Platinum", basePrice: 10, bidIncrement: null },
+  { id: "gold", name: "Gold", basePrice: 5, bidIncrement: null },
+  { id: "silver", name: "Silver", basePrice: 2, bidIncrement: null },
 ];
 
 function player(id: string, categoryId: string): AnalyticsPlayer {

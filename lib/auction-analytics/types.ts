@@ -30,6 +30,10 @@ export type AnalyticsCategory = {
   id: string;
   name: string;
   basePrice: number;
+  /** Minimum raise between successive bids, if this category has one — a
+   * simulated sale price snaps to this grid (basePrice + k * bidIncrement),
+   * matching how real bids actually land rather than an arbitrary decimal. */
+  bidIncrement: number | null;
 };
 
 export type AnalyticsPlayer = {
@@ -71,6 +75,25 @@ export type RivalCategoryEstimateInput = {
   estimatedBudget: number;
 };
 
+/** This manager's own guess at who wins a not-yet-sold player, and for how
+ * much — the ground truth the simulation engine honors deterministically
+ * for that player, rather than randomizing it away (see simulateLot.ts). */
+export type PlayerPredictionInput = {
+  playerId: string;
+  /** Null when the manager guessed only a price, with no team attached —
+   * the simulation engine then treats this player as unpredicted (resolved
+   * competitively), since there's no winner to deterministically assign. */
+  predictedWinnerTeamId: string | null;
+  /** Null when a team was predicted without an amount guess. Acts as a max
+   * price (ceiling) wherever the engine resolves this player competitively. */
+  predictedAmount: number | null;
+  /** The low end of the guess, if one was given — acts as a min price
+   * (floor) wherever the engine resolves this player competitively. */
+  predictedMinAmount: number | null;
+};
+
+export type BudgetTargetInput = { categoryId: string; targetAvgPrice: number };
+
 /** Everything a computation needs for one auction, from either ingestion
  * mode — the shape an adapter (Mode 1: `lib/auction/analyticsAdapter.ts`,
  * Mode 2: a future standalone adapter) produces and every panel consumes. */
@@ -83,6 +106,8 @@ export type AuctionAnalyticsSnapshot = {
   selfTeamId: string;
   wishlist: WishlistEntry[];
   rivalEstimates: RivalCategoryEstimateInput[];
+  predictions: PlayerPredictionInput[];
+  budgetTargets: BudgetTargetInput[];
 };
 
 // ---- Outputs ----

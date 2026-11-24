@@ -28,6 +28,7 @@ export function PredictionPicker({
   // Local draft text per player, so typing a digit doesn't have to round-trip
   // to the server before the input reflects it — committed onBlur.
   const [amountDrafts, setAmountDrafts] = useState<Record<string, string>>({});
+  const [minAmountDrafts, setMinAmountDrafts] = useState<Record<string, string>>({});
   // Per-player save errors — a failed save must never fail silently: the
   // amount input keeps showing what was typed regardless of whether it
   // actually persisted, so without this a rejected save (e.g. predicting
@@ -41,10 +42,20 @@ export function PredictionPicker({
   const effectiveCategory =
     activeCategory && categories.includes(activeCategory) ? activeCategory : (categories[0] ?? null);
 
-  async function handleTeamChange(auctionPlayerId: string, teamId: string) {
+  // A team, a max amount, and a min amount are all independent now — any
+  // can be set without the others. Only when ALL THREE end up empty is
+  // there nothing left to represent, so that's the one case that removes
+  // the row entirely.
+  async function persistPrediction(
+    auctionPlayerId: string,
+    teamIdOrEmpty: string,
+    amount: number | null,
+    minAmount: number | null
+  ) {
+    const teamId = teamIdOrEmpty === "" ? null : teamIdOrEmpty;
     setPending(auctionPlayerId);
     setErrors((prev) => ({ ...prev, [auctionPlayerId]: "" }));
-    if (teamId === "") {
+    if (teamId == null && amount == null && minAmount == null) {
       const result = await removePredictionAction(entryId, auctionPlayerId);
       if (result.error) {
         setErrors((prev) => ({ ...prev, [auctionPlayerId]: result.error }));
@@ -52,34 +63,43 @@ export function PredictionPicker({
         onPredictionChange(auctionPlayerId, null);
       }
     } else {
-      const existingAmount = predictions[auctionPlayerId]?.amount ?? null;
-      const result = await savePredictionAction(entryId, auctionPlayerId, teamId, existingAmount);
+      const result = await savePredictionAction(entryId, auctionPlayerId, teamId, amount, minAmount);
       if (result.error) {
         setErrors((prev) => ({ ...prev, [auctionPlayerId]: result.error }));
       } else {
-        onPredictionChange(auctionPlayerId, { teamId, amount: existingAmount });
+        onPredictionChange(auctionPlayerId, { teamId, amount, minAmount });
       }
     }
     setPending(null);
   }
 
-  async function handleAmountBlur(auctionPlayerId: string, teamId: string, rawValue: string) {
+  async function handleTeamChange(auctionPlayerId: string, teamIdOrEmpty: string) {
+    const existing = predictions[auctionPlayerId];
+    await persistPrediction(auctionPlayerId, teamIdOrEmpty, existing?.amount ?? null, existing?.minAmount ?? null);
+  }
+
+  function parseAmountBlur(auctionPlayerId: string, label: string, rawValue: string): number | null | undefined {
     const trimmed = rawValue.trim();
     const amount = trimmed === "" ? null : Number(trimmed);
     if (amount != null && (Number.isNaN(amount) || amount <= 0)) {
-      setErrors((prev) => ({ ...prev, [auctionPlayerId]: "Amount must be a number greater than 0" }));
-      return;
+      setErrors((prev) => ({ ...prev, [auctionPlayerId]: `${label} must be a number greater than 0` }));
+      return undefined;
     }
+    return amount;
+  }
 
-    setPending(auctionPlayerId);
-    setErrors((prev) => ({ ...prev, [auctionPlayerId]: "" }));
-    const result = await savePredictionAction(entryId, auctionPlayerId, teamId, amount);
-    if (result.error) {
-      setErrors((prev) => ({ ...prev, [auctionPlayerId]: result.error }));
-    } else {
-      onPredictionChange(auctionPlayerId, { teamId, amount });
-    }
-    setPending(null);
+  async function handleAmountBlur(auctionPlayerId: string, teamIdOrEmpty: string, rawValue: string) {
+    const amount = parseAmountBlur(auctionPlayerId, "Amount", rawValue);
+    if (amount === undefined) return;
+    const existingMinAmount = predictions[auctionPlayerId]?.minAmount ?? null;
+    await persistPrediction(auctionPlayerId, teamIdOrEmpty, amount, existingMinAmount);
+  }
+
+  async function handleMinAmountBlur(auctionPlayerId: string, teamIdOrEmpty: string, rawValue: string) {
+    const minAmount = parseAmountBlur(auctionPlayerId, "Min amount", rawValue);
+    if (minAmount === undefined) return;
+    const existingAmount = predictions[auctionPlayerId]?.amount ?? null;
+    await persistPrediction(auctionPlayerId, teamIdOrEmpty, existingAmount, minAmount);
   }
 
   const visiblePlayers = players.filter((p) => p.categoryName === effectiveCategory);
@@ -126,28 +146,39 @@ export function PredictionPicker({
                     disabled={pending === p.id}
                     className={`${selectClass} text-xs py-1`}
                   >
-                    <option value="">No prediction</option>
+                    <option value="">No team guess</option>
                     {otherTeams.map((t) => (
                       <option key={t.id} value={t.id}>
                         {t.teamName}
                       </option>
                     ))}
                   </select>
-                  {teamId && (
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder="Predicted bid"
-                      value={amountDrafts[p.id] ?? prediction?.amount ?? ""}
-                      onChange={(e) =>
-                        setAmountDrafts((prev) => ({ ...prev, [p.id]: e.target.value }))
-                      }
-                      onBlur={(e) => handleAmountBlur(p.id, teamId, e.target.value)}
-                      disabled={pending === p.id}
-                      className={`${inputClass} w-24 text-xs py-1`}
-                    />
-                  )}
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Min bid"
+                    value={minAmountDrafts[p.id] ?? prediction?.minAmount ?? ""}
+                    onChange={(e) =>
+                      setMinAmountDrafts((prev) => ({ ...prev, [p.id]: e.target.value }))
+                    }
+                    onBlur={(e) => handleMinAmountBlur(p.id, teamId, e.target.value)}
+                    disabled={pending === p.id}
+                    className={`${inputClass} w-24 text-xs py-1`}
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="Max bid"
+                    value={amountDrafts[p.id] ?? prediction?.amount ?? ""}
+                    onChange={(e) =>
+                      setAmountDrafts((prev) => ({ ...prev, [p.id]: e.target.value }))
+                    }
+                    onBlur={(e) => handleAmountBlur(p.id, teamId, e.target.value)}
+                    disabled={pending === p.id}
+                    className={`${inputClass} w-24 text-xs py-1`}
+                  />
                 </div>
                 {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
               </li>

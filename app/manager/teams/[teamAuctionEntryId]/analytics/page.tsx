@@ -56,7 +56,11 @@ export default async function ManagerAnalyticsPage({
   const initialPredictions: Record<string, PlayerPrediction> = Object.fromEntries(
     Object.entries(predictions).map(([auctionPlayerId, p]) => [
       auctionPlayerId,
-      { teamId: p.predictedWinnerEntryId, amount: p.predictedAmount != null ? Number(p.predictedAmount) : null },
+      {
+        teamId: p.predictedWinnerEntryId,
+        amount: p.predictedAmount != null ? Number(p.predictedAmount) : null,
+        minAmount: p.predictedMinAmount != null ? Number(p.predictedMinAmount) : null,
+      },
     ])
   );
 

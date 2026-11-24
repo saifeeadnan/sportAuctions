@@ -8,7 +8,9 @@ import { computeWishlistFeasibility } from "@/lib/auction-analytics/wishlistFeas
 import { computeRivalCategoryEstimates } from "@/lib/auction-analytics/rivalCategoryEstimate";
 import { computeRivalRosters } from "@/lib/auction-analytics/rivalRosters";
 import { getStrategyForEntry } from "@/lib/services/auctionStrategy.service";
+import { getPredictionsForEntry } from "@/lib/services/auctionPrediction.service";
 import { AnalyticsV2Dashboard } from "@/components/manager/AnalyticsV2Dashboard";
+import type { PlayerPrediction } from "@/lib/auction/projectedStandings";
 
 export default async function ManagerAnalyticsV2Page({
   params,
@@ -26,7 +28,7 @@ export default async function ManagerAnalyticsV2Page({
     notFound();
   }
 
-  const [snapshot, auction, strategy, auctionState] = await Promise.all([
+  const [snapshot, auction, strategy, auctionState, predictions] = await Promise.all([
     loadAuctionAnalyticsSnapshot(entry.auctionId, entry.id),
     prisma.auction.findUnique({
       where: { id: entry.auctionId },
@@ -34,8 +36,20 @@ export default async function ManagerAnalyticsV2Page({
     }),
     getStrategyForEntry(entry.id),
     getAuctionState(entry.auctionId),
+    getPredictionsForEntry(entry.id),
   ]);
   if (!snapshot || !auction || !auctionState) notFound();
+
+  const initialPredictions: Record<string, PlayerPrediction> = Object.fromEntries(
+    Object.entries(predictions).map(([auctionPlayerId, p]) => [
+      auctionPlayerId,
+      {
+        teamId: p.predictedWinnerEntryId,
+        amount: p.predictedAmount != null ? Number(p.predictedAmount) : null,
+        minAmount: p.predictedMinAmount != null ? Number(p.predictedMinAmount) : null,
+      },
+    ])
+  );
 
   const selfTeam = snapshot.teams.find((t) => t.id === snapshot.selfTeamId);
   if (!selfTeam) notFound();
@@ -128,6 +142,7 @@ export default async function ManagerAnalyticsV2Page({
       tournamentName={auction.tournament.name}
       wishlistItems={wishlistItems}
       wishlistSummary={wishlistSummary}
+      initialPredictions={initialPredictions}
       strategy={{
         entryId: entry.id,
         categories: snapshot.categories.map((c) => ({ id: c.id, name: c.name })),

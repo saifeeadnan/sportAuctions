@@ -992,15 +992,23 @@ model AuctionPlayerPrediction {
   teamAuctionEntry       TeamAuctionEntry @relation("PredictionsMadeBy", fields: [teamAuctionEntryId], references: [id], onDelete: Cascade)
   auctionPlayerId        String
   auctionPlayer          AuctionPlayer    @relation(fields: [auctionPlayerId], references: [id], onDelete: Cascade)
-  predictedWinnerEntryId String
-  predictedWinnerEntry   TeamAuctionEntry @relation("PredictedWinner", fields: [predictedWinnerEntryId], references: [id], onDelete: Cascade)
+  /** Optional: a manager can guess just a price without naming a team. */
+  predictedWinnerEntryId String?
+  predictedWinnerEntry   TeamAuctionEntry? @relation("PredictedWinner", fields: [predictedWinnerEntryId], references: [id], onDelete: Cascade)
   /**
    * This manager's own guess at what the predicted winner would pay — used
    * to estimate that team's "reserved" budget and its likely ceiling on
    * whichever player is currently on the clock. Optional: a team can be
-   * predicted without a price guess.
+   * predicted without a price guess, and a price can be guessed without a
+   * team. Acts as a max price in the Simulate tab's engine.
    */
   predictedAmount        Decimal?         @db.Decimal(12, 2)
+  /**
+   * The low end of this manager's price guess — optional, and only
+   * meaningful alongside (or instead of) predictedAmount as the high end.
+   * Acts as a min price (floor) in the Simulate tab's engine.
+   */
+  predictedMinAmount     Decimal?         @db.Decimal(12, 2)
   createdAt              DateTime         @default(now())
   updatedAt              DateTime         @updatedAt
 

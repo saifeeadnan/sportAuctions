@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { SponsorLink } from "@/components/tournament/SponsorLink";
 import { SPONSOR_TIERS, type SponsorTier } from "@/lib/sponsorTiers";
+import { mulberry32 } from "@/lib/random";
 
 type Sponsor = {
   id: string;
@@ -46,19 +47,9 @@ const TIER_CAPTION_WIDTH_COMPACT: Record<SponsorTier, string> = {
 };
 const TIER_ROTATION_WEIGHT: Record<SponsorTier, number> = { TITLE: 3, MARQUEE: 2, COMMUNITY: 1 };
 
-// Deterministic PRNG (mulberry32) — the same seed always produces the same
-// shuffle, so persisting one seed per browser session (not reshuffling on
-// every render) is enough to keep the order stable across page navigations.
-function mulberry32(seed: number) {
-  return function () {
-    seed |= 0;
-    seed = (seed + 0x6d2b79f5) | 0;
-    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
-}
-
+// The same seed always produces the same shuffle, so persisting one seed per
+// browser session (not reshuffling on every render) is enough to keep the
+// order stable across page navigations.
 function shuffle<T>(items: T[], seed: number): T[] {
   const rng = mulberry32(seed);
   const result = [...items];
