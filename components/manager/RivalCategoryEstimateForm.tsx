@@ -46,6 +46,12 @@ export function RivalCategoryEstimateForm({
     });
   }
 
+  const [selectedTeamId, setSelectedTeamId] = useState<string>(teams[0]?.id ?? "");
+  // md+ always shows list+detail side by side regardless of this flag; below
+  // md it switches which single pane is visible (list first, detail after a
+  // team's tapped) — see the className toggles below.
+  const [mobileShowingDetail, setMobileShowingDetail] = useState(false);
+
   async function handleSubmit() {
     setLoading(true);
     setError(null);
@@ -82,45 +88,82 @@ export function RivalCategoryEstimateForm({
     router.refresh();
   }
 
+  const selectedTeam = teams.find((t) => t.id === selectedTeamId);
+
+  function selectTeam(teamId: string) {
+    setSelectedTeamId(teamId);
+    setMobileShowingDetail(true);
+  }
+
   return (
     <div className="flex flex-col gap-3">
       <p className="text-xs text-black/60 dark:text-white/60">
         Your own private guess at how much each other team plans to spend per category — used to
         estimate what they can still afford. Never shown to anyone else.
       </p>
-      <div className={`${card} overflow-x-auto`}>
-        <table className="w-full text-sm border-collapse">
-          <thead>
-            <tr className="text-left border-b border-black/10 dark:border-white/10">
-              <th className="py-2 pl-4 pr-4">Team</th>
-              {categories.map((c) => (
-                <th key={c.id} className="py-2 pr-4">
-                  {c.name}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {teams.map((team) => (
-              <tr key={team.id} className="border-b border-black/5 dark:border-white/5 last:border-0">
-                <td className="py-2 pl-4 pr-4 font-medium">{team.name}</td>
+
+      <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-3 items-start">
+        <div className={`${card} ${mobileShowingDetail ? "hidden md:block" : "block"} overflow-hidden`}>
+          <ul className="flex flex-col">
+            {teams.map((team) => {
+              const estimatedCount = categories.filter((c) => {
+                const v = values.get(cellKey(team.id, c.id));
+                return v != null && v.trim() !== "";
+              }).length;
+              return (
+                <li key={team.id}>
+                  <button
+                    type="button"
+                    onClick={() => selectTeam(team.id)}
+                    className={`w-full flex items-center justify-between gap-2 px-4 py-2.5 text-sm text-left border-b border-black/5 dark:border-white/5 last:border-0 transition-colors ${
+                      team.id === selectedTeamId
+                        ? "bg-indigo-600/10 dark:bg-indigo-500/15"
+                        : "hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
+                    }`}
+                  >
+                    <span className="font-medium truncate">{team.name}</span>
+                    <span className="text-xs text-black/50 dark:text-white/50 shrink-0">
+                      {estimatedCount}/{categories.length}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+
+        <div className={`${card} ${mobileShowingDetail ? "block" : "hidden md:block"} p-4`}>
+          {selectedTeam && (
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setMobileShowingDetail(false)}
+                  className="md:hidden text-sm text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white"
+                >
+                  ← Teams
+                </button>
+                <h4 className="text-sm font-medium">{selectedTeam.name}</h4>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {categories.map((category) => (
-                  <td key={category.id} className="py-2 pr-4">
+                  <label key={category.id} className="flex flex-col gap-1 text-sm">
+                    {category.name}
                     <input
                       type="number"
                       min="0"
                       step="0.01"
                       placeholder="No estimate"
-                      value={values.get(cellKey(team.id, category.id)) ?? ""}
-                      onChange={(e) => setValue(team.id, category.id, e.target.value)}
-                      className={`${inputClass} w-28`}
+                      value={values.get(cellKey(selectedTeam.id, category.id)) ?? ""}
+                      onChange={(e) => setValue(selectedTeam.id, category.id, e.target.value)}
+                      className={inputClass}
                     />
-                  </td>
+                  </label>
                 ))}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}

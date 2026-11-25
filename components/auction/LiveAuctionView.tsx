@@ -14,7 +14,7 @@ import { RosterRibbon } from "@/components/roster/RosterRibbon";
 import { BidControl } from "@/components/auction/BidControl";
 import { computeMaxBid } from "@/lib/auction/maxBid";
 import { computeBidGuidance, computeLiveCategoryAvgPrice, type InitialStrategy } from "@/lib/auction/guidance";
-import { openAnalyticsDashboardWindow, openAnalyticsV2DashboardWindow } from "@/lib/auction/popupWindow";
+import { openAnalyticsDashboardWindow, openAnalyticsV2DashboardWindow, isTouchPrimaryDevice } from "@/lib/auction/popupWindow";
 import { isCricketLeague } from "@/lib/leagueSport";
 import { countInCategory } from "@/lib/auction/categoryCaps";
 import { card, tabsTrack, tabItem } from "@/lib/ui";
@@ -318,7 +318,16 @@ export function LiveAuctionView({
         <div className="fixed bottom-5 right-5 z-40 flex flex-col items-end gap-2">
           <button
             type="button"
-            onClick={() => openAnalyticsV2DashboardWindow(myTeam.id)}
+            onClick={() => {
+              // Popups are unreliable on tablets/phones (often blocked, and
+              // there's no real multi-window desktop benefit anyway) — same-
+              // tab navigation is the safer default there.
+              if (isTouchPrimaryDevice()) {
+                router.push(`/manager/teams/${myTeam.id}/analytics-v2`);
+              } else {
+                openAnalyticsV2DashboardWindow(myTeam.id);
+              }
+            }}
             className="inline-flex items-center gap-2 rounded-full border border-black/15 dark:border-white/15 bg-white dark:bg-neutral-900 pl-4 pr-5 py-2 text-sm font-medium shadow-lg hover:bg-black/[0.03] dark:hover:bg-white/[0.06] transition-colors"
           >
             Analytics v2 (beta) ↗

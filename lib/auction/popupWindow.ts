@@ -28,3 +28,14 @@ export function openAnalyticsV2DashboardWindow(teamAuctionEntryId: string) {
     `analytics-v2-dashboard-${teamAuctionEntryId}`
   );
 }
+
+/**
+ * True on a touch-primary device (tablets, phones) — `window.open` popups
+ * are unreliable there (often blocked, or just take over the screen with no
+ * real "side by side with the live auction" benefit anyway, since there's no
+ * real multi-window desktop to speak of). Callers should navigate same-tab
+ * instead of calling openAnalyticsV2DashboardWindow when this is true.
+ */
+export function isTouchPrimaryDevice(): boolean {
+  return typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches;
+}

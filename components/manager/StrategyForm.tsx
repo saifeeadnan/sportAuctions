@@ -142,7 +142,7 @@ export function StrategyForm({
           ))}
         </div>
 
-        <div className={`${card} max-h-[420px] overflow-y-auto`}>
+        <div className={card}>
           <ul className="flex flex-col gap-1.5 p-2">
             {visiblePlayers.map((p) => {
               const state = preferences.get(p.id) ?? null;

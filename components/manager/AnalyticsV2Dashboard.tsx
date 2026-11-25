@@ -13,6 +13,7 @@ import {
 } from "@/components/manager/RivalCategoryEstimateForm";
 import { RivalCategoryEstimatePanel, type RivalCategoryEstimateRow } from "@/components/manager/RivalCategoryEstimatePanel";
 import { StrategyForm, type StrategyCategoryOption, type StrategyPlayerOption } from "@/components/manager/StrategyForm";
+import { SetupProgressBanner, type SetupChecklistItem } from "@/components/manager/SetupProgressBanner";
 import { LiveBidGuidancePanel } from "@/components/manager/LiveBidGuidancePanel";
 import { RosterAffordabilityPanel } from "@/components/manager/RosterAffordabilityPanel";
 import { V2PredictionPicker } from "@/components/manager/V2PredictionPicker";
@@ -95,12 +96,23 @@ export function AnalyticsV2Dashboard({
   const predictablePlayers = liveState.players.filter((p) => V2_PREDICTABLE_STATUSES.has(p.status));
   const otherTeams = liveState.teams.filter((t) => t.id !== myTeamEntryId);
 
+  const setupItems: SetupChecklistItem[] = [
+    {
+      key: "strategy",
+      label: "Must-haves or avoids set",
+      done: strategy.initialMustHaveIds.length > 0 || strategy.initialAvoidIds.length > 0,
+    },
+    { key: "strategy", label: "Budget targets set", done: strategy.initialBudgetTargets.length > 0 },
+    { key: "estimates", label: "Rival estimates set", done: estimateForm.initialEstimates.length > 0 },
+    { key: "predictions", label: "Predictions made", done: Object.keys(predictions).length > 0 },
+  ];
+
   return (
     // fixed inset-0 — this popup fills its own window edge to edge rather
     // than sitting inside the manager section's normal layout (which would
     // otherwise show the Tournaments/Fantasy teams nav above it).
     <div className="fixed inset-0 flex flex-col bg-white dark:bg-neutral-950 text-black dark:text-white">
-      <div className="max-w-4xl w-full mx-auto px-8 py-6 flex flex-col gap-6 flex-1 min-h-0">
+      <div className="max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 flex flex-col gap-6 flex-1 min-h-0">
         <div className="flex items-center justify-between shrink-0">
           <div>
             <h1 className="text-lg font-semibold mb-1">
@@ -112,6 +124,12 @@ export function AnalyticsV2Dashboard({
           </div>
           <CloseWindowButton />
         </div>
+
+        <SetupProgressBanner
+          storageKey={`analytics-v2-setup:${myTeamEntryId}`}
+          items={setupItems}
+          onJump={(key) => setTab(key as Tab)}
+        />
 
         <div className={`${tabsTrack} self-start shrink-0`}>
           {TABS.map((t) => (
