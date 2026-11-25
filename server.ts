@@ -20,11 +20,16 @@ app.prepare().then(() => {
   const io = new Server(httpServer, { path: "/socket.io" });
   io.on("connection", (socket) => {
     // Which cookie name NextAuth used (__Secure-authjs.session-token vs
-    // plain) depends on whether the browser sees the site as HTTPS — true
-    // when this dev server is reached through the Cloudflare tunnel, even
-    // though NODE_ENV still says "development". Reading it off the actual
-    // cookie header (rather than guessing from NODE_ENV) works in every
-    // setup: plain localhost dev, tunneled dev, and a real prod deploy.
+    // plain) depends on whether *this request* arrived over HTTPS — true
+    // when reached through the Cloudflare tunnel, even though NODE_ENV
+    // still says "development". This must be read off the actual
+    // connection (x-forwarded-proto, same signal lib/siteOrigin.ts uses,
+    // falling back to the raw socket's own TLS state), NOT off whether a
+    // "__Secure-" cookie merely exists in the header: a browser that has
+    // ever visited both the plain-http and tunneled-https origins carries
+    // BOTH cookies at once, and trusting presence alone picks whichever
+    // origin was visited first — silently decoding a stale session from
+    // the other origin instead of the one this connection is actually on.
     // Mobile clients can't attach a browser-style cookie, so they pass
     // their bearer token via socket.io's own `auth` payload
     // (`io(url, { auth: { token } })`) instead of a header — checked
@@ -36,8 +41,12 @@ app.prepare().then(() => {
         typeof bearerToken === "string" ? await decodeMobileToken(bearerToken) : null;
 
       if (!token) {
-        const rawCookies = (socket.request.headers as Record<string, string | undefined>).cookie ?? "";
-        const secureCookie = rawCookies.includes("__Secure-authjs.session-token=");
+        const forwardedProto = (socket.request.headers["x-forwarded-proto"] as string | undefined)
+          ?.split(",")[0]
+          ?.trim()
+          .toLowerCase();
+        const socketEncrypted = Boolean((socket.request.socket as unknown as { encrypted?: boolean }).encrypted);
+        const secureCookie = forwardedProto ? forwardedProto === "https" : socketEncrypted;
 
         token = await getToken({
           req: socket.request as unknown as { headers: Record<string, string> },
