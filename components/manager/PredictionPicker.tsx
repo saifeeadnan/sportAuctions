@@ -67,7 +67,7 @@ export function PredictionPicker({
       if (result.error) {
         setErrors((prev) => ({ ...prev, [auctionPlayerId]: result.error }));
       } else {
-        onPredictionChange(auctionPlayerId, { teamId, amount, minAmount });
+        onPredictionChange(auctionPlayerId, { teamId, amount, minAmount, unsold: false });
       }
     }
     setPending(null);

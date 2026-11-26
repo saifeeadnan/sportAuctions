@@ -31,7 +31,8 @@ export async function savePredictionAction(
   auctionPlayerId: string,
   predictedWinnerEntryId: string | null,
   predictedAmount: number | null,
-  predictedMinAmount: number | null
+  predictedMinAmount: number | null,
+  predictedUnsold: boolean = false
 ): Promise<ActionResult> {
   return toActionResult(async () => {
     const actorUserId = await requireOwnedAnalyticsEntry(teamAuctionEntryId);
@@ -41,6 +42,7 @@ export async function savePredictionAction(
       predictedWinnerEntryId,
       predictedAmount,
       predictedMinAmount,
+      predictedUnsold,
       actorUserId
     );
   });

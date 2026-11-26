@@ -60,6 +60,7 @@ export default async function ManagerAnalyticsPage({
         teamId: p.predictedWinnerEntryId,
         amount: p.predictedAmount != null ? Number(p.predictedAmount) : null,
         minAmount: p.predictedMinAmount != null ? Number(p.predictedMinAmount) : null,
+        unsold: p.predictedUnsold,
       },
     ])
   );

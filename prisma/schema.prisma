@@ -1009,6 +1009,14 @@ model AuctionPlayerPrediction {
    * Acts as a min price (floor) in the Simulate tab's engine.
    */
   predictedMinAmount     Decimal?         @db.Decimal(12, 2)
+  /**
+   * This manager's guess that NOBODY wins this player — mutually exclusive
+   * with predictedWinnerEntryId/predictedAmount/predictedMinAmount (enforced
+   * in auctionPrediction.service.ts's savePrediction), all three of which
+   * stay null whenever this is true. The Simulate tab's engine honors it
+   * deterministically, same as a predicted winner — see simulateAuction.ts.
+   */
+  predictedUnsold        Boolean          @default(false)
   createdAt              DateTime         @default(now())
   updatedAt              DateTime         @updatedAt
 

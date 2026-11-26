@@ -25,6 +25,7 @@ export function StrategyForm({
   initialMustHaveIds,
   initialAvoidIds,
   initialBudgetTargets,
+  budgetRemaining,
 }: {
   entryId: string;
   categories: StrategyCategoryOption[];
@@ -32,6 +33,10 @@ export function StrategyForm({
   initialMustHaveIds: string[];
   initialAvoidIds: string[];
   initialBudgetTargets: { categoryId: string; targetAvgPrice: string }[];
+  /** Team's current live budget, for the running-total/remaining readout
+   * below the category grid. Optional — omitted entirely (not shown as 0)
+   * wherever a caller doesn't have it handy. */
+  budgetRemaining?: number;
 }) {
   const router = useRouter();
   const [preferences, setPreferences] = useState<Map<string, PreferenceState>>(() => {
@@ -101,25 +106,52 @@ export function StrategyForm({
   const mustHaveCount = Array.from(preferences.values()).filter((v) => v === "MUST_HAVE").length;
   const avoidCount = Array.from(preferences.values()).filter((v) => v === "AVOID").length;
 
+  // Each target is a per-category AVERAGE price (not a total allocation), so
+  // this sum is a rough one-pick-per-category gut-check, not a literal
+  // spending plan — worded in the UI below as "target sum", not "planned
+  // spend", to avoid overstating its precision.
+  const targetSum = Array.from(budgetTargets.values()).reduce((sum, v) => sum + (Number(v) || 0), 0);
+  const remaining = budgetRemaining != null ? budgetRemaining - targetSum : null;
+
   return (
     <div className="flex flex-col gap-5">
       <section className="flex flex-col gap-2">
         <h4 className="text-sm font-medium">Budget target per category</h4>
-        <div className={`${card} p-4 grid grid-cols-1 sm:grid-cols-3 gap-3`}>
-          {categories.map((cat) => (
-            <label key={cat.id} className="flex flex-col gap-1 text-sm">
-              {cat.name}
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="No target"
-                value={budgetTargets.get(cat.id) ?? ""}
-                onChange={(e) => setBudgetTarget(cat.id, e.target.value)}
-                className={inputClass}
-              />
-            </label>
-          ))}
+        <div className={`${card} p-4 flex flex-col gap-3`}>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {categories.map((cat) => (
+              <label key={cat.id} className="flex flex-col gap-1 text-sm">
+                {cat.name}
+                <input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="No target"
+                  value={budgetTargets.get(cat.id) ?? ""}
+                  onChange={(e) => setBudgetTarget(cat.id, e.target.value)}
+                  className={inputClass}
+                />
+              </label>
+            ))}
+          </div>
+          <div className="flex items-center justify-between text-sm pt-2 border-t border-black/[0.06] dark:border-white/10">
+            <span className="text-black/60 dark:text-white/60">
+              Target sum{" "}
+              <span className="font-medium text-black dark:text-white tabular-nums">
+                {targetSum.toLocaleString()}
+              </span>
+            </span>
+            {remaining != null && (
+              <span className={remaining < 0 ? "text-red-600 dark:text-red-400 font-medium" : "text-black/60 dark:text-white/60"}>
+                {remaining < 0 ? "Over budget by " : "Remaining "}
+                <span className="tabular-nums font-medium">{Math.abs(remaining).toLocaleString()}</span>
+              </span>
+            )}
+          </div>
+          <p className="text-xs text-black/50 dark:text-white/50">
+            Each target is an average price per pick, not a total — this sum assumes one pick per
+            category with a target set, as a rough gut-check against your current budget.
+          </p>
         </div>
       </section>
 

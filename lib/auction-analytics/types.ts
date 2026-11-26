@@ -90,6 +90,13 @@ export type PlayerPredictionInput = {
   /** The low end of the guess, if one was given — acts as a min price
    * (floor) wherever the engine resolves this player competitively. */
   predictedMinAmount: number | null;
+  /** True when the manager predicts nobody wins this player — the engine
+   * honors it deterministically (the lot resolves straight to unsold,
+   * bypassing both the predicted-winner and competitive-resolution paths),
+   * same as a predicted winner. Mutually exclusive with predictedWinnerTeamId/
+   * predictedAmount/predictedMinAmount, which are always null when this is
+   * true (enforced in auctionPrediction.service.ts). */
+  predictedUnsold: boolean;
 };
 
 export type BudgetTargetInput = { categoryId: string; targetAvgPrice: number };

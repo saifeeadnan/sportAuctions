@@ -12,6 +12,8 @@ function cellKey(targetEntryId: string, categoryId: string) {
   return `${targetEntryId}:${categoryId}`;
 }
 
+export type RivalEstimateTeamContext = { budgetRemaining: number; slotsToFill: number };
+
 /**
  * A manager's own private estimate of every OTHER team's budget per
  * category — one grid, edited freely, saved as a batch. Never asks about
@@ -22,11 +24,18 @@ export function RivalCategoryEstimateForm({
   teams,
   categories,
   initialEstimates,
+  teamContextById,
 }: {
   entryId: string;
   teams: RivalEstimateTeamOption[];
   categories: RivalEstimateCategoryOption[];
   initialEstimates: { targetEntryId: string; categoryId: string; estimatedBudget: string }[];
+  /** Each team's current live budgetRemaining + slots still to fill, shown
+   * alongside the selected team's category grid as a sizing aid (e.g. "6
+   * slots, 1800L left" suggests ~300L/slot on average) and for the running-
+   * total/remaining readout below it. Optional — omitted entirely (not
+   * shown as 0) wherever a caller doesn't have it. */
+  teamContextById?: Record<string, RivalEstimateTeamContext>;
 }) {
   const router = useRouter();
   const initialMap = new Map(
@@ -89,6 +98,11 @@ export function RivalCategoryEstimateForm({
   }
 
   const selectedTeam = teams.find((t) => t.id === selectedTeamId);
+  const selectedTeamContext = selectedTeam ? teamContextById?.[selectedTeam.id] : undefined;
+  const estimateSum = selectedTeam
+    ? categories.reduce((sum, c) => sum + (Number(values.get(cellKey(selectedTeam.id, c.id))) || 0), 0)
+    : 0;
+  const estimateRemaining = selectedTeamContext != null ? selectedTeamContext.budgetRemaining - estimateSum : null;
 
   function selectTeam(teamId: string) {
     setSelectedTeamId(teamId);
@@ -144,6 +158,11 @@ export function RivalCategoryEstimateForm({
                   ← Teams
                 </button>
                 <h4 className="text-sm font-medium">{selectedTeam.name}</h4>
+                {selectedTeamContext && (
+                  <span className="text-xs text-black/60 dark:text-white/60">
+                    {`${selectedTeamContext.slotsToFill} slot${selectedTeamContext.slotsToFill === 1 ? "" : "s"} to fill · ${selectedTeamContext.budgetRemaining.toLocaleString()} left`}
+                  </span>
+                )}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {categories.map((category) => (
@@ -160,6 +179,20 @@ export function RivalCategoryEstimateForm({
                     />
                   </label>
                 ))}
+              </div>
+              <div className="flex items-center justify-between text-sm pt-2 border-t border-black/[0.06] dark:border-white/10">
+                <span className="text-black/60 dark:text-white/60">
+                  Estimate sum{" "}
+                  <span className="font-medium text-black dark:text-white tabular-nums">
+                    {estimateSum.toLocaleString()}
+                  </span>
+                </span>
+                {estimateRemaining != null && (
+                  <span className={estimateRemaining < 0 ? "text-red-600 dark:text-red-400 font-medium" : "text-black/60 dark:text-white/60"}>
+                    {estimateRemaining < 0 ? "Over their budget by " : "Remaining "}
+                    <span className="tabular-nums font-medium">{Math.abs(estimateRemaining).toLocaleString()}</span>
+                  </span>
+                )}
               </div>
             </div>
           )}

@@ -347,6 +347,7 @@ export function AnalyticsDashboardPage({
                   initialMustHaveIds={initialStrategy.mustHaveIds}
                   initialAvoidIds={initialStrategy.avoidIds}
                   initialBudgetTargets={initialStrategy.budgetTargets}
+                  budgetRemaining={myTeam ? Number(myTeam.budgetRemaining) : undefined}
                 />
               </section>
             </div>

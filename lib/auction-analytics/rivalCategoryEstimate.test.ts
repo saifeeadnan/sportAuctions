@@ -31,12 +31,14 @@ describe("computeRivalCategoryEstimates", () => {
     const results = computeRivalCategoryEstimates(team(90), CATEGORIES, players, sales, estimates);
     const platinum = results.find((r) => r.categoryId === "platinum")!;
 
-    // remaining estimated: gold=40, silver=20 -> reserved for others = 60.
-    // available for platinum = 90 - 60 = 30. remainingEstimatedCount: liveAvgPrice
-    // for platinum is 10 (the one sale), estimatedTotalCount = 30/10 = 3, actual
-    // count 1 -> remaining 2. affordable price = 30 / 2 = 15.
-    expect(platinum.remainingEstimatedCount).toBe(2);
-    expect(platinum.estimatedAffordablePrice).toBe(15);
+    // Each estimate is forward-looking-only, so it's already the remaining
+    // budget: gold=40, silver=20 -> reserved for others = 60. available for
+    // platinum = 90 - 60 = 30. remainingEstimatedCount: liveAvgPrice for
+    // platinum is 10 (the one sale), 30/10 = 3 (its own estimate converts
+    // straight to a count, no netting against the 1 already bought).
+    // affordable price = 30 / 3 = 10.
+    expect(platinum.remainingEstimatedCount).toBe(3);
+    expect(platinum.estimatedAffordablePrice).toBe(10);
   });
 
   it("handles 3+ categories, not just a hardcoded 2 (Excel bug 4)", () => {
@@ -52,17 +54,18 @@ describe("computeRivalCategoryEstimates", () => {
 
     const results = computeRivalCategoryEstimates(team(90), CATEGORIES, players, sales, estimates);
     const gold = results.find((r) => r.categoryId === "gold")!;
-    // budgetRemaining = 90 (authoritative, as passed in). Reserved for BOTH other categories: platinum's
-    // remaining is 0 (its 10 estimate was fully spent already), silver's is
-    // 10 -> reserved = 10. Available for gold = 90 - 10 = 80. Gold's own
-    // liveAvgPrice falls back to base price (5, nothing sold in it yet), so
-    // estimated count = 10/5 = 2, affordable price = 80/2 = 40. A hardcoded
-    // 2-category (platinum-then-gold) cascade would have missed silver's
-    // reserve entirely and gotten this wrong.
-    expect(gold.estimatedAffordablePrice).toBe(40);
+    // budgetRemaining = 90 (authoritative, as passed in). Reserved for BOTH
+    // other categories: platinum's remaining estimate is 10 (its own number,
+    // not netted against its 1 actual sale), silver's is 10 -> reserved =
+    // 20. Available for gold = 90 - 20 = 70. Gold's own liveAvgPrice falls
+    // back to base price (5, nothing sold in it yet), so estimated count =
+    // 10/5 = 2, affordable price = 70/2 = 35. A hardcoded 2-category
+    // (platinum-then-gold) cascade would have missed silver's reserve
+    // entirely and gotten this wrong.
+    expect(gold.estimatedAffordablePrice).toBe(35);
   });
 
-  it("clamps an overshot category to done (0 remaining, no negative affordable price) instead of the Excel's =0-only check", () => {
+  it("ignores how much a team has already bought in a category — the estimate is forward-looking spend only", () => {
     const players = [player("p1", "platinum"), player("p2", "platinum"), player("p3", "platinum"), player("p4", "platinum")];
     const sales: SaleEvent[] = [
       { playerId: "p1", teamId: "rival", price: 10, timestamp: "t1" },
@@ -70,8 +73,9 @@ describe("computeRivalCategoryEstimates", () => {
       { playerId: "p3", teamId: "rival", price: 10, timestamp: "t3" },
       { playerId: "p4", teamId: "rival", price: 10, timestamp: "t4" },
     ];
-    // Estimated only 2 Platinum players (20 / liveAvg 10), but the team
-    // already bought 4 — a real overshoot.
+    // The team already bought 4 Platinum players (40 total, e.g. retained
+    // picks) — none of that should count against or reduce this "20 more"
+    // estimate, which liveAvg (10) converts to 2 more picks.
     const estimates: RivalCategoryEstimateInput[] = [
       { targetTeamId: "rival", categoryId: "platinum", estimatedBudget: 20 },
     ];
@@ -79,8 +83,11 @@ describe("computeRivalCategoryEstimates", () => {
     const results = computeRivalCategoryEstimates(team(60), CATEGORIES, players, sales, estimates);
     const platinum = results.find((r) => r.categoryId === "platinum")!;
 
-    expect(platinum.remainingEstimatedCount).toBe(0);
-    expect(platinum.estimatedAffordablePrice).toBeNull();
+    expect(platinum.remainingEstimatedCount).toBe(2);
+    expect(platinum.estimatedAffordablePrice).toBe(30);
+    // The already-bought count/spend is still reported, just not blended in.
+    expect(platinum.actualCount).toBe(4);
+    expect(platinum.actualSpent).toBe(40);
   });
 
   it("returns nulls for a category with no estimate set, while still reporting real actuals", () => {
@@ -98,10 +105,9 @@ describe("computeRivalCategoryEstimates", () => {
     expect(gold.actualCount).toBe(1);
   });
 
-  it("infers the one missing category's budget from the team's total spendable budget when the other N-1 are specified", () => {
-    // No sales yet -> total spendable budget is just the current
-    // budgetRemaining (100). Platinum=30 and Gold=40 specified, Silver left
-    // blank -> Silver should be inferred as 100 - (30+40) = 30.
+  it("infers the one missing category's budget from the team's current remaining budget when the other N-1 are specified", () => {
+    // Platinum=30 and Gold=40 specified (both forward-looking-only), Silver
+    // left blank -> Silver should be inferred as 100 - (30+40) = 30.
     const estimates: RivalCategoryEstimateInput[] = [
       { targetTeamId: "rival", categoryId: "platinum", estimatedBudget: 30 },
       { targetTeamId: "rival", categoryId: "gold", estimatedBudget: 40 },
@@ -131,8 +137,8 @@ describe("computeRivalCategoryEstimates", () => {
   });
 
   it("clamps an inferred budget at 0 rather than going negative", () => {
-    // Specified categories (130) already exceed the team's total spendable
-    // budget (100) — the inferred remainder can't be negative.
+    // Specified categories (130) already exceed the team's current
+    // remaining budget (100) — the inferred remainder can't be negative.
     const estimates: RivalCategoryEstimateInput[] = [
       { targetTeamId: "rival", categoryId: "platinum", estimatedBudget: 90 },
       { targetTeamId: "rival", categoryId: "gold", estimatedBudget: 40 },
@@ -145,10 +151,11 @@ describe("computeRivalCategoryEstimates", () => {
     expect(silver.isInferred).toBe(true);
   });
 
-  it("uses total spendable budget (remaining + already spent), not just current remaining, as the basis for inference", () => {
-    // Team started with 100, already spent 20 on a platinum sale -> total
-    // spendable budget is 20 (spent) + 80 (remaining) = 100, same as if
-    // nothing had sold yet. Gold=40 specified, Silver inferred.
+  it("infers from current remaining budget only — already-spent money in other categories isn't added back in", () => {
+    // Team started with 100, already spent 20 on a platinum sale, so its
+    // current remaining budget is 80. Platinum's own forward-looking
+    // estimate is 20 (20 more, unrelated to the 20 already spent), Gold=40
+    // specified -> Silver inferred as 80 - (20+40) = 20.
     const players = [player("p1", "platinum")];
     const sales: SaleEvent[] = [{ playerId: "p1", teamId: "rival", price: 20, timestamp: "t1" }];
     const estimates: RivalCategoryEstimateInput[] = [
@@ -159,7 +166,7 @@ describe("computeRivalCategoryEstimates", () => {
     const results = computeRivalCategoryEstimates(team(80), CATEGORIES, players, sales, estimates);
     const silver = results.find((r) => r.categoryId === "silver")!;
 
-    expect(silver.estimatedBudget).toBe(40);
+    expect(silver.estimatedBudget).toBe(20);
     expect(silver.isInferred).toBe(true);
   });
 });

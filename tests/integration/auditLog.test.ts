@@ -341,7 +341,7 @@ describe("audit log — analytics dashboard", () => {
     const fx = await buildAnalyticsFixture();
     const actorId = fx.entry1.team.managerId!;
 
-    await savePrediction(fx.entry1.id, fx.playerOne.id, fx.entry2.id, 250, null, actorId);
+    await savePrediction(fx.entry1.id, fx.playerOne.id, fx.entry2.id, 250, null, false, actorId);
     const saved = await expectAuditLog({
       entityType: "TeamAuctionEntry",
       entityId: fx.entry1.id,
@@ -365,7 +365,7 @@ describe("audit log — analytics dashboard", () => {
     const fx = await buildAnalyticsFixture();
     const actorId = fx.entry1.team.managerId!;
 
-    await savePrediction(fx.entry1.id, fx.playerOne.id, null, 90, null, actorId);
+    await savePrediction(fx.entry1.id, fx.playerOne.id, null, 90, null, false, actorId);
     const saved = await expectAuditLog({
       entityType: "TeamAuctionEntry",
       entityId: fx.entry1.id,
@@ -380,7 +380,7 @@ describe("audit log — analytics dashboard", () => {
     const fx = await buildAnalyticsFixture();
     const actorId = fx.entry1.team.managerId!;
 
-    await savePrediction(fx.entry1.id, fx.playerOne.id, null, null, 30, actorId);
+    await savePrediction(fx.entry1.id, fx.playerOne.id, null, null, 30, false, actorId);
     const saved = await expectAuditLog({
       entityType: "TeamAuctionEntry",
       entityId: fx.entry1.id,
@@ -389,7 +389,7 @@ describe("audit log — analytics dashboard", () => {
     });
     expect((saved.after as { predictedMinAmount?: string })?.predictedMinAmount).toBe("30");
 
-    await expect(savePrediction(fx.entry1.id, fx.playerOne.id, null, 50, 60, actorId)).rejects.toThrow(
+    await expect(savePrediction(fx.entry1.id, fx.playerOne.id, null, 50, 60, false, actorId)).rejects.toThrow(
       "Minimum amount cannot be greater than the predicted amount"
     );
   });
@@ -398,9 +398,27 @@ describe("audit log — analytics dashboard", () => {
     const fx = await buildAnalyticsFixture();
     const actorId = fx.entry1.team.managerId!;
 
-    await expect(savePrediction(fx.entry1.id, fx.playerOne.id, null, null, null, actorId)).rejects.toThrow(
-      "A prediction needs at least a team or an amount"
+    await expect(savePrediction(fx.entry1.id, fx.playerOne.id, null, null, null, false, actorId)).rejects.toThrow(
+      "A prediction needs at least a team, an amount, or a predicted-unsold guess"
     );
+  });
+
+  it("savePrediction allows a predicted-unsold guess, and rejects combining it with a team or amount", async () => {
+    const fx = await buildAnalyticsFixture();
+    const actorId = fx.entry1.team.managerId!;
+
+    await savePrediction(fx.entry1.id, fx.playerOne.id, null, null, null, true, actorId);
+    const saved = await expectAuditLog({
+      entityType: "TeamAuctionEntry",
+      entityId: fx.entry1.id,
+      action: "PREDICTION_SAVED",
+      actorUserId: actorId,
+    });
+    expect((saved.after as { predictedUnsold?: boolean })?.predictedUnsold).toBe(true);
+
+    await expect(
+      savePrediction(fx.entry1.id, fx.playerOne.id, fx.entry2.id, 250, null, true, actorId)
+    ).rejects.toThrow("A predicted-unsold guess can't also include a team or amount");
   });
 
   it("upsertRivalCategoryEstimate writes RIVAL_ESTIMATE_SAVED, then RIVAL_ESTIMATE_REMOVED when cleared", async () => {

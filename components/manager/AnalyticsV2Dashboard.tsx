@@ -10,6 +10,7 @@ import {
   RivalCategoryEstimateForm,
   type RivalEstimateTeamOption,
   type RivalEstimateCategoryOption,
+  type RivalEstimateTeamContext,
 } from "@/components/manager/RivalCategoryEstimateForm";
 import { RivalCategoryEstimatePanel, type RivalCategoryEstimateRow } from "@/components/manager/RivalCategoryEstimatePanel";
 import { StrategyForm, type StrategyCategoryOption, type StrategyPlayerOption } from "@/components/manager/StrategyForm";
@@ -30,9 +31,9 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "live", label: "Live Analytics" },
   { id: "strategy", label: "Strategy" },
   { id: "predictions", label: "Predictions" },
-  { id: "rosters", label: "All Rosters" },
   { id: "estimates", label: "My estimates" },
   { id: "simulate", label: "Simulate" },
+  { id: "rosters", label: "All Rosters" },
 ];
 
 // v2's own copy of which statuses are still predictable — deliberately not
@@ -95,6 +96,14 @@ export function AnalyticsV2Dashboard({
 
   const predictablePlayers = liveState.players.filter((p) => V2_PREDICTABLE_STATUSES.has(p.status));
   const otherTeams = liveState.teams.filter((t) => t.id !== myTeamEntryId);
+  const myTeam = liveState.teams.find((t) => t.id === myTeamEntryId);
+
+  const rivalTeamContextById: Record<string, RivalEstimateTeamContext> = Object.fromEntries(
+    otherTeams.map((t) => [
+      t.id,
+      { budgetRemaining: Number(t.budgetRemaining), slotsToFill: t.slotsTotal - t.slotsFilled },
+    ])
+  );
 
   const setupItems: SetupChecklistItem[] = [
     {
@@ -183,6 +192,7 @@ export function AnalyticsV2Dashboard({
                     initialMustHaveIds={strategy.initialMustHaveIds}
                     initialAvoidIds={strategy.initialAvoidIds}
                     initialBudgetTargets={strategy.initialBudgetTargets}
+                    budgetRemaining={myTeam ? Number(myTeam.budgetRemaining) : undefined}
                   />
                 </div>
               </details>
@@ -241,6 +251,7 @@ export function AnalyticsV2Dashboard({
                     teams={estimateForm.teams}
                     categories={estimateForm.categories}
                     initialEstimates={estimateForm.initialEstimates}
+                    teamContextById={rivalTeamContextById}
                   />
                 </div>
               </details>

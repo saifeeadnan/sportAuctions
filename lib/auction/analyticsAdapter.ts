@@ -80,6 +80,7 @@ export async function loadAuctionAnalyticsSnapshot(
       predictedWinnerTeamId: p.predictedWinnerEntryId,
       predictedAmount: p.predictedAmount != null ? Number(p.predictedAmount) : null,
       predictedMinAmount: p.predictedMinAmount != null ? Number(p.predictedMinAmount) : null,
+      predictedUnsold: p.predictedUnsold,
     })),
     budgetTargets: budgetTargets.map((t) => ({
       categoryId: t.categoryId,

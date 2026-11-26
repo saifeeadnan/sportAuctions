@@ -47,6 +47,7 @@ export default async function ManagerAnalyticsV2Page({
         teamId: p.predictedWinnerEntryId,
         amount: p.predictedAmount != null ? Number(p.predictedAmount) : null,
         minAmount: p.predictedMinAmount != null ? Number(p.predictedMinAmount) : null,
+        unsold: p.predictedUnsold,
       },
     ])
   );
@@ -120,6 +121,16 @@ export default async function ManagerAnalyticsV2Page({
       basePrice: String(p.basePrice),
     }));
 
+  // A category with nobody left to act on (either nobody was ever in it, or
+  // everybody in it has already sold) clutters Strategy's must-have/avoid
+  // picker and budget-target grid, and My estimates' per-category inputs,
+  // with a control that does nothing — hide it from both instead of
+  // listing every auction-wide category unconditionally.
+  const categoryIdsWithRemainingPlayers = new Set(strategyPlayers.map((p) => p.categoryId));
+  const activeCategories = snapshot.categories
+    .filter((c) => categoryIdsWithRemainingPlayers.has(c.id))
+    .map((c) => ({ id: c.id, name: c.name }));
+
   const budgetTargetsByCategoryName: Record<string, number> = Object.fromEntries(
     strategy.budgetTargets
       .map((t) => [categoryNameById.get(t.categoryId), Number(t.targetAvgPrice)] as const)
@@ -145,7 +156,7 @@ export default async function ManagerAnalyticsV2Page({
       initialPredictions={initialPredictions}
       strategy={{
         entryId: entry.id,
-        categories: snapshot.categories.map((c) => ({ id: c.id, name: c.name })),
+        categories: activeCategories,
         players: strategyPlayers,
         initialMustHaveIds: strategy.mustHaveIds,
         initialAvoidIds: strategy.avoidIds,
@@ -157,7 +168,7 @@ export default async function ManagerAnalyticsV2Page({
       estimateForm={{
         entryId: entry.id,
         teams: otherTeams,
-        categories: snapshot.categories.map((c) => ({ id: c.id, name: c.name })),
+        categories: activeCategories,
         initialEstimates,
       }}
     />

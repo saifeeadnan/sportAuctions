@@ -93,13 +93,36 @@ describe("simulateAuctionRun", () => {
       ],
       categories: [category],
       players,
-      predictions: [{ playerId: "p1", predictedWinnerTeamId: "rival", predictedAmount: 40, predictedMinAmount: null }],
+      predictions: [{ playerId: "p1", predictedWinnerTeamId: "rival", predictedAmount: 40, predictedMinAmount: null, predictedUnsold: false }],
     });
 
     for (let seed = 0; seed < 10; seed++) {
       const run = simulateAuctionRun(snapshot, seed);
       const p1Lot = run.lots.find((l) => l.playerId === "p1");
       expect(p1Lot).toMatchObject({ teamId: "rival", price: 40, source: "predicted" });
+    }
+  });
+
+  it("honors a predicted-unsold guess unconditionally, in every run regardless of seed", () => {
+    const category = { id: "gold", name: "Gold", basePrice: 10, bidIncrement: null };
+    const players = [{ id: "p1", name: "p1", categoryId: "gold", basePrice: 10 }];
+    const snapshot = baseSnapshot({
+      // A rival flush with budget and slots who would otherwise certainly
+      // buy this player under ordinary competitive resolution — proves the
+      // unsold guess overrides that, rather than just happening to win by
+      // nobody else bidding.
+      teams: [{ id: "rival", name: "Rival", budgetRemaining: 100000, totalSlots: 15 }],
+      categories: [category],
+      players,
+      predictions: [
+        { playerId: "p1", predictedWinnerTeamId: null, predictedAmount: null, predictedMinAmount: null, predictedUnsold: true },
+      ],
+    });
+
+    for (let seed = 0; seed < 10; seed++) {
+      const run = simulateAuctionRun(snapshot, seed);
+      const p1Lot = run.lots.find((l) => l.playerId === "p1");
+      expect(p1Lot).toEqual({ playerId: "p1", categoryId: "gold", unsold: true });
     }
   });
 
@@ -114,7 +137,7 @@ describe("simulateAuctionRun", () => {
       categories: [category],
       players,
       // A manager guessed a price but didn't name a team.
-      predictions: [{ playerId: "p1", predictedWinnerTeamId: null, predictedAmount: 40, predictedMinAmount: null }],
+      predictions: [{ playerId: "p1", predictedWinnerTeamId: null, predictedAmount: 40, predictedMinAmount: null, predictedUnsold: false }],
     });
 
     const run = simulateAuctionRun(snapshot, 1);
@@ -134,7 +157,7 @@ describe("simulateAuctionRun", () => {
       ],
       categories: [category],
       players,
-      predictions: [{ playerId: "p1", predictedWinnerTeamId: null, predictedAmount: 40, predictedMinAmount: null }],
+      predictions: [{ playerId: "p1", predictedWinnerTeamId: null, predictedAmount: 40, predictedMinAmount: null, predictedUnsold: false }],
     });
 
     for (let seed = 0; seed < 20; seed++) {
@@ -154,7 +177,7 @@ describe("simulateAuctionRun", () => {
       ],
       categories: [category],
       players,
-      predictions: [{ playerId: "p1", predictedWinnerTeamId: null, predictedAmount: null, predictedMinAmount: 30 }],
+      predictions: [{ playerId: "p1", predictedWinnerTeamId: null, predictedAmount: null, predictedMinAmount: 30, predictedUnsold: false }],
     });
 
     for (let seed = 0; seed < 20; seed++) {
@@ -176,7 +199,7 @@ describe("simulateAuctionRun", () => {
       ],
       categories: [category],
       players,
-      predictions: [{ playerId: "p1", predictedWinnerTeamId: "rival", predictedAmount: 50, predictedMinAmount: null }],
+      predictions: [{ playerId: "p1", predictedWinnerTeamId: "rival", predictedAmount: 50, predictedMinAmount: null, predictedUnsold: false }],
     });
 
     const run = simulateAuctionRun(snapshot, 1);
@@ -213,6 +236,45 @@ describe("simulateAuctionRun", () => {
         }
       }
     }
+  });
+
+  it("does not count pre-existing (retained/traded) category spend against the manager's 'My estimates' cap — only new spend during the run", () => {
+    const category = { id: "gold", name: "Gold", basePrice: 10, bidIncrement: null };
+    const retainedPlayer = { id: "retained", name: "retained", categoryId: "gold", basePrice: 10 };
+    const openPlayers = Array.from({ length: 6 }, (_, i) => ({ id: `p${i}`, name: `p${i}`, categoryId: "gold", basePrice: 10 }));
+    const snapshot = baseSnapshot({
+      teams: [
+        { id: "self", name: "Self", budgetRemaining: 1000, totalSlots: 0 }, // excluded, never interferes
+        { id: "rivalA", name: "RivalA", budgetRemaining: 100000, totalSlots: 10 },
+        { id: "rivalB", name: "RivalB", budgetRemaining: 100000, totalSlots: 10 },
+      ],
+      categories: [category],
+      players: [retainedPlayer, ...openPlayers],
+      // rivalA already has a retained pick in "gold" worth 500 — far more
+      // than the 25 the manager is estimating for gold *going forward*.
+      // Under the old (buggy) semantics this pre-existing spend alone would
+      // have put rivalA "over cap" before the live auction even started.
+      sales: [{ playerId: "retained", teamId: "rivalA", price: 500, timestamp: "t0" }],
+      rivalEstimates: [{ targetTeamId: "rivalA", categoryId: "gold", estimatedBudget: 25 }],
+    });
+
+    let rivalAEverWon = false;
+    for (let seed = 0; seed < 20; seed++) {
+      const run = simulateAuctionRun(snapshot, seed);
+      let rivalASpentDuringRun = 0;
+      let rivalAWasOverCap = false;
+      for (const lot of run.lots) {
+        if ("unsold" in lot) continue;
+        if (lot.teamId === "rivalA") {
+          expect(rivalAWasOverCap).toBe(false); // must never win again once already over the estimate
+          rivalASpentDuringRun += lot.price;
+          rivalAEverWon = true;
+          if (rivalASpentDuringRun >= 25) rivalAWasOverCap = true;
+        }
+      }
+    }
+    // The pre-existing 500 spend must never have blocked rivalA outright.
+    expect(rivalAEverWon).toBe(true);
   });
 });
 

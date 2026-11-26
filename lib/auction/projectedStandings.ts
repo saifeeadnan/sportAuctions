@@ -5,8 +5,15 @@ import type { AuctionStatePlayer, AuctionStateTeam } from "@/lib/services/auctio
 /** A manager's own private guess: which team wins this player, and/or
  * optionally how much that manager thinks it'll cost them. teamId is null
  * when the manager guessed only a price, with no team attached. minAmount
- * is the low end of a price range (amount acts as the high end). */
-export type PlayerPrediction = { teamId: string | null; amount: number | null; minAmount: number | null };
+ * is the low end of a price range (amount acts as the high end). unsold is
+ * mutually exclusive with the rest — a guess that nobody wins this player
+ * at all, rather than a guess about who does and for how much. */
+export type PlayerPrediction = {
+  teamId: string | null;
+  amount: number | null;
+  minAmount: number | null;
+  unsold: boolean;
+};
 
 export type TeamProjection = {
   teamId: string;

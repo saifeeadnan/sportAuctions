@@ -78,12 +78,19 @@ function teamSpentInCategory(
 // budget target gets, applied to the manager's own belief about a rival
 // instead. Previously "My estimates" was display-only and never actually
 // shaped how a rival was simulated to bid.
+//
+// The estimate is forward-looking only (how much MORE a rival spends from
+// here, never counting what they'd already spent/retained in this category
+// before the simulation even started), so the cap is checked against spend
+// accrued DURING this run — salesSoFar minus the original, pre-simulation
+// `sales` baseline — not against salesSoFar's cumulative-ever total.
 function rivalsOverEstimatedCategoryBudget(
   teams: { id: string }[],
   selfTeamId: string,
   categoryId: string,
   rivalEstimateByTeamCategory: ReadonlyMap<string, number>,
   players: AnalyticsPlayer[],
+  sales: SaleEvent[],
   salesSoFar: SaleEvent[]
 ): ReadonlySet<string> {
   const over = new Set<string>();
@@ -91,7 +98,9 @@ function rivalsOverEstimatedCategoryBudget(
     if (team.id === selfTeamId) continue;
     const cap = rivalEstimateByTeamCategory.get(`${team.id}:${categoryId}`);
     if (cap == null) continue;
-    if (teamSpentInCategory(team.id, categoryId, players, salesSoFar) >= cap) over.add(team.id);
+    const baselineSpent = teamSpentInCategory(team.id, categoryId, players, sales);
+    const spentDuringRun = teamSpentInCategory(team.id, categoryId, players, salesSoFar) - baselineSpent;
+    if (spentDuringRun >= cap) over.add(team.id);
   }
   return over;
 }
@@ -149,7 +158,12 @@ export function simulateAuctionRun(snapshot: AuctionAnalyticsSnapshot, seed: num
       prediction != null &&
       prediction.predictedWinnerTeamId != null &&
       legalMaxBidEnforced(teamState.get(prediction.predictedWinnerTeamId)!, unit) >= player.basePrice;
-    const lot = predictedWinnerStillLegal
+    // A predicted-unsold guess is honored unconditionally — there's no
+    // "still legal" check to make since nothing is being bought (unlike a
+    // predicted winner, no team's budget/slots are at stake).
+    const lot = prediction?.predictedUnsold
+      ? ({ playerId: player.id, categoryId: category.id, unsold: true } as const)
+      : predictedWinnerStillLegal
       ? resolvePredictedLot({
           player,
           category,
@@ -176,6 +190,7 @@ export function simulateAuctionRun(snapshot: AuctionAnalyticsSnapshot, seed: num
             player.categoryId,
             rivalEstimateByTeamCategory,
             players,
+            sales,
             salesSoFar
           ),
           // The manager's own predicted price for this player still applies

@@ -11,6 +11,10 @@ export type PredictionEntry = {
   /** The low end of the guess — optional. Acts as a min price (floor) in
    * the Simulate tab. */
   predictedMinAmount: string | null;
+  /** True when the manager predicts nobody wins this player at all —
+   * mutually exclusive with the three fields above, which are always null
+   * whenever this is true. */
+  predictedUnsold: boolean;
 };
 
 /** auctionPlayerId -> prediction, for the calling team only — predictions
@@ -20,7 +24,13 @@ export async function getPredictionsForEntry(
 ): Promise<Record<string, PredictionEntry>> {
   const predictions = await prisma.auctionPlayerPrediction.findMany({
     where: { teamAuctionEntryId },
-    select: { auctionPlayerId: true, predictedWinnerEntryId: true, predictedAmount: true, predictedMinAmount: true },
+    select: {
+      auctionPlayerId: true,
+      predictedWinnerEntryId: true,
+      predictedAmount: true,
+      predictedMinAmount: true,
+      predictedUnsold: true,
+    },
   });
   return Object.fromEntries(
     predictions.map((p) => [
@@ -29,6 +39,7 @@ export async function getPredictionsForEntry(
         predictedWinnerEntryId: p.predictedWinnerEntryId,
         predictedAmount: p.predictedAmount != null ? String(p.predictedAmount) : null,
         predictedMinAmount: p.predictedMinAmount != null ? String(p.predictedMinAmount) : null,
+        predictedUnsold: p.predictedUnsold,
       },
     ])
   );
@@ -40,10 +51,19 @@ export async function savePrediction(
   predictedWinnerEntryId: string | null,
   predictedAmount: number | null,
   predictedMinAmount: number | null,
+  predictedUnsold: boolean,
   actorUserId: string
 ) {
-  if (predictedWinnerEntryId == null && predictedAmount == null && predictedMinAmount == null) {
-    throw new ValidationError("A prediction needs at least a team or an amount");
+  if (predictedUnsold && (predictedWinnerEntryId != null || predictedAmount != null || predictedMinAmount != null)) {
+    throw new ValidationError("A predicted-unsold guess can't also include a team or amount");
+  }
+  if (
+    predictedWinnerEntryId == null &&
+    predictedAmount == null &&
+    predictedMinAmount == null &&
+    !predictedUnsold
+  ) {
+    throw new ValidationError("A prediction needs at least a team, an amount, or a predicted-unsold guess");
   }
   if (predictedWinnerEntryId === teamAuctionEntryId) {
     throw new ValidationError("You cannot predict your own team as the winner");
@@ -84,8 +104,8 @@ export async function savePrediction(
     });
     await tx.auctionPlayerPrediction.upsert({
       where: { teamAuctionEntryId_auctionPlayerId: { teamAuctionEntryId, auctionPlayerId } },
-      create: { teamAuctionEntryId, auctionPlayerId, predictedWinnerEntryId, predictedAmount, predictedMinAmount },
-      update: { predictedWinnerEntryId, predictedAmount, predictedMinAmount },
+      create: { teamAuctionEntryId, auctionPlayerId, predictedWinnerEntryId, predictedAmount, predictedMinAmount, predictedUnsold },
+      update: { predictedWinnerEntryId, predictedAmount, predictedMinAmount, predictedUnsold },
     });
     await writeAuditLog(tx, {
       entityType: "TeamAuctionEntry",
@@ -99,6 +119,7 @@ export async function savePrediction(
             predictedWinnerEntryId: existing.predictedWinnerEntryId,
             predictedAmount: existing.predictedAmount?.toString() ?? null,
             predictedMinAmount: existing.predictedMinAmount?.toString() ?? null,
+            predictedUnsold: existing.predictedUnsold,
           }
         : null,
       after: {
@@ -106,6 +127,7 @@ export async function savePrediction(
         predictedWinnerEntryId,
         predictedAmount: predictedAmount?.toString() ?? null,
         predictedMinAmount: predictedMinAmount?.toString() ?? null,
+        predictedUnsold,
       },
     });
   });
@@ -134,6 +156,7 @@ export async function removePrediction(teamAuctionEntryId: string, auctionPlayer
         predictedWinnerEntryId: existing.predictedWinnerEntryId,
         predictedAmount: existing.predictedAmount?.toString() ?? null,
         predictedMinAmount: existing.predictedMinAmount?.toString() ?? null,
+        predictedUnsold: existing.predictedUnsold,
       },
     });
   });

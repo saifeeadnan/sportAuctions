@@ -23,8 +23,13 @@ import type {
  *    real data
  *  - if exactly one category is left unestimated for a team, its budget
  *    isn't really unknown — it's inferred as whatever's left of the team's
- *    total spendable budget once the specified categories are accounted
+ *    current remaining budget once the specified categories are accounted
  *    for, rather than treated as blank
+ *  - every estimate is forward-looking only: it's how much MORE a manager
+ *    expects a rival to spend in that category from here, never a total
+ *    that's supposed to also cover players they've already retained/bought
+ *    in it (entering "100" for a team that already has a 1600-cost pick in
+ *    that category means "100 more," not "100 total, already blown")
  */
 export function computeRivalCategoryEstimates(
   teams: AnalyticsTeam[],
@@ -56,12 +61,10 @@ export function computeRivalCategoryEstimates(
 
     // If every category but one has an explicit estimate for this team, the
     // last one isn't really unknown — infer it from what's left of the
-    // team's total spendable budget (current remaining + everything already
-    // spent, i.e. the budget available for auction picks specifically,
-    // which excludes e.g. a manager's own fixed self-slot fee) once the
-    // specified categories are subtracted out. Two or more missing
-    // categories genuinely can't be disentangled from a single total, so
-    // those are left alone.
+    // team's current remaining budget once the specified categories (each
+    // already a forward-looking, remaining-only figure) are subtracted out.
+    // Two or more missing categories genuinely can't be disentangled from a
+    // single total, so those are left alone.
     const categoryIds = categories.map((c) => c.id);
     const explicitCategoryIds = categoryIds.filter((id) =>
       explicitEstimateByTeamCategory.has(`${team.id}:${id}`)
@@ -76,25 +79,25 @@ export function computeRivalCategoryEstimates(
       });
     }
     if (explicitCategoryIds.length > 0 && missingCategoryIds.length === 1) {
-      const totalSpendableBudget = budgetRemaining + teamSales.reduce((sum, s) => sum + s.price, 0);
-      const specifiedTotal = explicitCategoryIds.reduce(
+      const specifiedRemainingTotal = explicitCategoryIds.reduce(
         (sum, id) => sum + effectiveEstimateByCategory.get(id)!.amount,
         0
       );
       effectiveEstimateByCategory.set(missingCategoryIds[0], {
-        amount: Math.max(totalSpendableBudget - specifiedTotal, 0),
+        amount: Math.max(budgetRemaining - specifiedRemainingTotal, 0),
         inferred: true,
       });
     }
 
-    // This team's remaining estimated budget per category it has an
-    // (explicit or inferred) estimate for — reused both as "what's left to
-    // reserve" when computing every OTHER category's affordable price, and
-    // as the numerator when it's this category's own turn.
+    // Every estimate is already forward-looking/remaining-only (never
+    // including money already spent on this category's retained/sold
+    // players), so it doubles directly as "this team's remaining estimated
+    // budget" — reused both as "what's left to reserve" when computing every
+    // OTHER category's affordable price, and as the numerator when it's this
+    // category's own turn.
     const remainingEstimatedBudgetByCategory = new Map<string, number>();
     for (const [categoryId, { amount }] of effectiveEstimateByCategory) {
-      const actualSpent = actualByCategory.get(categoryId)?.spent ?? 0;
-      remainingEstimatedBudgetByCategory.set(categoryId, Math.max(amount - actualSpent, 0));
+      remainingEstimatedBudgetByCategory.set(categoryId, Math.max(amount, 0));
     }
 
     for (const category of categories) {
@@ -126,8 +129,9 @@ export function computeRivalCategoryEstimates(
           : category.basePrice;
 
       const remainingEstimatedBudget = remainingEstimatedBudgetByCategory.get(category.id) ?? 0;
-      const estimatedTotalCount = liveAvgPrice > 0 ? effective.amount / liveAvgPrice : 0;
-      const remainingEstimatedCount = Math.max(Math.round(estimatedTotalCount) - actual.count, 0);
+      // effective.amount is already remaining-only spend, so it converts
+      // straight to a remaining pick count — no actual.count to net out.
+      const remainingEstimatedCount = liveAvgPrice > 0 ? Math.max(Math.round(effective.amount / liveAvgPrice), 0) : 0;
 
       let estimatedAffordablePrice: number | null = null;
       if (remainingEstimatedCount > 0) {
