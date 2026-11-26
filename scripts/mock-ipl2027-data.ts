@@ -551,3 +551,122 @@ export const OPEN_POOL_PLAYERS: OpenPoolPlayer[] = [
   { name: "Shivam Mavi", position: "Bowler", category: "B-Tier", nationality: "India" },
   { name: "Umran Malik", position: "Bowler", category: "B-Tier", nationality: "India" },
 ];
+
+/**
+ * 3. TEAM_STRATEGIES: NOT real data like the two lists above — this is
+ * grounded analysis, not fact. Each team's must-have/avoid picks (chosen
+ * only from OPEN_POOL_PLAYERS above) and per-category budget targets are
+ * this session's read of real auction-preview coverage of each franchise's
+ * actual needs (gaps left by this cycle's real releases/retentions, and in
+ * some cases a specific named target from that coverage), translated into
+ * this mock's own category ladder and in-game economy. Sources:
+ * https://sports.yahoo.com/articles/ipl-2027-auction-every-team-172001170.html
+ * (team-by-team needs/targets), https://www.yardbarker.com/cricket/articles/ipl_2027_auction_3_biggest_weaknesses_mumbai_indians_must_fix/s1_17781_44420265,
+ * https://sports.yahoo.com/articles/kkr-likely-auction-targets-buy-085001914.html,
+ * https://sports.yahoo.com/articles/ipl-2027-mini-auction-rcb-122112549.html,
+ * https://whatsthescore.in/blog/csk-ipl-2027-squad-analysis-strongest-playing-xi.
+ * Where a real named target isn't in our 76-player pool (it's registered in
+ * a lower, unpublished tier), the closest same-role player actually in the
+ * pool stands in instead — e.g. PBKS's real target Lockie Ferguson isn't
+ * here, so Riley Meredith (same express-pace role, Elite tier) fills in.
+ * Some avoids exist only to keep two teams from scripting a double-chase of
+ * the same player they can't both realistically land (e.g. DC avoids Trent
+ * Boult once he's KKR's must-have) — not a claim either team actually
+ * avoided that real player. A couple of overlaps are left deliberately
+ * intact where the real coverage names the SAME player as a target for two
+ * teams (Shimron Hetmyer for both SRH and RR) — real contention, not a bug.
+ */
+export type TeamStrategySeed = {
+  teamSlug: string;
+  mustHaveNames: string[];
+  avoidNames: string[];
+  budgetTargetsByCategory: Record<string, number>;
+};
+
+export const TEAM_STRATEGIES: TeamStrategySeed[] = [
+  {
+    // Pace attack is the real, widely-cited concern (Khaleel Ahmed and
+    // Nathan Ellis both left); no clean Indian-spin-allrounder fit exists
+    // in the open pool, so this strategy leans entirely on death pace.
+    teamSlug: "csk",
+    mustHaveNames: ["Matheesha Pathirana", "Gerald Coetzee"],
+    avoidNames: ["Ben Stokes"], // the marquee headline name, not the bowling fix they actually need
+    budgetTargetsByCategory: { Marquee: 450, "B-Tier": 90 },
+  },
+  {
+    // Real coverage names both of these almost verbatim: a wrist-spinner to
+    // replace the released slow-bowling options, and overseas pace to share
+    // the new ball with Bumrah.
+    teamSlug: "mi",
+    mustHaveNames: ["Wanindu Hasaranga", "Spencer Johnson"],
+    avoidNames: ["Jonny Bairstow"], // De Kock already covers the keeper slot
+    budgetTargetsByCategory: { Marquee: 500, "A-Tier": 130 },
+  },
+  {
+    // Only 1 overseas slot (fewest in the league) — one overseas all-rounder
+    // pick has to do double duty as death-overs cover for David/Shepherd.
+    teamSlug: "rcb",
+    mustHaveNames: ["David Wiese", "Umesh Yadav"],
+    avoidNames: ["David Warner"], // another opener, not the finishing/all-round cover they need
+    budgetTargetsByCategory: { Elite: 180, "B-Tier": 90 },
+  },
+  {
+    // Rahane's retirement plus Pathirana's release left two real gaps: death
+    // pace and a middle-order Indian finisher.
+    teamSlug: "kkr",
+    mustHaveNames: ["Trent Boult", "Rahmanullah Gurbaz", "Rahul Tripathi"],
+    avoidNames: ["Umran Malik"], // a player KKR itself just released
+    budgetTargetsByCategory: { Marquee: 480, "B-Tier": 100 },
+  },
+  {
+    // Travis Head's opt-out leaves an opener-shaped hole; Hetmyer is also
+    // explicitly named in coverage as an SRH target (not just RR's below).
+    teamSlug: "srh",
+    mustHaveNames: ["David Warner", "Shimron Hetmyer"],
+    avoidNames: ["Jake Fraser-McGurk"], // a second opener once Warner's in
+    budgetTargetsByCategory: { Marquee: 520 },
+  },
+  {
+    // Starc's opt-out needs a like-for-like overseas pace leader; Nair is a
+    // plausible buy-back for the Indian middle-order cover they also lost.
+    teamSlug: "dc",
+    mustHaveNames: ["Anrich Nortje", "Karun Nair"],
+    avoidNames: ["Trent Boult"], // leave the other marquee pacer to KKR
+    budgetTargetsByCategory: { Marquee: 460, "B-Tier": 90 },
+  },
+  {
+    // Real coverage's named pace target (Lockie Ferguson) isn't in this
+    // pool — Meredith fills the same express-pace role at a cheaper tier,
+    // which also fits PBKS's more modest remaining purse.
+    teamSlug: "pbks",
+    mustHaveNames: ["Riley Meredith", "Deepak Hooda"],
+    avoidNames: ["Jhye Richardson"], // same role as Meredith, pricier tier
+    budgetTargetsByCategory: { Elite: 190, "B-Tier": 90 },
+  },
+  {
+    // Both of RR's own real releases are named as plausible buy-backs in
+    // coverage: Hetmyer for the No. 6/7 finisher slot, Deshpande for pace
+    // depth behind Archer/Shami.
+    teamSlug: "rr",
+    mustHaveNames: ["Shimron Hetmyer", "Tushar Deshpande"],
+    avoidNames: ["Kyle Mayers"], // a second finisher option once Hetmyer's the priority
+    budgetTargetsByCategory: { Marquee: 470, "A-Tier": 130 },
+  },
+  {
+    // Smallest real remaining purse in the league — both picks sit in the
+    // same affordable Premium tier rather than reaching for Marquee.
+    teamSlug: "gt",
+    mustHaveNames: ["Kyle Mayers", "Matthew Forde"],
+    avoidNames: ["David Wiese"], // pricier Elite-tier alternative to Mayers
+    budgetTargetsByCategory: { Premium: 160 },
+  },
+  {
+    // Largest remaining purse in the league, and it shows: both picks are
+    // Marquee-tier, going after a frontline pacer (replacing Shami/Avesh/
+    // Nortje) and an overseas top-order anchor.
+    teamSlug: "lsg",
+    mustHaveNames: ["Jhye Richardson", "Daryl Mitchell"],
+    avoidNames: ["Rachin Ravindra"], // an opener-profile bat, not the anchor role they need
+    budgetTargetsByCategory: { Marquee: 550 },
+  },
+];
