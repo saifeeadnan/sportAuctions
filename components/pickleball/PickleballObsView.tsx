@@ -53,11 +53,11 @@ export function PickleballObsView({ token, initial }: { token: string; initial: 
             <table className="w-full text-lg border-collapse">
               <thead>
                 <tr className="border-b border-white/20 text-left text-sm text-white/50">
-                  <th className="py-2 pr-2 font-medium">#</th>
-                  <th className="py-2 pr-2 font-medium">Team</th>
-                  <th className="py-2 pr-2 font-medium text-right">W-L</th>
-                  <th className="py-2 pr-2 font-medium text-right">Games</th>
-                  <th className="py-2 font-medium text-right">Diff</th>
+                  <th className="py-2 pr-2 font-medium text-white/50">#</th>
+                  <th className="py-2 pr-2 font-medium text-white/50">Team</th>
+                  <th className="py-2 pr-2 font-medium text-right text-white/50">W-L</th>
+                  <th className="py-2 pr-2 font-medium text-right text-white/50">Games</th>
+                  <th className="py-2 font-medium text-right text-white/50">Diff</th>
                 </tr>
               </thead>
               <tbody>

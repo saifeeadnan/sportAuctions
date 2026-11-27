@@ -24,6 +24,7 @@ import { countInCategory, isAtOrOverCap } from "@/lib/auction/categoryCaps";
 import { shortName } from "@/lib/playerDisplayName";
 import { card, buttonPrimary, buttonSecondary, buttonDanger, inputClass, selectClass, tabsTrack, tabItem } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
+import { PlayerStatusBadge } from "@/components/ui/PlayerStatusBadge";
 
 export function AuctioneerConsole({
   initialState,
@@ -387,8 +388,7 @@ export function AuctioneerConsole({
                 >
                   <span className="flex items-center gap-1.5 truncate">
                     <span className="truncate">{p.name}</span>
-                    {p.status === "IN_PRE_AUCTION_POOL" && <Badge variant="warning">Contested</Badge>}
-                    {p.status === "UNSOLD" && <Badge variant="neutral">Re-offer</Badge>}
+                    <PlayerStatusBadge status={p.status} />
                   </span>
                   <button
                     onClick={() => handleSelect(p.id)}

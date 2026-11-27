@@ -32,7 +32,7 @@ export const tabsTrack = "inline-flex flex-wrap gap-1 rounded-lg bg-black/[0.04]
 export function tabItem(active: boolean) {
   return `rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
     active
-      ? "bg-white dark:bg-white/10 text-black dark:text-white shadow-sm"
-      : "text-black/60 dark:text-white/60 hover:text-black dark:hover:text-white"
+      ? "bg-white dark:bg-white/10 text-violet-600 dark:text-violet-400 shadow-sm"
+      : "text-black/60 dark:text-white/60 hover:text-violet-600 dark:hover:text-violet-400"
   }`;
 }

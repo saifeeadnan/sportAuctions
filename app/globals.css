@@ -58,6 +58,17 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  /* The denser type-scale above only remaps what a `text-*` utility class
+     resolves to — it never touched the actual DEFAULT size an element gets
+     when it has no such class at all, which stayed the browser's 16px the
+     whole time. Several admin list panels (tournament/roster/auction/
+     fantasy-team row names, among others) render their primary text in a
+     bare <span> with no size class, so they never shrank yesterday and now
+     look oversized next to the text-sm siblings around them. Matching
+     text-sm here, the dominant UI text size everywhere else, fixes every
+     one of those in one place instead of hunting down each bare span. */
+  font-size: var(--text-sm);
+  line-height: var(--text-sm--line-height);
 }
 
 a:focus-visible,
@@ -65,4 +76,33 @@ button:focus-visible {
   outline: 2px solid rgb(99 102 241 / 0.6);
   outline-offset: 2px;
   border-radius: 4px;
+}
+
+/* Site-wide accent for two structural elements that are styled ad hoc per
+   component rather than through a shared class: table column headers and
+   collapsible-panel headings. A bare element selector (lower specificity
+   than any Tailwind utility class) so it only colors the many <th>/
+   <summary> instances that don't already set their own text color —
+   anything that deliberately stays muted (e.g. a nested "advanced" toggle)
+   keeps its own explicit class untouched. */
+thead th,
+summary {
+  color: rgb(79 70 229 / 0.9); /* indigo-600 */
+}
+:root.dark thead th,
+:root.dark summary {
+  color: rgb(129 140 248 / 0.95); /* indigo-400 */
+}
+
+/* Zebra-striped table body rows, site-wide, for readability on anything
+   with more than a couple of rows. :where() gives this zero specificity,
+   so it only ever fills in a row's DEFAULT background — any row that sets
+   its own background explicitly (a "this is your team" highlight, a
+   selected row, a hover state) keeps winning over it untouched. Only
+   :nth-child(even) within <tbody> is targeted, never <thead>'s row. */
+:where(tbody tr:nth-child(even)) {
+  background-color: rgb(0 0 0 / 0.02);
+}
+:root.dark :where(tbody tr:nth-child(even)) {
+  background-color: rgb(255 255 255 / 0.03);
 }

@@ -24,12 +24,12 @@ export function HelpTooltip({ title, children }: { title: string; children: Reac
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-label={`Help: ${title}`}
-        className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-black/20 dark:border-white/25 text-[10px] leading-none text-black/50 dark:text-white/50 hover:text-black dark:hover:text-white hover:border-black/40 dark:hover:border-white/40 transition-colors"
+        className="inline-flex items-center justify-center w-4 h-4 rounded-full border border-indigo-600/30 dark:border-indigo-400/30 text-[10px] leading-none text-indigo-600 dark:text-indigo-400 hover:border-indigo-600/60 dark:hover:border-indigo-400/60 transition-colors"
       >
         ?
       </button>
       {open && (
-        <div className="absolute z-30 top-6 left-0 w-72 rounded-lg border border-black/10 dark:border-white/10 bg-white dark:bg-neutral-900 shadow-lg p-3 text-xs leading-relaxed text-black/70 dark:text-white/70">
+        <div className="absolute z-30 top-6 left-0 w-72 rounded-lg border border-black/10 dark:border-white/10 bg-white dark:bg-neutral-900 shadow-lg p-3 text-[10px] leading-relaxed text-indigo-700 dark:text-indigo-300">
           {children}
         </div>
       )}
