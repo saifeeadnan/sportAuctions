@@ -898,6 +898,15 @@ model TeamAuctionEntry {
   // any time post-completion, not a one-shot action.
   captainAuctionPlayerId String?                @unique
   captainAuctionPlayer   AuctionPlayer?         @relation("TeamCaptain", fields: [captainAuctionPlayerId], references: [id])
+  // Which saved strategy (if any) the live must-have/avoid/budget-target/
+  // rival-estimate/prediction state is nominally a copy of — set only by
+  // saving or loading a snapshot (savedStrategy.service.ts), never by the
+  // ordinary per-cell autosave actions. Lets a "has this drifted since the
+  // last save/load" dirty-check be answered with a plain DB-state
+  // comparison. SetNull (not Cascade) so deleting the active saved
+  // strategy just clears the pointer rather than the entry itself.
+  activeSavedStrategyId  String?
+  activeSavedStrategy    SavedAuctionStrategy?  @relation("ActiveSavedStrategy", fields: [activeSavedStrategyId], references: [id], onDelete: SetNull)
 
   draftSubmissions       PreAuctionSubmission[]
   playersWon             AuctionPlayer[]               @relation("SoldPlayers")
@@ -909,6 +918,7 @@ model TeamAuctionEntry {
   predictedToWin         AuctionPlayerPrediction[]     @relation("PredictedWinner")
   categoryEstimatesMade  RivalCategoryBudgetEstimate[] @relation("CategoryEstimatesMadeBy")
   categoryEstimatesAbout RivalCategoryBudgetEstimate[] @relation("CategoryEstimateTarget")
+  savedStrategies        SavedAuctionStrategy[]        @relation("SavedStrategyOwner")
 
   @@unique([teamId, auctionId])
   @@index([auctionId])
@@ -1047,6 +1057,38 @@ model RivalCategoryBudgetEstimate {
 
   @@unique([teamAuctionEntryId, targetEntryId, categoryId])
   @@map("rival_category_budget_estimates")
+}
+
+/**
+ * A named, point-in-time snapshot of a manager's own Analytics v2 strategy —
+ * must-haves/avoids, own per-category budget targets, every rival's
+ * estimated budget, and predictions — captured so a manager can try out a
+ * different strategy in Simulate and come back to an earlier one later.
+ * Written as JSON blobs rather than normalized child tables: a snapshot is
+ * always written and read as one atomic unit (list shows name + date only;
+ * load reads the whole thing), nothing ever queries *inside* one, same
+ * reasoning as AuditLog.before/after and PlayerRoster.priorStats already use
+ * this schema. Saving under an existing name overwrites it (see the unique
+ * constraint below) rather than erroring or prompting to pick a slot.
+ */
+model SavedAuctionStrategy {
+  id                 String           @id @default(cuid())
+  teamAuctionEntryId String
+  teamAuctionEntry   TeamAuctionEntry @relation("SavedStrategyOwner", fields: [teamAuctionEntryId], references: [id], onDelete: Cascade)
+  name               String
+  mustHaveIds        Json
+  avoidIds           Json
+  budgetTargets      Json
+  rivalEstimates     Json
+  predictions        Json
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  activeFor          TeamAuctionEntry[] @relation("ActiveSavedStrategy")
+
+  @@unique([teamAuctionEntryId, name])
+  @@index([teamAuctionEntryId])
+  @@map("saved_auction_strategies")
 }
 
 model PreAuctionSubmission {

@@ -275,6 +275,32 @@ Because a batch of 100 runs is pure in-memory arithmetic (nothing is written to 
 re-running costs you seconds, not minutes — there's no real cost to checking again after every
 few lots if you want to.
 
+## 11. Saving and comparing named strategies
+
+Everything above describes one live, continuously-editable state. The bar above the tab strip
+(visible no matter which tab you're on, since a strategy spans both Set Budgets and Wish list &
+Predictions) lets you name and keep more than one version of it, so you can try an idea, check
+what Simulate thinks of it, and get back to where you started without losing anything.
+
+- **Save current as…** captures everything at once — must-haves, avoids, your budget targets,
+  every rival estimate, and every prediction — under the name you give it. Saving under a name
+  that already exists overwrites that saved copy; the save-as box starts pre-filled with
+  whichever strategy is currently active, so change the name there if you want a new, separate
+  copy instead of overwriting it.
+- **Load** overwrites live state with a saved snapshot — must-haves, avoids, budget targets,
+  rival estimates, and predictions all switch over together. Simulate needs no separate step
+  afterward: the next time you click Run, it reads this freshly-loaded state automatically, the
+  same way it always reads whatever's live.
+- **Editing after a load never writes back into the saved copy.** Every toggle and every cell
+  still only autosaves to *live* state, exactly as described throughout this document — the
+  named strategy you loaded stays exactly as it was until you explicitly save again. This means
+  you can load "Plan A," experiment freely, and either save those changes back into "Plan A" by
+  name, or save them under a new name to keep both versions side by side, entirely your choice.
+- **Switching to a different saved strategy while live state has unsaved changes prompts you to
+  save first**, so an experiment never gets silently lost by loading over it. Reloading the
+  strategy that's already active skips that prompt — it's treated as "revert to what I last
+  saved here," not a conflict with itself.
+
 ---
 
 ## Appendix: real engine output, not illustration
@@ -566,3 +592,39 @@ manager has to decide, not something the tool resolves for you:
 Pick based on which player you'd be more upset to lose — there's no universally correct choice.
 RR's real setup now takes the first option, protecting Hetmyer. A manager who'd rather protect
 Deshpande's chances instead would make the opposite call, just as validly.
+
+### A11. Comparing two real, named KKR strategies: shifting budget from Marquee to Elite
+
+This is exactly the kind of comparison §11's save/load feature is for, and these are two
+genuinely saved, named strategies on KKR's real team, not a hypothetical. Both keep the same
+must-haves, avoids, rival estimates, and predictions as everywhere else in this appendix — the
+only difference between them is where Marquee's budget target moved to:
+
+| | "default" | "Elite Target" |
+|---|---|---|
+| Marquee target | 4500 | 3500 |
+| Elite target | 650 | 1650 |
+
+Same engine, same 100 runs, same fixed seed, loading each saved strategy in turn:
+
+| | "default" | "Elite Target" |
+|---|---|---|
+| Trent Boult (must-have) | won 100/100, avg price **4500** | won **95/100**, avg price **3500** |
+| Rahul Tripathi (must-have) | won 100/100, avg price 473 | won 100/100, avg price **1083** |
+| Budget remaining (avg) | 132.75 | 85.75 |
+| Completion (full squad) | **0/100** | **20/100** |
+
+The headline result is a direct, easily-explained one: completion jumps from 0/100 to 20/100.
+Freeing Elite up to a real 1650 target (instead of 650) lets KKR actually compete for Elite
+picks it was previously capping itself out of — the same "don't set a target below the real
+going rate" lesson as A8/A10, just applied to a category that isn't a must-have at all. The
+trade-off is just as direct: lowering Marquee's own cap to 3500 means Boult now loses 5% of the
+time (3500 isn't always enough), where he was unbeatable at 4500.
+
+Tripathi's price rising from 473 to 1083 is a second, less obvious effect — B-Tier still has no
+budget target of its own in either strategy, so his price has always floated with however much
+of KKR's budget is left by the time his lot comes up (A4). Reshuffling how much Marquee and
+Elite consume earlier in the same run changes that leftover in ways that aren't obvious just
+from reading the two budget numbers side by side. That's the actual point of being able to save
+and compare two real strategies instead of reasoning it out in advance: Simulate tells you what
+actually happens, including the parts you wouldn't have predicted.

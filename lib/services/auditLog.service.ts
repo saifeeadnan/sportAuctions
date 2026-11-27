@@ -18,7 +18,8 @@ export type AuditEntityType =
   | "PlayerRoster"
   | "Player"
   | "PickleballEvent"
-  | "PickleballGame";
+  | "PickleballGame"
+  | "SavedAuctionStrategy";
 
 /** Every audited business action, as a semantic label — never a raw CRUD
  * verb. One entry per mutation actually hooked up; see the audit-log plan
@@ -80,6 +81,11 @@ export type AuditAction =
   | "PREDICTION_REMOVED"
   | "RIVAL_ESTIMATE_SAVED"
   | "RIVAL_ESTIMATE_REMOVED"
+  | "RIVAL_ESTIMATES_REPLACED"
+  | "PREDICTIONS_REPLACED"
+  | "SAVED_STRATEGY_SAVED"
+  | "SAVED_STRATEGY_LOADED"
+  | "SAVED_STRATEGY_DELETED"
   | "ANALYTICS_ENABLED"
   | "ANALYTICS_DISABLED"
   | "ROSTER_CARD_LINK_CREATED"

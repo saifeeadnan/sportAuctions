@@ -133,6 +133,89 @@ export async function savePrediction(
   });
 }
 
+export type PredictionReplaceInput = {
+  auctionPlayerId: string;
+  predictedWinnerEntryId: string | null;
+  predictedAmount: number | null;
+  predictedMinAmount: number | null;
+  predictedUnsold: boolean;
+};
+
+/**
+ * Wipe-and-replace every prediction for this entry in one go — the bulk
+ * counterpart to savePrediction/removePrediction's per-player edits, used by
+ * savedStrategy.service.ts's loadSavedStrategy to restore a whole saved
+ * snapshot at once (one summary audit row instead of one per player).
+ * Predictions are "only meaningful for players reality hasn't already
+ * answered for" (same reasoning savePrediction already applies) — a player
+ * that's sold since the snapshot was saved is silently dropped rather than
+ * failing the whole load, since that's an expected staleness, not an error.
+ */
+export async function replacePredictions(
+  teamAuctionEntryId: string,
+  predictions: PredictionReplaceInput[],
+  actorUserId: string
+) {
+  const entry = await prisma.teamAuctionEntry.findUnique({ where: { id: teamAuctionEntryId } });
+  if (!entry) throw new ValidationError("Team auction entry not found");
+
+  const playerIds = Array.from(new Set(predictions.map((p) => p.auctionPlayerId)));
+  const players = playerIds.length > 0
+    ? await prisma.auctionPlayer.findMany({ where: { id: { in: playerIds }, auctionId: entry.auctionId } })
+    : [];
+  const playerById = new Map(players.map((p) => [p.id, p]));
+
+  const winnerEntryIds = Array.from(
+    new Set(predictions.map((p) => p.predictedWinnerEntryId).filter((id): id is string => id != null))
+  );
+  const validWinnerEntries = winnerEntryIds.length > 0
+    ? await prisma.teamAuctionEntry.findMany({ where: { id: { in: winnerEntryIds }, auctionId: entry.auctionId }, select: { id: true } })
+    : [];
+  if (validWinnerEntries.length !== winnerEntryIds.length) {
+    throw new ValidationError("One or more predicted teams do not belong to this auction");
+  }
+
+  const applicable = predictions.filter((p) => {
+    const player = playerById.get(p.auctionPlayerId);
+    return player != null && player.status !== "SOLD";
+  });
+
+  for (const p of applicable) {
+    if (p.predictedWinnerEntryId === teamAuctionEntryId) {
+      throw new ValidationError("You cannot predict your own team as the winner");
+    }
+    if (p.predictedUnsold && (p.predictedWinnerEntryId != null || p.predictedAmount != null || p.predictedMinAmount != null)) {
+      throw new ValidationError("A predicted-unsold guess can't also include a team or amount");
+    }
+  }
+
+  await prisma.$transaction(async (tx) => {
+    const existingCount = await tx.auctionPlayerPrediction.count({ where: { teamAuctionEntryId } });
+    await tx.auctionPlayerPrediction.deleteMany({ where: { teamAuctionEntryId } });
+    if (applicable.length > 0) {
+      await tx.auctionPlayerPrediction.createMany({
+        data: applicable.map((p) => ({
+          teamAuctionEntryId,
+          auctionPlayerId: p.auctionPlayerId,
+          predictedWinnerEntryId: p.predictedWinnerEntryId,
+          predictedAmount: p.predictedAmount,
+          predictedMinAmount: p.predictedMinAmount,
+          predictedUnsold: p.predictedUnsold,
+        })),
+      });
+    }
+    await writeAuditLog(tx, {
+      entityType: "TeamAuctionEntry",
+      entityId: teamAuctionEntryId,
+      auctionId: entry.auctionId,
+      action: "PREDICTIONS_REPLACED",
+      actorUserId,
+      before: { predictionCount: existingCount },
+      after: { predictionCount: applicable.length },
+    });
+  });
+}
+
 export async function removePrediction(teamAuctionEntryId: string, auctionPlayerId: string, actorUserId: string) {
   const [entry, existing] = await Promise.all([
     prisma.teamAuctionEntry.findUnique({ where: { id: teamAuctionEntryId } }),

@@ -9,6 +9,7 @@ import { computeRivalCategoryEstimates } from "@/lib/auction-analytics/rivalCate
 import { computeRivalRosters } from "@/lib/auction-analytics/rivalRosters";
 import { getStrategyForEntry } from "@/lib/services/auctionStrategy.service";
 import { getPredictionsForEntry } from "@/lib/services/auctionPrediction.service";
+import { listSavedStrategies } from "@/lib/services/savedStrategy.service";
 import { AnalyticsV2Dashboard } from "@/components/manager/AnalyticsV2Dashboard";
 import type { PlayerPrediction } from "@/lib/auction/projectedStandings";
 
@@ -28,16 +29,24 @@ export default async function ManagerAnalyticsV2Page({
     notFound();
   }
 
-  const [snapshot, auction, strategy, auctionState, predictions] = await Promise.all([
-    loadAuctionAnalyticsSnapshot(entry.auctionId, entry.id),
-    prisma.auction.findUnique({
-      where: { id: entry.auctionId },
-      select: { name: true, tournament: { select: { name: true } } },
-    }),
-    getStrategyForEntry(entry.id),
-    getAuctionState(entry.auctionId),
-    getPredictionsForEntry(entry.id),
-  ]);
+  const [snapshot, auction, strategy, auctionState, predictions, savedStrategies, activeSavedStrategy] =
+    await Promise.all([
+      loadAuctionAnalyticsSnapshot(entry.auctionId, entry.id),
+      prisma.auction.findUnique({
+        where: { id: entry.auctionId },
+        select: { name: true, tournament: { select: { name: true } } },
+      }),
+      getStrategyForEntry(entry.id),
+      getAuctionState(entry.auctionId),
+      getPredictionsForEntry(entry.id),
+      listSavedStrategies(entry.id),
+      entry.activeSavedStrategyId
+        ? prisma.savedAuctionStrategy.findUnique({
+            where: { id: entry.activeSavedStrategyId },
+            select: { name: true },
+          })
+        : null,
+    ]);
   if (!snapshot || !auction || !auctionState) notFound();
 
   const initialPredictions: Record<string, PlayerPrediction> = Object.fromEntries(
@@ -198,6 +207,8 @@ export default async function ManagerAnalyticsV2Page({
         categories: activeCategories,
         initialEstimates,
       }}
+      activeStrategyName={activeSavedStrategy?.name ?? null}
+      savedStrategies={savedStrategies}
     />
   );
 }

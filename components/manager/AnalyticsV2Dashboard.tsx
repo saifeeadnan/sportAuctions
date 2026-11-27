@@ -7,16 +7,17 @@ import { WishlistFeasibilityPanel, type WishlistItemDisplay } from "@/components
 import { WishlistStatusBadge } from "@/components/manager/WishlistStatusBadge";
 import { RivalRostersPanel, type RivalRosterDisplay } from "@/components/manager/RivalRostersPanel";
 import {
-  RivalCategoryEstimateForm,
+  RivalCategoryEstimateTable,
   type RivalEstimateTeamOption,
   type RivalEstimateCategoryOption,
   type RivalEstimateTeamContext,
-} from "@/components/manager/RivalCategoryEstimateForm";
-import { RivalCategoryEstimatePanel, type RivalCategoryEstimateRow } from "@/components/manager/RivalCategoryEstimatePanel";
+  type RivalCategoryEstimateRow,
+} from "@/components/manager/RivalCategoryEstimateTable";
 import { SetupProgressBanner, type SetupChecklistItem } from "@/components/manager/SetupProgressBanner";
 import { LiveBidGuidancePanel } from "@/components/manager/LiveBidGuidancePanel";
 import { RosterAffordabilityPanel } from "@/components/manager/RosterAffordabilityPanel";
 import { WishlistAndPredictionsPicker } from "@/components/manager/WishlistAndPredictionsPicker";
+import { SavedStrategiesBar, type SavedStrategyOption } from "@/components/manager/SavedStrategiesBar";
 import { SimulationPanel, type SimulationPlanSummaryDisplay } from "@/components/manager/SimulationPanel";
 import { useAuctionSocket } from "@/hooks/useAuctionSocket";
 import { computeRosterAffordability } from "@/lib/auction/rosterAffordability";
@@ -54,6 +55,8 @@ export function AnalyticsV2Dashboard({
   rivalRosters,
   rivalEstimateRows,
   estimateForm,
+  activeStrategyName,
+  savedStrategies,
 }: {
   auctionId: string;
   initialState: AuctionState;
@@ -80,6 +83,8 @@ export function AnalyticsV2Dashboard({
     categories: RivalEstimateCategoryOption[];
     initialEstimates: { targetEntryId: string; categoryId: string; estimatedBudget: string }[];
   };
+  activeStrategyName: string | null;
+  savedStrategies: SavedStrategyOption[];
 }) {
   const [tab, setTab] = useState<Tab>("live");
   // Owned here, not inside LiveBidGuidancePanel — that panel only renders
@@ -158,6 +163,12 @@ export function AnalyticsV2Dashboard({
           storageKey={`analytics-v2-setup:${myTeamEntryId}`}
           items={setupItems}
           onJump={(key) => setTab(key as Tab)}
+        />
+
+        <SavedStrategiesBar
+          teamAuctionEntryId={myTeamEntryId}
+          activeStrategyName={activeStrategyName}
+          savedStrategies={savedStrategies}
         />
 
         <div className={`${tabsTrack} self-start shrink-0`}>
@@ -242,21 +253,21 @@ export function AnalyticsV2Dashboard({
 
           {tab === "estimates" && (
             <section className="flex flex-col gap-3">
-              <details className={card}>
+              <details className={card} open>
                 <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
                   Set your budgets
                 </summary>
                 <div className="px-4 pb-4">
-                  <RivalCategoryEstimateForm
+                  <RivalCategoryEstimateTable
                     entryId={estimateForm.entryId}
                     teams={estimateForm.teams}
                     categories={estimateForm.categories}
                     initialEstimates={estimateForm.initialEstimates}
                     teamContextById={teamContextById}
+                    analyticsRows={rivalEstimateRows}
                   />
                 </div>
               </details>
-              <RivalCategoryEstimatePanel rows={rivalEstimateRows} selfTeamName={myTeam?.teamName} />
             </section>
           )}
 
