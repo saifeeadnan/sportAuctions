@@ -7,6 +7,15 @@ export type RivalRosterEntry = {
   categoryId: string;
   price: number;
   valueScore: number | null;
+  /** When this sale happened (SaleEvent.timestamp, from the player's real
+   * soldAt) — "" for a simulated lot, which has no real timestamp. Lets a
+   * display sort players in the order they were actually sold. */
+  soldAt: string;
+  /** How this sale happened — "LIVE_BID" vs. a pre-assigned retained/traded
+   * player (ADMIN_ASSIGNED/ADMIN_REPLACED/PRE_AUCTION_DRAFT) or an unset
+   * legacy row. Lets a display distinguish "won this auction" from
+   * "already had it going in." */
+  soldVia: string | null;
 };
 
 export type RivalRoster = {
@@ -45,6 +54,8 @@ export function computeRivalRosters(
           categoryId: playerById.get(s.playerId)?.categoryId ?? "",
           price: s.price,
           valueScore: valueByPlayerId.get(s.playerId) ?? null,
+          soldAt: s.timestamp,
+          soldVia: s.soldVia ?? null,
         }))
         .sort((a, b) => (b.valueScore ?? -Infinity) - (a.valueScore ?? -Infinity)),
     };

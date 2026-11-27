@@ -131,6 +131,8 @@ export default async function ManagerAnalyticsV2Page({
         categoryName: categoryNameById.get(e.categoryId) ?? e.categoryId,
         price: e.price,
         valueScore: e.valueScore,
+        soldAt: e.soldAt,
+        soldVia: e.soldVia,
       })),
     }))
     // The manager's own team always leads, everyone else keeps the adapter's

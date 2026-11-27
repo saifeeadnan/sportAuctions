@@ -5,7 +5,7 @@ import { tabsTrack, tabItem, card } from "@/lib/ui";
 import { CloseWindowButton } from "@/components/manager/CloseWindowButton";
 import { WishlistFeasibilityPanel, type WishlistItemDisplay } from "@/components/manager/WishlistFeasibilityPanel";
 import { WishlistStatusBadge } from "@/components/manager/WishlistStatusBadge";
-import { RivalRostersPanel, type RivalRosterDisplay } from "@/components/manager/RivalRostersPanel";
+import { AllRostersTable, type AllRostersTeamDisplay } from "@/components/manager/AllRostersTable";
 import {
   RivalCategoryEstimateTable,
   type RivalEstimateTeamOption,
@@ -75,7 +75,7 @@ export function AnalyticsV2Dashboard({
   /** Same shape as InitialStrategy.budgetTargetsByCategoryName — keyed by
    * category *name* to match AuctionStatePlayer.categoryName directly. */
   budgetTargetsByCategoryName: Record<string, number>;
-  rivalRosters: RivalRosterDisplay[];
+  rivalRosters: AllRostersTeamDisplay[];
   rivalEstimateRows: RivalCategoryEstimateRow[];
   estimateForm: {
     entryId: string;
@@ -249,7 +249,7 @@ export function AnalyticsV2Dashboard({
             </div>
           )}
 
-          {tab === "rosters" && <RivalRostersPanel rosters={rivalRosters} />}
+          {tab === "rosters" && <AllRostersTable rosters={rivalRosters} />}
 
           {tab === "estimates" && (
             <section className="flex flex-col gap-3">
