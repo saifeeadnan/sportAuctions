@@ -19,7 +19,7 @@ function player(id: string, categoryId: string): AnalyticsPlayer {
 describe("computeRivalCategoryEstimates", () => {
   it("reserves every other estimated category's remaining budget when computing one category's affordable price", () => {
     const players = [player("p1", "platinum")];
-    const sales: SaleEvent[] = [{ playerId: "p1", teamId: "rival", price: 10, timestamp: "t1" }];
+    const sales: SaleEvent[] = [{ playerId: "p1", teamId: "rival", price: 10, timestamp: "t1", soldVia: "LIVE_BID" }];
     const estimates: RivalCategoryEstimateInput[] = [
       { targetTeamId: "rival", categoryId: "platinum", estimatedBudget: 30 },
       { targetTeamId: "rival", categoryId: "gold", estimatedBudget: 40 },
@@ -45,7 +45,7 @@ describe("computeRivalCategoryEstimates", () => {
     // Same fixture as above already covers 3 categories at once — platinum's
     // reserve correctly sums *both* gold and silver, not just one.
     const players = [player("p1", "platinum")];
-    const sales: SaleEvent[] = [{ playerId: "p1", teamId: "rival", price: 10, timestamp: "t1" }];
+    const sales: SaleEvent[] = [{ playerId: "p1", teamId: "rival", price: 10, timestamp: "t1", soldVia: "LIVE_BID" }];
     const estimates: RivalCategoryEstimateInput[] = [
       { targetTeamId: "rival", categoryId: "platinum", estimatedBudget: 10 },
       { targetTeamId: "rival", categoryId: "gold", estimatedBudget: 10 },
@@ -68,10 +68,10 @@ describe("computeRivalCategoryEstimates", () => {
   it("ignores how much a team has already bought in a category — the estimate is forward-looking spend only", () => {
     const players = [player("p1", "platinum"), player("p2", "platinum"), player("p3", "platinum"), player("p4", "platinum")];
     const sales: SaleEvent[] = [
-      { playerId: "p1", teamId: "rival", price: 10, timestamp: "t1" },
-      { playerId: "p2", teamId: "rival", price: 10, timestamp: "t2" },
-      { playerId: "p3", teamId: "rival", price: 10, timestamp: "t3" },
-      { playerId: "p4", teamId: "rival", price: 10, timestamp: "t4" },
+      { playerId: "p1", teamId: "rival", price: 10, timestamp: "t1", soldVia: "LIVE_BID" },
+      { playerId: "p2", teamId: "rival", price: 10, timestamp: "t2", soldVia: "LIVE_BID" },
+      { playerId: "p3", teamId: "rival", price: 10, timestamp: "t3", soldVia: "LIVE_BID" },
+      { playerId: "p4", teamId: "rival", price: 10, timestamp: "t4", soldVia: "LIVE_BID" },
     ];
     // The team already bought 4 Platinum players (40 total, e.g. retained
     // picks) — none of that should count against or reduce this "20 more"
@@ -88,6 +88,32 @@ describe("computeRivalCategoryEstimates", () => {
     // The already-bought count/spend is still reported, just not blended in.
     expect(platinum.actualCount).toBe(4);
     expect(platinum.actualSpent).toBe(40);
+  });
+
+  it("falls back to base price when nothing in a category has sold via a real live bid yet", () => {
+    // A pre-assigned retained/traded player's price is their real-world
+    // historical cost, not today's market rate — blending it into the
+    // "live average" would badly skew the $-to-picks conversion (e.g. a
+    // single real superstar retained for 1600 would make a reasonable
+    // 100-estimate look like it buys zero picks). Only a genuine LIVE_BID
+    // sale should ever feed that average.
+    const players = [player("p1", "platinum")];
+    const sales: SaleEvent[] = [
+      { playerId: "p1", teamId: "rival", price: 1600, timestamp: "t1", soldVia: "ADMIN_ASSIGNED" },
+    ];
+    const estimates: RivalCategoryEstimateInput[] = [
+      { targetTeamId: "rival", categoryId: "platinum", estimatedBudget: 20 },
+    ];
+
+    const results = computeRivalCategoryEstimates(team(100), CATEGORIES, players, sales, estimates);
+    const platinum = results.find((r) => r.categoryId === "platinum")!;
+
+    // No LIVE_BID sales in platinum -> falls back to its base price (10),
+    // so 20/10 = 2 picks, not 20/1600 rounding down to 0.
+    expect(platinum.remainingEstimatedCount).toBe(2);
+    // The admin-assigned sale is still reported as real history, though.
+    expect(platinum.actualCount).toBe(1);
+    expect(platinum.actualSpent).toBe(1600);
   });
 
   it("returns nulls for a category with no estimate set, while still reporting real actuals", () => {
@@ -157,7 +183,7 @@ describe("computeRivalCategoryEstimates", () => {
     // estimate is 20 (20 more, unrelated to the 20 already spent), Gold=40
     // specified -> Silver inferred as 80 - (20+40) = 20.
     const players = [player("p1", "platinum")];
-    const sales: SaleEvent[] = [{ playerId: "p1", teamId: "rival", price: 20, timestamp: "t1" }];
+    const sales: SaleEvent[] = [{ playerId: "p1", teamId: "rival", price: 20, timestamp: "t1", soldVia: "LIVE_BID" }];
     const estimates: RivalCategoryEstimateInput[] = [
       { targetTeamId: "rival", categoryId: "platinum", estimatedBudget: 20 },
       { targetTeamId: "rival", categoryId: "gold", estimatedBudget: 40 },

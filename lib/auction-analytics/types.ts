@@ -55,6 +55,13 @@ export type SaleEvent = {
   teamId: string;
   price: number;
   timestamp: string;
+  /** How this sale happened — "LIVE_BID" is the only kind reflecting a real
+   * market price; a pre-assigned retained/traded player's price is its
+   * historical cost, not what today's open market would pay, so
+   * rivalCategoryEstimate.ts's live-average calc excludes anything else
+   * (including unset/legacy rows). Optional since most SaleEvent consumers
+   * (spend totals, rosters, wishlist feasibility) never look at it. */
+  soldVia?: string | null;
 };
 
 export type UnsoldEvent = {

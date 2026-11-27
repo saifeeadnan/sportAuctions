@@ -61,6 +61,7 @@ export async function loadAuctionAnalyticsSnapshot(
         teamId: p.soldToEntryId!,
         price: Number(p.soldPrice),
         timestamp: p.soldAt ?? "",
+        soldVia: p.soldVia,
       })),
     unsold: state.players
       .filter((p) => p.status === "UNSOLD")

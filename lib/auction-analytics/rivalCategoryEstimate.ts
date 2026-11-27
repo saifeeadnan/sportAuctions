@@ -119,10 +119,17 @@ export function computeRivalCategoryEstimates(
         continue;
       }
 
-      // This category's live average sold price so far this auction,
-      // falling back to base price before anything's sold in it — used to
-      // convert a $ budget estimate into an estimated pick count.
-      const categorySales = sales.filter((s) => categoryIdByPlayerId.get(s.playerId) === category.id);
+      // This category's average LIVE-BID sale price so far this auction,
+      // falling back to base price before anything's sold that way — used
+      // to convert a $ budget estimate into an estimated pick count. Only
+      // soldVia "LIVE_BID" counts: a pre-assigned retained/traded player's
+      // price is their real-world historical cost, often far above what an
+      // actual open-pool free agent in the same category will fetch today,
+      // so blending it in skewed this average wildly high and made a
+      // perfectly reasonable estimate look like it bought zero picks.
+      const categorySales = sales.filter(
+        (s) => categoryIdByPlayerId.get(s.playerId) === category.id && s.soldVia === "LIVE_BID"
+      );
       const liveAvgPrice =
         categorySales.length > 0
           ? categorySales.reduce((sum, s) => sum + s.price, 0) / categorySales.length
