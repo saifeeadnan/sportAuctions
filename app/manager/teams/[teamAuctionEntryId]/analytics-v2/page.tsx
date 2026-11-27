@@ -73,12 +73,28 @@ export default async function ManagerAnalyticsV2Page({
     playerName: playerNameById.get(item.playerId) ?? item.playerId,
   }));
 
+  // The manager's own budget target lives in a different table
+  // (AuctionCategoryBudgetTarget, via getStrategyForEntry — Live Analytics'
+  // bid guidance and the Simulate engine's self-restraint gate both still
+  // read it from there, untouched) than a rival estimate
+  // (RivalCategoryBudgetEstimate). Reshaping it into the same
+  // {targetTeamId, categoryId, estimatedBudget} input and merging it in
+  // here is what lets computeRivalCategoryEstimates — already generic over
+  // every team, never actually rival-specific — produce the exact same
+  // Spent/Bought/Picks-left/Affordable row for the manager's own team that
+  // it already produces for every rival, with no changes to that function.
+  const selfEstimateInputs = strategy.budgetTargets.map((t) => ({
+    targetTeamId: selfTeam.id,
+    categoryId: t.categoryId,
+    estimatedBudget: Number(t.targetAvgPrice),
+  }));
+
   const rivalEstimateRows = computeRivalCategoryEstimates(
     snapshot.teams,
     snapshot.categories,
     snapshot.players,
     snapshot.sales,
-    snapshot.rivalEstimates
+    [...snapshot.rivalEstimates, ...selfEstimateInputs]
   ).map((row) => ({
     teamName: teamNameById.get(row.teamId) ?? row.teamId,
     categoryName: categoryNameById.get(row.categoryId) ?? row.categoryId,
@@ -90,6 +106,7 @@ export default async function ManagerAnalyticsV2Page({
     estimatedAffordablePrice: row.estimatedAffordablePrice,
   }));
 
+  const totalSlotsByTeamId = new Map(snapshot.teams.map((t) => [t.id, t.totalSlots]));
   const allRosters = computeRivalRosters(snapshot.teams, snapshot.players, snapshot.sales, valueScores)
     .map((r) => ({
       teamId: r.teamId,
@@ -97,6 +114,8 @@ export default async function ManagerAnalyticsV2Page({
       isSelf: r.teamId === selfTeam.id,
       budgetRemaining: r.budgetRemaining,
       teamStrength: r.teamStrength,
+      slotsFilled: r.entries.length,
+      slotsTotal: totalSlotsByTeamId.get(r.teamId) ?? r.entries.length,
       players: r.entries.map((e) => ({
         playerId: e.playerId,
         playerName: playerNameById.get(e.playerId) ?? e.playerId,
@@ -129,7 +148,7 @@ export default async function ManagerAnalyticsV2Page({
   const categoryIdsWithRemainingPlayers = new Set(strategyPlayers.map((p) => p.categoryId));
   const activeCategories = snapshot.categories
     .filter((c) => categoryIdsWithRemainingPlayers.has(c.id))
-    .map((c) => ({ id: c.id, name: c.name }));
+    .map((c) => ({ id: c.id, name: c.name, basePrice: c.basePrice }));
 
   const budgetTargetsByCategoryName: Record<string, number> = Object.fromEntries(
     strategy.budgetTargets
@@ -138,11 +157,21 @@ export default async function ManagerAnalyticsV2Page({
   );
 
   const otherTeams = snapshot.teams.filter((t) => t.id !== selfTeam.id).map((t) => ({ id: t.id, name: t.name }));
-  const initialEstimates = snapshot.rivalEstimates.map((e) => ({
-    targetEntryId: e.targetTeamId,
-    categoryId: e.categoryId,
-    estimatedBudget: String(e.estimatedBudget),
-  }));
+  // Self listed first, then every rival — the grid's own row for "you" vs.
+  // "them" is distinguished purely by id === entryId at render time.
+  const estimateFormTeams = [{ id: selfTeam.id, name: selfTeam.name }, ...otherTeams];
+  const initialEstimates = [
+    ...strategy.budgetTargets.map((t) => ({
+      targetEntryId: selfTeam.id,
+      categoryId: t.categoryId,
+      estimatedBudget: t.targetAvgPrice,
+    })),
+    ...snapshot.rivalEstimates.map((e) => ({
+      targetEntryId: e.targetTeamId,
+      categoryId: e.categoryId,
+      estimatedBudget: String(e.estimatedBudget),
+    })),
+  ];
 
   return (
     <AnalyticsV2Dashboard
@@ -167,7 +196,7 @@ export default async function ManagerAnalyticsV2Page({
       rivalEstimateRows={rivalEstimateRows}
       estimateForm={{
         entryId: entry.id,
-        teams: otherTeams,
+        teams: estimateFormTeams,
         categories: activeCategories,
         initialEstimates,
       }}

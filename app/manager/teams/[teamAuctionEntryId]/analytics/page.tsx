@@ -31,7 +31,7 @@ export default async function ManagerAnalyticsPage({
     getStrategyForEntry(entry.id),
     prisma.auctionCategory.findMany({
       where: { auctionId: entry.auctionId },
-      select: { id: true, name: true },
+      select: { id: true, name: true, basePrice: true },
     }),
     getPredictionsForEntry(entry.id),
     prisma.auctionPlayer.findMany({
@@ -42,6 +42,7 @@ export default async function ManagerAnalyticsPage({
   ]);
 
   const categoryNameById = new Map(categories.map((c) => [c.id, c.name]));
+  const strategyCategories = categories.map((c) => ({ id: c.id, name: c.name, basePrice: Number(c.basePrice) }));
   const initialStrategy: InitialStrategy = {
     mustHaveIds: strategy.mustHaveIds,
     avoidIds: strategy.avoidIds,
@@ -71,7 +72,7 @@ export default async function ManagerAnalyticsPage({
       myTeamId={entry.id}
       initialStrategy={initialStrategy}
       initialPredictions={initialPredictions}
-      strategyCategories={categories}
+      strategyCategories={strategyCategories}
       strategyPlayers={auctionPlayers.map((ap) => ({
         id: ap.id,
         name: ap.player.name,

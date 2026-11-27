@@ -29,9 +29,9 @@ type Tab = "live" | "strategy" | "predictions" | "rosters" | "estimates" | "simu
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "live", label: "Live Analytics" },
-  { id: "strategy", label: "Strategy" },
+  { id: "estimates", label: "Set Budgets" },
+  { id: "strategy", label: "Wish list" },
   { id: "predictions", label: "Predictions" },
-  { id: "estimates", label: "My estimates" },
   { id: "simulate", label: "Simulate" },
   { id: "rosters", label: "All Rosters" },
 ];
@@ -98,8 +98,10 @@ export function AnalyticsV2Dashboard({
   const otherTeams = liveState.teams.filter((t) => t.id !== myTeamEntryId);
   const myTeam = liveState.teams.find((t) => t.id === myTeamEntryId);
 
-  const rivalTeamContextById: Record<string, RivalEstimateTeamContext> = Object.fromEntries(
-    otherTeams.map((t) => [
+  // Every team, including self — the merged estimates grid shows the
+  // manager's own slots/budget context alongside every rival's.
+  const teamContextById: Record<string, RivalEstimateTeamContext> = Object.fromEntries(
+    liveState.teams.map((t) => [
       t.id,
       { budgetRemaining: Number(t.budgetRemaining), slotsToFill: t.slotsTotal - t.slotsFilled },
     ])
@@ -111,7 +113,7 @@ export function AnalyticsV2Dashboard({
       label: "Must-haves or avoids set",
       done: strategy.initialMustHaveIds.length > 0 || strategy.initialAvoidIds.length > 0,
     },
-    { key: "strategy", label: "Budget targets set", done: strategy.initialBudgetTargets.length > 0 },
+    { key: "estimates", label: "Budget targets set", done: strategy.initialBudgetTargets.length > 0 },
     { key: "estimates", label: "Rival estimates set", done: estimateForm.initialEstimates.length > 0 },
     { key: "predictions", label: "Predictions made", done: Object.keys(predictions).length > 0 },
   ];
@@ -182,7 +184,7 @@ export function AnalyticsV2Dashboard({
             <div className="flex flex-col gap-3">
               <details className={card} open>
                 <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
-                  Set strategy
+                  Set wish list
                 </summary>
                 <div className="px-4 pb-4">
                   <StrategyForm
@@ -193,6 +195,7 @@ export function AnalyticsV2Dashboard({
                     initialAvoidIds={strategy.initialAvoidIds}
                     initialBudgetTargets={strategy.initialBudgetTargets}
                     budgetRemaining={myTeam ? Number(myTeam.budgetRemaining) : undefined}
+                    showBudgetTargets={false}
                   />
                 </div>
               </details>
@@ -243,7 +246,7 @@ export function AnalyticsV2Dashboard({
             <section className="flex flex-col gap-3">
               <details className={card}>
                 <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
-                  Set your estimates
+                  Set your budgets
                 </summary>
                 <div className="px-4 pb-4">
                   <RivalCategoryEstimateForm
@@ -251,11 +254,11 @@ export function AnalyticsV2Dashboard({
                     teams={estimateForm.teams}
                     categories={estimateForm.categories}
                     initialEstimates={estimateForm.initialEstimates}
-                    teamContextById={rivalTeamContextById}
+                    teamContextById={teamContextById}
                   />
                 </div>
               </details>
-              <RivalCategoryEstimatePanel rows={rivalEstimateRows} />
+              <RivalCategoryEstimatePanel rows={rivalEstimateRows} selfTeamName={myTeam?.teamName} />
             </section>
           )}
 
@@ -263,7 +266,7 @@ export function AnalyticsV2Dashboard({
               fetched result and selected-run state survive switching to
               another tab and back — same reasoning as the live socket above. */}
           <div className={tab === "simulate" ? "contents" : "hidden"}>
-            <SimulationPanel teamAuctionEntryId={myTeamEntryId} />
+            <SimulationPanel teamAuctionEntryId={myTeamEntryId} totalSlots={myTeam?.slotsTotal} />
           </div>
         </div>
       </div>

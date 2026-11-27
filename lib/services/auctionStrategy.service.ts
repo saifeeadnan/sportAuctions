@@ -137,3 +137,72 @@ export async function saveStrategy(
     });
   });
 }
+
+/**
+ * Set (or clear, when `targetAvgPrice` is null) this manager's budget
+ * target for one category — a single upsert/delete, same shape as
+ * rivalCategoryEstimate.service.ts's upsertRivalCategoryEstimate, so the
+ * "My estimates" grid can edit one cell at a time (including the manager's
+ * own row) without wiping every other category's target the way
+ * saveStrategy's whole-form wipe-and-replace would.
+ */
+export async function upsertCategoryBudgetTarget(
+  teamAuctionEntryId: string,
+  categoryId: string,
+  targetAvgPrice: number | null,
+  actorUserId: string
+) {
+  const entry = await prisma.teamAuctionEntry.findUnique({
+    where: { id: teamAuctionEntryId },
+    include: { auction: true },
+  });
+  if (!entry) throw new ValidationError("Team auction entry not found");
+
+  if (entry.auction.status === "COMPLETED") {
+    throw new InvalidStateTransitionError("Cannot change strategy once the auction has concluded");
+  }
+
+  const category = await prisma.auctionCategory.findFirst({
+    where: { id: categoryId, auctionId: entry.auctionId },
+  });
+  if (!category) throw new ValidationError("Category does not belong to this auction");
+
+  const existing = await prisma.auctionCategoryBudgetTarget.findUnique({
+    where: { teamAuctionEntryId_categoryId: { teamAuctionEntryId, categoryId } },
+  });
+
+  if (targetAvgPrice == null) {
+    if (!existing) return;
+    await prisma.$transaction(async (tx) => {
+      await tx.auctionCategoryBudgetTarget.deleteMany({ where: { teamAuctionEntryId, categoryId } });
+      await writeAuditLog(tx, {
+        entityType: "TeamAuctionEntry",
+        entityId: teamAuctionEntryId,
+        auctionId: entry.auctionId,
+        action: "BUDGET_TARGET_REMOVED",
+        actorUserId,
+        before: { category: category.name, targetAvgPrice: existing.targetAvgPrice.toString() },
+      });
+    });
+    return;
+  }
+
+  if (targetAvgPrice <= 0) throw new ValidationError("Budget target must be greater than 0");
+
+  await prisma.$transaction(async (tx) => {
+    await tx.auctionCategoryBudgetTarget.upsert({
+      where: { teamAuctionEntryId_categoryId: { teamAuctionEntryId, categoryId } },
+      create: { teamAuctionEntryId, categoryId, targetAvgPrice },
+      update: { targetAvgPrice },
+    });
+    await writeAuditLog(tx, {
+      entityType: "TeamAuctionEntry",
+      entityId: teamAuctionEntryId,
+      auctionId: entry.auctionId,
+      action: "BUDGET_TARGET_SAVED",
+      actorUserId,
+      before: existing ? { category: category.name, targetAvgPrice: existing.targetAvgPrice.toString() } : null,
+      after: { category: category.name, targetAvgPrice: targetAvgPrice.toString() },
+    });
+  });
+}

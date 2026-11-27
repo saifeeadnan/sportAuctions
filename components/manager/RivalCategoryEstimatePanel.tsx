@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { card } from "@/lib/ui";
 import { Badge } from "@/components/ui/Badge";
+import { HelpTooltip } from "@/components/ui/HelpTooltip";
 
 export type RivalCategoryEstimateRow = {
   teamName: string;
@@ -21,16 +22,25 @@ export type RivalCategoryEstimateRow = {
  * afford to pay for their next pick in it. Informative only, never a
  * directive.
  */
-function CategoryStatTile({ label, value }: { label: string; value: string }) {
+function ColumnHeader({ label, help }: { label: string; help?: React.ReactNode }) {
   return (
-    <div className="flex flex-col gap-0.5">
-      <span className="text-[11px] uppercase tracking-wide text-black/50 dark:text-white/50">{label}</span>
-      <span className="text-base font-semibold tabular-nums">{value}</span>
-    </div>
+    <span className="inline-flex items-center gap-1">
+      {label}
+      {help && <HelpTooltip title={label}>{help}</HelpTooltip>}
+    </span>
   );
 }
 
-export function RivalCategoryEstimatePanel({ rows }: { rows: RivalCategoryEstimateRow[] }) {
+export function RivalCategoryEstimatePanel({
+  rows,
+  selfTeamName,
+}: {
+  rows: RivalCategoryEstimateRow[];
+  /** Marks the manager's own row "(you)" in the team list/detail header —
+   * matched by name since rows are keyed by teamName, not id. Optional;
+   * omitted entirely just skips the marker. */
+  selfTeamName?: string;
+}) {
   const estimatedRows = rows.filter((r) => r.estimatedBudget != null);
   const teamNames = Array.from(new Set(estimatedRows.map((r) => r.teamName)));
   const [selectedTeam, setSelectedTeam] = useState<string>(teamNames[0] ?? "");
@@ -39,7 +49,8 @@ export function RivalCategoryEstimatePanel({ rows }: { rows: RivalCategoryEstima
   if (estimatedRows.length === 0) {
     return (
       <p className="text-sm text-black/50 dark:text-white/50">
-        Set a budget estimate for another team above to see their live category affordability here.
+        Set a budget target or estimate for a team above to see its live category affordability
+        here.
       </p>
     );
   }
@@ -69,7 +80,12 @@ export function RivalCategoryEstimatePanel({ rows }: { rows: RivalCategoryEstima
                       : "hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
                   }`}
                 >
-                  <span className="font-medium truncate">{teamName}</span>
+                  <span className="font-medium truncate">
+                    {teamName}
+                    {teamName === selfTeamName && (
+                      <span className="text-black/50 dark:text-white/50 font-normal"> (you)</span>
+                    )}
+                  </span>
                   <span className="text-xs text-black/50 dark:text-white/50 shrink-0">
                     {count} categor{count === 1 ? "y" : "ies"}
                   </span>
@@ -90,41 +106,110 @@ export function RivalCategoryEstimatePanel({ rows }: { rows: RivalCategoryEstima
             >
               ← Teams
             </button>
-            <h4 className="text-sm font-medium">{effectiveTeam}</h4>
+            <h4 className="text-sm font-medium">
+              {effectiveTeam}
+              {effectiveTeam === selfTeamName && (
+                <span className="text-black/50 dark:text-white/50 font-normal"> (you)</span>
+              )}
+            </h4>
           </div>
-          <ul className="flex flex-col gap-3">
-            {teamRows.map((r) => (
-              <li
-                key={r.categoryName}
-                className="flex flex-col gap-2 rounded-lg border border-black/[0.06] dark:border-white/10 p-3"
-              >
-                <span className="inline-flex items-center gap-1.5 text-sm font-medium">
-                  {r.categoryName}
-                  {r.isInferred && <Badge variant="neutral">inferred</Badge>}
-                </span>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <CategoryStatTile label="Spent" value={r.actualSpent.toLocaleString()} />
-                  <CategoryStatTile label="Bought" value={String(r.actualCount)} />
-                  <CategoryStatTile
-                    label="Picks left (est.)"
-                    value={
-                      r.remainingEstimatedCount != null && r.remainingEstimatedCount > 0
-                        ? String(r.remainingEstimatedCount)
-                        : "Done"
-                    }
-                  />
-                  <CategoryStatTile
-                    label="Affordable (est.)"
-                    value={
-                      r.estimatedAffordablePrice != null
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="text-left border-b border-black/10 dark:border-white/10">
+                  <th className="py-2 pr-4">Category</th>
+                  <th className="py-2 pr-4 text-right">
+                    <ColumnHeader
+                      label="Spent"
+                      help={
+                        <p>
+                          Real money this team has already committed to this category —
+                          retention, trade, or a live bid already won. Pure history: your estimate
+                          never changes this number, and this number never changes your estimate.
+                        </p>
+                      }
+                    />
+                  </th>
+                  <th className="py-2 pr-4 text-right">
+                    <ColumnHeader
+                      label="Bought"
+                      help={
+                        <p>
+                          How many players this team already has in this category, for the same
+                          real reasons as &quot;Spent&quot; — retention, trade, or a won live bid.
+                        </p>
+                      }
+                    />
+                  </th>
+                  <th className="py-2 pr-4 text-right">
+                    <ColumnHeader
+                      label="Estimate"
+                      help={
+                        <p>
+                          What you set (or, when marked &quot;inferred&quot;, what&apos;s implied
+                          by your other categories) for how much more this team spends here.
+                        </p>
+                      }
+                    />
+                  </th>
+                  <th className="py-2 pr-4 text-right">
+                    <ColumnHeader
+                      label="Picks left (est.)"
+                      help={
+                        <p>
+                          Your estimate ÷ the average price of real live bids won in this category
+                          so far (falls back to its base price before any have). Your estimate is
+                          already meant to be <span className="font-medium">spend from here</span>
+                          {" "}— it&apos;s never reduced by what they&apos;ve already bought.
+                          &quot;Done&quot; means your number rounds to 0 more picks.
+                        </p>
+                      }
+                    />
+                  </th>
+                  <th className="py-2 text-right">
+                    <ColumnHeader
+                      label="Affordable (est.)"
+                      help={
+                        <p>
+                          This team&apos;s real current remaining budget, minus whatever you
+                          estimated for every <span className="font-medium">other</span> category,
+                          split evenly across &quot;Picks left&quot; for this one. Blank when
+                          Picks left is 0 — nothing left to divide.
+                        </p>
+                      }
+                    />
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {teamRows.map((r) => (
+                  <tr key={r.categoryName} className="border-b border-black/5 dark:border-white/5 last:border-0">
+                    <td className="py-2 pr-4">
+                      <span className="inline-flex items-center gap-1.5">
+                        {r.categoryName}
+                        {r.isInferred && <Badge variant="neutral">inferred</Badge>}
+                      </span>
+                    </td>
+                    <td className="py-2 pr-4 text-right tabular-nums">{r.actualSpent.toLocaleString()}</td>
+                    <td className="py-2 pr-4 text-right tabular-nums">{r.actualCount}</td>
+                    <td className="py-2 pr-4 text-right tabular-nums">
+                      {r.estimatedBudget != null ? r.estimatedBudget.toLocaleString() : "—"}
+                    </td>
+                    <td className="py-2 pr-4 text-right tabular-nums">
+                      {r.remainingEstimatedCount != null && r.remainingEstimatedCount > 0
+                        ? r.remainingEstimatedCount
+                        : "Done"}
+                    </td>
+                    <td className="py-2 text-right tabular-nums">
+                      {r.estimatedAffordablePrice != null
                         ? Math.round(r.estimatedAffordablePrice).toLocaleString()
-                        : "—"
-                    }
-                  />
-                </div>
-              </li>
-            ))}
-          </ul>
+                        : "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     </div>

@@ -3,10 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { saveRivalCategoryEstimateAction } from "@/lib/actions/rivalCategoryEstimate.actions";
+import { saveCategoryBudgetTargetAction } from "@/lib/actions/auctionStrategy.actions";
 import { card, buttonPrimary, inputClass } from "@/lib/ui";
 
 export type RivalEstimateTeamOption = { id: string; name: string };
-export type RivalEstimateCategoryOption = { id: string; name: string };
+export type RivalEstimateCategoryOption = { id: string; name: string; basePrice: number };
 
 function cellKey(targetEntryId: string, categoryId: string) {
   return `${targetEntryId}:${categoryId}`;
@@ -15,9 +16,16 @@ function cellKey(targetEntryId: string, categoryId: string) {
 export type RivalEstimateTeamContext = { budgetRemaining: number; slotsToFill: number };
 
 /**
- * A manager's own private estimate of every OTHER team's budget per
- * category — one grid, edited freely, saved as a batch. Never asks about
- * the manager's own team (they know their own budget exactly).
+ * One grid for every team's budget per category, including the manager's
+ * own — edited freely, saved as a batch. The manager's own row (teams[].id
+ * === entryId) is a real, live-editable budget target (same data Strategy's
+ * must-have/avoid picker and the Simulate/bid-guidance engines read),
+ * saved one cell at a time via saveCategoryBudgetTargetAction; every other
+ * row is this manager's own private guess at that team's spend, saved via
+ * saveRivalCategoryEstimateAction. Both render through the exact same
+ * grid/table so the manager's own category breakdown finally gets the same
+ * Picks left/Affordable readout rivals get, instead of living in a
+ * separate, differently-shaped place.
  */
 export function RivalCategoryEstimateForm({
   entryId,
@@ -77,14 +85,12 @@ export function RivalCategoryEstimateForm({
     );
 
     const results = await Promise.all(
-      changedCells.map(({ team, category, current }) =>
-        saveRivalCategoryEstimateAction(
-          entryId,
-          team.id,
-          category.id,
-          current.trim() === "" ? null : Number(current)
-        )
-      )
+      changedCells.map(({ team, category, current }) => {
+        const amount = current.trim() === "" ? null : Number(current);
+        return team.id === entryId
+          ? saveCategoryBudgetTargetAction(entryId, category.id, amount)
+          : saveRivalCategoryEstimateAction(entryId, team.id, category.id, amount);
+      })
     );
 
     setLoading(false);
@@ -98,6 +104,7 @@ export function RivalCategoryEstimateForm({
   }
 
   const selectedTeam = teams.find((t) => t.id === selectedTeamId);
+  const isSelfSelected = selectedTeam?.id === entryId;
   const selectedTeamContext = selectedTeam ? teamContextById?.[selectedTeam.id] : undefined;
   const estimateSum = selectedTeam
     ? categories.reduce((sum, c) => sum + (Number(values.get(cellKey(selectedTeam.id, c.id))) || 0), 0)
@@ -112,8 +119,8 @@ export function RivalCategoryEstimateForm({
   return (
     <div className="flex flex-col gap-3">
       <p className="text-xs text-black/60 dark:text-white/60">
-        Your own private guess at how much each other team plans to spend per category — used to
-        estimate what they can still afford. Never shown to anyone else.
+        Your own budget target per category, plus your private guess at every other team's — used
+        to estimate what each can still afford. Never shown to anyone else.
       </p>
 
       <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-3 items-start">
@@ -135,7 +142,12 @@ export function RivalCategoryEstimateForm({
                         : "hover:bg-black/[0.03] dark:hover:bg-white/[0.04]"
                     }`}
                   >
-                    <span className="font-medium truncate">{team.name}</span>
+                    <span className="font-medium truncate">
+                      {team.name}
+                      {team.id === entryId && (
+                        <span className="text-black/50 dark:text-white/50 font-normal"> (you)</span>
+                      )}
+                    </span>
                     <span className="text-xs text-black/50 dark:text-white/50 shrink-0">
                       {estimatedCount}/{categories.length}
                     </span>
@@ -167,12 +179,17 @@ export function RivalCategoryEstimateForm({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {categories.map((category) => (
                   <label key={category.id} className="flex flex-col gap-1 text-sm">
-                    {category.name}
+                    <span>
+                      {category.name}{" "}
+                      <span className="text-xs text-black/50 dark:text-white/50">
+                        (base {category.basePrice.toLocaleString()})
+                      </span>
+                    </span>
                     <input
                       type="number"
                       min="0"
                       step="0.01"
-                      placeholder="No estimate"
+                      placeholder={isSelfSelected ? "No target" : "No estimate"}
                       value={values.get(cellKey(selectedTeam.id, category.id)) ?? ""}
                       onChange={(e) => setValue(selectedTeam.id, category.id, e.target.value)}
                       className={inputClass}
@@ -182,14 +199,14 @@ export function RivalCategoryEstimateForm({
               </div>
               <div className="flex items-center justify-between text-sm pt-2 border-t border-black/[0.06] dark:border-white/10">
                 <span className="text-black/60 dark:text-white/60">
-                  Estimate sum{" "}
+                  {isSelfSelected ? "Target sum" : "Estimate sum"}{" "}
                   <span className="font-medium text-black dark:text-white tabular-nums">
                     {estimateSum.toLocaleString()}
                   </span>
                 </span>
                 {estimateRemaining != null && (
                   <span className={estimateRemaining < 0 ? "text-red-600 dark:text-red-400 font-medium" : "text-black/60 dark:text-white/60"}>
-                    {estimateRemaining < 0 ? "Over their budget by " : "Remaining "}
+                    {estimateRemaining < 0 ? `Over ${isSelfSelected ? "your" : "their"} budget by ` : "Remaining "}
                     <span className="tabular-nums font-medium">{Math.abs(estimateRemaining).toLocaleString()}</span>
                   </span>
                 )}

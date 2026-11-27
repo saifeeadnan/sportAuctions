@@ -14,7 +14,7 @@ export type StrategyPlayerOption = {
   basePrice: string;
 };
 
-export type StrategyCategoryOption = { id: string; name: string };
+export type StrategyCategoryOption = { id: string; name: string; basePrice: number };
 
 type PreferenceState = "MUST_HAVE" | "AVOID" | null;
 
@@ -26,6 +26,7 @@ export function StrategyForm({
   initialAvoidIds,
   initialBudgetTargets,
   budgetRemaining,
+  showBudgetTargets = true,
 }: {
   entryId: string;
   categories: StrategyCategoryOption[];
@@ -37,6 +38,14 @@ export function StrategyForm({
    * below the category grid. Optional — omitted entirely (not shown as 0)
    * wherever a caller doesn't have it handy. */
   budgetRemaining?: number;
+  /** v1's AnalyticsDashboardPage has no "My estimates" tab, so this is its
+   * only way to set budget targets — default true, unchanged for it. v2
+   * passes false: budget targets (including the manager's own) are set
+   * from the merged "My estimates" grid instead, one category at a time,
+   * so they don't get wiped by this form's whole-strategy submit either —
+   * initialBudgetTargets is always resubmitted as-is below regardless of
+   * this flag, never edited here when hidden. */
+  showBudgetTargets?: boolean;
 }) {
   const router = useRouter();
   const [preferences, setPreferences] = useState<Map<string, PreferenceState>>(() => {
@@ -115,45 +124,48 @@ export function StrategyForm({
 
   return (
     <div className="flex flex-col gap-5">
-      <section className="flex flex-col gap-2">
-        <h4 className="text-sm font-medium">Budget target per category</h4>
-        <div className={`${card} p-4 flex flex-col gap-3`}>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {categories.map((cat) => (
-              <label key={cat.id} className="flex flex-col gap-1 text-sm">
-                {cat.name}
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="No target"
-                  value={budgetTargets.get(cat.id) ?? ""}
-                  onChange={(e) => setBudgetTarget(cat.id, e.target.value)}
-                  className={inputClass}
-                />
-              </label>
-            ))}
-          </div>
-          <div className="flex items-center justify-between text-sm pt-2 border-t border-black/[0.06] dark:border-white/10">
-            <span className="text-black/60 dark:text-white/60">
-              Target sum{" "}
-              <span className="font-medium text-black dark:text-white tabular-nums">
-                {targetSum.toLocaleString()}
+      {showBudgetTargets && (
+        <section className="flex flex-col gap-2">
+          <h4 className="text-sm font-medium">Budget target per category</h4>
+          <div className={`${card} p-4 flex flex-col gap-3`}>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {categories.map((cat) => (
+                <label key={cat.id} className="flex flex-col gap-1 text-sm">
+                  <span>
+                    {cat.name}{" "}
+                    <span className="text-xs text-black/50 dark:text-white/50">
+                      (base {cat.basePrice.toLocaleString()})
+                    </span>
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="No target"
+                    value={budgetTargets.get(cat.id) ?? ""}
+                    onChange={(e) => setBudgetTarget(cat.id, e.target.value)}
+                    className={inputClass}
+                  />
+                </label>
+              ))}
+            </div>
+            <div className="flex items-center justify-between text-sm pt-2 border-t border-black/[0.06] dark:border-white/10">
+              <span className="text-black/60 dark:text-white/60">
+                Target sum{" "}
+                <span className="font-medium text-black dark:text-white tabular-nums">
+                  {targetSum.toLocaleString()}
+                </span>
               </span>
-            </span>
-            {remaining != null && (
-              <span className={remaining < 0 ? "text-red-600 dark:text-red-400 font-medium" : "text-black/60 dark:text-white/60"}>
-                {remaining < 0 ? "Over budget by " : "Remaining "}
-                <span className="tabular-nums font-medium">{Math.abs(remaining).toLocaleString()}</span>
-              </span>
-            )}
+              {remaining != null && (
+                <span className={remaining < 0 ? "text-red-600 dark:text-red-400 font-medium" : "text-black/60 dark:text-white/60"}>
+                  {remaining < 0 ? "Over budget by " : "Remaining "}
+                  <span className="tabular-nums font-medium">{Math.abs(remaining).toLocaleString()}</span>
+                </span>
+              )}
+            </div>
           </div>
-          <p className="text-xs text-black/50 dark:text-white/50">
-            Each target is an average price per pick, not a total — this sum assumes one pick per
-            category with a target set, as a rough gut-check against your current budget.
-          </p>
-        </div>
-      </section>
+        </section>
+      )}
 
       <section className="flex flex-col gap-2">
         <h4 className="text-sm font-medium">Must-have &amp; avoid players</h4>
