@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { saveRivalCategoryEstimateAction } from "@/lib/actions/rivalCategoryEstimate.actions";
 import { saveCategoryBudgetTargetAction } from "@/lib/actions/auctionStrategy.actions";
-import { card, buttonPrimary, inputClass } from "@/lib/ui";
+import { card, inputClass } from "@/lib/ui";
 
 export type RivalEstimateTeamOption = { id: string; name: string };
 export type RivalEstimateCategoryOption = { id: string; name: string; basePrice: number };
@@ -17,15 +17,20 @@ export type RivalEstimateTeamContext = { budgetRemaining: number; slotsToFill: n
 
 /**
  * One grid for every team's budget per category, including the manager's
- * own — edited freely, saved as a batch. The manager's own row (teams[].id
- * === entryId) is a real, live-editable budget target (same data Strategy's
- * must-have/avoid picker and the Simulate/bid-guidance engines read),
- * saved one cell at a time via saveCategoryBudgetTargetAction; every other
- * row is this manager's own private guess at that team's spend, saved via
+ * own — edited freely. The manager's own row (teams[].id === entryId) is a
+ * real, live-editable budget target (same data Strategy's must-have/avoid
+ * picker and the Simulate/bid-guidance engines read), saved one cell at a
+ * time via saveCategoryBudgetTargetAction; every other row is this
+ * manager's own private guess at that team's spend, saved via
  * saveRivalCategoryEstimateAction. Both render through the exact same
  * grid/table so the manager's own category breakdown finally gets the same
  * Picks left/Affordable readout rivals get, instead of living in a
  * separate, differently-shaped place.
+ *
+ * Every cell autosaves on blur (same pattern as Predictions'
+ * V2PredictionPicker) instead of batching every edit behind one "Save"
+ * button that could scroll out of view or get discarded by a tab switch —
+ * see autosave-wishlist-budgets-plan.md.
  */
 export function RivalCategoryEstimateForm({
   entryId,
@@ -50,12 +55,13 @@ export function RivalCategoryEstimateForm({
     initialEstimates.map((e) => [cellKey(e.targetEntryId, e.categoryId), e.estimatedBudget])
   );
   const [values, setValues] = useState<Map<string, string>>(new Map(initialMap));
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [saved, setSaved] = useState(false);
+  // Last server-confirmed value per cell — what a blur diffs against (skip
+  // the write if nothing actually changed) and what an error reverts to.
+  const [committed, setCommitted] = useState<Map<string, string>>(new Map(initialMap));
+  const [pendingCells, setPendingCells] = useState<Set<string>>(new Set());
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   function setValue(targetEntryId: string, categoryId: string, value: string) {
-    setSaved(false);
     setValues((prev) => {
       const next = new Map(prev);
       next.set(cellKey(targetEntryId, categoryId), value);
@@ -63,45 +69,51 @@ export function RivalCategoryEstimateForm({
     });
   }
 
+  async function handleBlur(team: RivalEstimateTeamOption, category: RivalEstimateCategoryOption) {
+    const key = cellKey(team.id, category.id);
+    const current = (values.get(key) ?? "").trim();
+    const previous = committed.get(key) ?? "";
+    if (current === previous) return; // nothing actually changed — skip the write
+
+    const amount = current === "" ? null : Number(current);
+    if (amount != null && Number.isNaN(amount)) {
+      setErrors((prev) => ({ ...prev, [key]: "Must be a number" }));
+      return;
+    }
+
+    setErrors((prev) => ({ ...prev, [key]: "" }));
+    setPendingCells((prev) => new Set(prev).add(key));
+
+    const result =
+      team.id === entryId
+        ? await saveCategoryBudgetTargetAction(entryId, category.id, amount)
+        : await saveRivalCategoryEstimateAction(entryId, team.id, category.id, amount);
+
+    setPendingCells((prev) => {
+      const set = new Set(prev);
+      set.delete(key);
+      return set;
+    });
+
+    if (result.error) {
+      setErrors((prev) => ({ ...prev, [key]: result.error }));
+      setValues((prev) => {
+        const next = new Map(prev);
+        if (previous === "") next.delete(key);
+        else next.set(key, previous);
+        return next;
+      });
+      return;
+    }
+    setCommitted((prev) => new Map(prev).set(key, current));
+    router.refresh();
+  }
+
   const [selectedTeamId, setSelectedTeamId] = useState<string>(teams[0]?.id ?? "");
   // md+ always shows list+detail side by side regardless of this flag; below
   // md it switches which single pane is visible (list first, detail after a
   // team's tapped) — see the className toggles below.
   const [mobileShowingDetail, setMobileShowingDetail] = useState(false);
-
-  async function handleSubmit() {
-    setLoading(true);
-    setError(null);
-
-    const changedCells = teams.flatMap((team) =>
-      categories
-        .map((category) => {
-          const key = cellKey(team.id, category.id);
-          const current = values.get(key) ?? "";
-          const initial = initialMap.get(key) ?? "";
-          return { team, category, current, initial };
-        })
-        .filter(({ current, initial }) => current !== initial)
-    );
-
-    const results = await Promise.all(
-      changedCells.map(({ team, category, current }) => {
-        const amount = current.trim() === "" ? null : Number(current);
-        return team.id === entryId
-          ? saveCategoryBudgetTargetAction(entryId, category.id, amount)
-          : saveRivalCategoryEstimateAction(entryId, team.id, category.id, amount);
-      })
-    );
-
-    setLoading(false);
-    const firstError = results.find((r) => r.error)?.error;
-    if (firstError) {
-      setError(firstError);
-      return;
-    }
-    setSaved(true);
-    router.refresh();
-  }
 
   const selectedTeam = teams.find((t) => t.id === selectedTeamId);
   const isSelfSelected = selectedTeam?.id === entryId;
@@ -120,7 +132,8 @@ export function RivalCategoryEstimateForm({
     <div className="flex flex-col gap-3">
       <p className="text-xs text-black/60 dark:text-white/60">
         Your own budget target per category, plus your private guess at every other team's — used
-        to estimate what each can still afford. Never shown to anyone else.
+        to estimate what each can still afford. Never shown to anyone else. Saved automatically as
+        you edit.
       </p>
 
       <div className="grid grid-cols-1 md:grid-cols-[260px_1fr] gap-3 items-start">
@@ -177,25 +190,31 @@ export function RivalCategoryEstimateForm({
                 )}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {categories.map((category) => (
-                  <label key={category.id} className="flex flex-col gap-1 text-sm">
-                    <span>
-                      {category.name}{" "}
-                      <span className="text-xs text-black/50 dark:text-white/50">
-                        (base {category.basePrice.toLocaleString()})
+                {categories.map((category) => {
+                  const key = cellKey(selectedTeam.id, category.id);
+                  return (
+                    <label key={category.id} className="flex flex-col gap-1 text-sm">
+                      <span>
+                        {category.name}{" "}
+                        <span className="text-xs text-black/50 dark:text-white/50">
+                          (base {category.basePrice.toLocaleString()})
+                        </span>
                       </span>
-                    </span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder={isSelfSelected ? "No target" : "No estimate"}
-                      value={values.get(cellKey(selectedTeam.id, category.id)) ?? ""}
-                      onChange={(e) => setValue(selectedTeam.id, category.id, e.target.value)}
-                      className={inputClass}
-                    />
-                  </label>
-                ))}
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder={isSelfSelected ? "No target" : "No estimate"}
+                        value={values.get(key) ?? ""}
+                        onChange={(e) => setValue(selectedTeam.id, category.id, e.target.value)}
+                        onBlur={() => handleBlur(selectedTeam, category)}
+                        disabled={pendingCells.has(key)}
+                        className={inputClass}
+                      />
+                      {errors[key] && <p className="text-xs text-red-600 dark:text-red-400">{errors[key]}</p>}
+                    </label>
+                  );
+                })}
               </div>
               <div className="flex items-center justify-between text-sm pt-2 border-t border-black/[0.06] dark:border-white/10">
                 <span className="text-black/60 dark:text-white/60">
@@ -215,13 +234,6 @@ export function RivalCategoryEstimateForm({
           )}
         </div>
       </div>
-
-      {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
-      {saved && <p className="text-sm text-emerald-600 dark:text-emerald-400">Estimates saved.</p>}
-
-      <button onClick={handleSubmit} disabled={loading} className={`${buttonPrimary} self-start`}>
-        {loading ? "Saving…" : "Save estimates"}
-      </button>
     </div>
   );
 }

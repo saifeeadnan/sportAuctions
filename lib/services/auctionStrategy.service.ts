@@ -139,6 +139,76 @@ export async function saveStrategy(
 }
 
 /**
+ * Set (or clear, when `type` is null) this manager's MUST_HAVE/AVOID tag on
+ * one player — a single upsert/delete, same shape as
+ * upsertCategoryBudgetTarget below, so the Wish list picker can autosave
+ * one player at a time (matching Predictions' autosave pattern) instead of
+ * batching every toggle behind saveStrategy's whole-form wipe-and-replace.
+ * A player's type is one field on one unique [entry, player] row, so
+ * must-have and avoid are mutually exclusive by construction — no separate
+ * cross-check needed the way saveStrategy's bulk arrays require.
+ */
+export async function upsertPlayerPreference(
+  teamAuctionEntryId: string,
+  auctionPlayerId: string,
+  type: "MUST_HAVE" | "AVOID" | null,
+  actorUserId: string
+) {
+  const entry = await prisma.teamAuctionEntry.findUnique({
+    where: { id: teamAuctionEntryId },
+    include: { auction: true },
+  });
+  if (!entry) throw new ValidationError("Team auction entry not found");
+
+  if (entry.auction.status === "COMPLETED") {
+    throw new InvalidStateTransitionError("Cannot change strategy once the auction has concluded");
+  }
+
+  const player = await prisma.auctionPlayer.findFirst({
+    where: { id: auctionPlayerId, auctionId: entry.auctionId },
+    include: { player: true },
+  });
+  if (!player) throw new ValidationError("Player does not belong to this auction");
+
+  const existing = await prisma.auctionPlayerPreference.findUnique({
+    where: { teamAuctionEntryId_auctionPlayerId: { teamAuctionEntryId, auctionPlayerId } },
+  });
+
+  if (type == null) {
+    if (!existing) return;
+    await prisma.$transaction(async (tx) => {
+      await tx.auctionPlayerPreference.deleteMany({ where: { teamAuctionEntryId, auctionPlayerId } });
+      await writeAuditLog(tx, {
+        entityType: "TeamAuctionEntry",
+        entityId: teamAuctionEntryId,
+        auctionId: entry.auctionId,
+        action: "PLAYER_PREFERENCE_REMOVED",
+        actorUserId,
+        before: { player: player.player.name, type: existing.type },
+      });
+    });
+    return;
+  }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.auctionPlayerPreference.upsert({
+      where: { teamAuctionEntryId_auctionPlayerId: { teamAuctionEntryId, auctionPlayerId } },
+      create: { teamAuctionEntryId, auctionPlayerId, type },
+      update: { type },
+    });
+    await writeAuditLog(tx, {
+      entityType: "TeamAuctionEntry",
+      entityId: teamAuctionEntryId,
+      auctionId: entry.auctionId,
+      action: "PLAYER_PREFERENCE_SET",
+      actorUserId,
+      before: existing ? { player: player.player.name, type: existing.type } : null,
+      after: { player: player.player.name, type },
+    });
+  });
+}
+
+/**
  * Set (or clear, when `targetAvgPrice` is null) this manager's budget
  * target for one category — a single upsert/delete, same shape as
  * rivalCategoryEstimate.service.ts's upsertRivalCategoryEstimate, so the

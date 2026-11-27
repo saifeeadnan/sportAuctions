@@ -25,7 +25,7 @@ import {
   changePassword,
   updateUserProfile,
 } from "@/lib/services/user.service";
-import { saveStrategy } from "@/lib/services/auctionStrategy.service";
+import { saveStrategy, upsertPlayerPreference } from "@/lib/services/auctionStrategy.service";
 import { savePrediction, removePrediction } from "@/lib/services/auctionPrediction.service";
 import { upsertRivalCategoryEstimate } from "@/lib/services/rivalCategoryEstimate.service";
 import { setAnalyticsEnabled } from "@/lib/services/auctionAnalyticsEntitlement.service";
@@ -442,6 +442,59 @@ describe("audit log — analytics dashboard", () => {
       actorUserId: actorId,
     });
     expect((removed.before as { estimatedBudget?: string })?.estimatedBudget).toBe("300");
+  });
+
+  it("upsertPlayerPreference writes PLAYER_PREFERENCE_SET, then PLAYER_PREFERENCE_REMOVED when cleared", async () => {
+    const fx = await buildAnalyticsFixture();
+    const actorId = fx.entry1.team.managerId!;
+
+    await upsertPlayerPreference(fx.entry1.id, fx.playerOne.id, "MUST_HAVE", actorId);
+    const saved = await expectAuditLog({
+      entityType: "TeamAuctionEntry",
+      entityId: fx.entry1.id,
+      action: "PLAYER_PREFERENCE_SET",
+      actorUserId: actorId,
+    });
+    expect((saved.after as { type?: string })?.type).toBe("MUST_HAVE");
+    expect(saved.before).toBeNull();
+
+    await upsertPlayerPreference(fx.entry1.id, fx.playerOne.id, null, actorId);
+    const removed = await expectAuditLog({
+      entityType: "TeamAuctionEntry",
+      entityId: fx.entry1.id,
+      action: "PLAYER_PREFERENCE_REMOVED",
+      actorUserId: actorId,
+    });
+    expect((removed.before as { type?: string })?.type).toBe("MUST_HAVE");
+  });
+
+  it("upsertPlayerPreference switches type in place on the same row rather than delete+insert", async () => {
+    const fx = await buildAnalyticsFixture();
+    const actorId = fx.entry1.team.managerId!;
+
+    await upsertPlayerPreference(fx.entry1.id, fx.playerOne.id, "MUST_HAVE", actorId);
+    await upsertPlayerPreference(fx.entry1.id, fx.playerOne.id, "AVOID", actorId);
+
+    const row = await prisma.auctionPlayerPreference.findUnique({
+      where: { teamAuctionEntryId_auctionPlayerId: { teamAuctionEntryId: fx.entry1.id, auctionPlayerId: fx.playerOne.id } },
+    });
+    expect(row?.type).toBe("AVOID");
+
+    const setRows = await prisma.auditLog.findMany({
+      where: { entityType: "TeamAuctionEntry", entityId: fx.entry1.id, action: "PLAYER_PREFERENCE_SET" },
+      orderBy: { createdAt: "asc" },
+    });
+    expect(setRows).toHaveLength(2);
+    expect((setRows[1].before as { type?: string })?.type).toBe("MUST_HAVE");
+    expect((setRows[1].after as { type?: string })?.type).toBe("AVOID");
+  });
+
+  it("upsertPlayerPreference rejects an auctionPlayerId that doesn't belong to this auction", async () => {
+    const fx = await buildAnalyticsFixture();
+
+    await expect(
+      upsertPlayerPreference(fx.entry1.id, "not-a-real-auction-player-id", "MUST_HAVE", fx.entry1.team.managerId!)
+    ).rejects.toThrow("Player does not belong to this auction");
   });
 
   it("setAnalyticsEnabled writes ANALYTICS_ENABLED / ANALYTICS_DISABLED", async () => {
