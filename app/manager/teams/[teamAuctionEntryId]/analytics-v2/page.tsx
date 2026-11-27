@@ -185,8 +185,6 @@ export default async function ManagerAnalyticsV2Page({
       initialPredictions={initialPredictions}
       strategy={{
         entryId: entry.id,
-        categories: activeCategories,
-        players: strategyPlayers,
         initialMustHaveIds: strategy.mustHaveIds,
         initialAvoidIds: strategy.avoidIds,
         initialBudgetTargets: strategy.budgetTargets,

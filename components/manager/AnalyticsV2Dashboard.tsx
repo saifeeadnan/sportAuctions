@@ -13,25 +13,23 @@ import {
   type RivalEstimateTeamContext,
 } from "@/components/manager/RivalCategoryEstimateForm";
 import { RivalCategoryEstimatePanel, type RivalCategoryEstimateRow } from "@/components/manager/RivalCategoryEstimatePanel";
-import { StrategyForm, type StrategyCategoryOption, type StrategyPlayerOption } from "@/components/manager/StrategyForm";
 import { SetupProgressBanner, type SetupChecklistItem } from "@/components/manager/SetupProgressBanner";
 import { LiveBidGuidancePanel } from "@/components/manager/LiveBidGuidancePanel";
 import { RosterAffordabilityPanel } from "@/components/manager/RosterAffordabilityPanel";
-import { V2PredictionPicker } from "@/components/manager/V2PredictionPicker";
-import { SimulationPanel } from "@/components/manager/SimulationPanel";
+import { WishlistAndPredictionsPicker } from "@/components/manager/WishlistAndPredictionsPicker";
+import { SimulationPanel, type SimulationPlanSummaryDisplay } from "@/components/manager/SimulationPanel";
 import { useAuctionSocket } from "@/hooks/useAuctionSocket";
 import { computeRosterAffordability } from "@/lib/auction/rosterAffordability";
 import type { WishlistFeasibilitySummary } from "@/lib/auction-analytics/types";
 import type { AuctionState } from "@/lib/services/auctionState.service";
 import type { PlayerPrediction } from "@/lib/auction/projectedStandings";
 
-type Tab = "live" | "strategy" | "predictions" | "rosters" | "estimates" | "simulate";
+type Tab = "live" | "strategy" | "rosters" | "estimates" | "simulate";
 
 const TABS: { id: Tab; label: string }[] = [
   { id: "live", label: "Live Analytics" },
   { id: "estimates", label: "Set Budgets" },
-  { id: "strategy", label: "Wish list" },
-  { id: "predictions", label: "Predictions" },
+  { id: "strategy", label: "Wish list & Predictions" },
   { id: "simulate", label: "Simulate" },
   { id: "rosters", label: "All Rosters" },
 ];
@@ -67,8 +65,6 @@ export function AnalyticsV2Dashboard({
   initialPredictions: Record<string, PlayerPrediction>;
   strategy: {
     entryId: string;
-    categories: StrategyCategoryOption[];
-    players: StrategyPlayerOption[];
     initialMustHaveIds: string[];
     initialAvoidIds: string[];
     initialBudgetTargets: { categoryId: string; targetAvgPrice: string }[];
@@ -98,6 +94,28 @@ export function AnalyticsV2Dashboard({
   const otherTeams = liveState.teams.filter((t) => t.id !== myTeamEntryId);
   const myTeam = liveState.teams.find((t) => t.id === myTeamEntryId);
 
+  // For Simulate's pre-run plan summary — resolves the raw ids strategy/
+  // predictions store into names using whatever the live socket already
+  // knows, no extra fetch.
+  const playerNameById = new Map(liveState.players.map((p) => [p.id, p.name]));
+  const teamNameById = new Map(liveState.teams.map((t) => [t.id, t.teamName]));
+  const planSummary: SimulationPlanSummaryDisplay = {
+    budgetTargets: Object.entries(budgetTargetsByCategoryName).map(([categoryName, targetAvgPrice]) => ({
+      categoryName,
+      targetAvgPrice,
+    })),
+    mustHaves: strategy.initialMustHaveIds.map((id) => ({ playerId: id, playerName: playerNameById.get(id) ?? id })),
+    avoids: strategy.initialAvoidIds.map((id) => ({ playerId: id, playerName: playerNameById.get(id) ?? id })),
+    predictions: Object.entries(predictions).map(([playerId, p]) => ({
+      playerId,
+      playerName: playerNameById.get(playerId) ?? playerId,
+      teamName: p.teamId ? teamNameById.get(p.teamId) ?? null : null,
+      amount: p.amount,
+      minAmount: p.minAmount,
+      unsold: p.unsold,
+    })),
+  };
+
   // Every team, including self — the merged estimates grid shows the
   // manager's own slots/budget context alongside every rival's.
   const teamContextById: Record<string, RivalEstimateTeamContext> = Object.fromEntries(
@@ -115,7 +133,7 @@ export function AnalyticsV2Dashboard({
     },
     { key: "estimates", label: "Budget targets set", done: strategy.initialBudgetTargets.length > 0 },
     { key: "estimates", label: "Rival estimates set", done: estimateForm.initialEstimates.length > 0 },
-    { key: "predictions", label: "Predictions made", done: Object.keys(predictions).length > 0 },
+    { key: "strategy", label: "Predictions made", done: Object.keys(predictions).length > 0 },
   ];
 
   return (
@@ -184,18 +202,27 @@ export function AnalyticsV2Dashboard({
             <div className="flex flex-col gap-3">
               <details className={card} open>
                 <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
-                  Set wish list
+                  Wish list &amp; predictions
                 </summary>
                 <div className="px-4 pb-4">
-                  <StrategyForm
+                  <WishlistAndPredictionsPicker
                     entryId={strategy.entryId}
-                    categories={strategy.categories}
-                    players={strategy.players}
+                    players={predictablePlayers}
+                    otherTeams={otherTeams}
                     initialMustHaveIds={strategy.initialMustHaveIds}
                     initialAvoidIds={strategy.initialAvoidIds}
-                    initialBudgetTargets={strategy.initialBudgetTargets}
-                    budgetRemaining={myTeam ? Number(myTeam.budgetRemaining) : undefined}
-                    showBudgetTargets={false}
+                    predictions={predictions}
+                    onPredictionChange={(playerId, prediction) => {
+                      setPredictions((prev) => {
+                        const next = { ...prev };
+                        if (prediction) {
+                          next[playerId] = prediction;
+                        } else {
+                          delete next[playerId];
+                        }
+                        return next;
+                      });
+                    }}
                   />
                 </div>
               </details>
@@ -208,35 +235,6 @@ export function AnalyticsV2Dashboard({
                   <WishlistFeasibilityPanel items={wishlistItems} />
                 </div>
               </details>
-            </div>
-          )}
-
-          {tab === "predictions" && (
-            <div className="flex flex-col gap-3">
-              <div>
-                <h2 className="text-sm font-medium">Who wins each remaining player?</h2>
-                <p className="text-xs text-black/60 dark:text-white/60">
-                  Your own private guesses, grouped by category — never visible to any other team. Also
-                  feeds the Simulate tab: a predicted player resolves to the team you picked in every run.
-                </p>
-              </div>
-              <V2PredictionPicker
-                entryId={myTeamEntryId}
-                players={predictablePlayers}
-                otherTeams={otherTeams}
-                predictions={predictions}
-                onPredictionChange={(playerId, prediction) => {
-                  setPredictions((prev) => {
-                    const next = { ...prev };
-                    if (prediction) {
-                      next[playerId] = prediction;
-                    } else {
-                      delete next[playerId];
-                    }
-                    return next;
-                  });
-                }}
-              />
             </div>
           )}
 
@@ -266,7 +264,11 @@ export function AnalyticsV2Dashboard({
               fetched result and selected-run state survive switching to
               another tab and back — same reasoning as the live socket above. */}
           <div className={tab === "simulate" ? "contents" : "hidden"}>
-            <SimulationPanel teamAuctionEntryId={myTeamEntryId} totalSlots={myTeam?.slotsTotal} />
+            <SimulationPanel
+              teamAuctionEntryId={myTeamEntryId}
+              totalSlots={myTeam?.slotsTotal}
+              planSummary={planSummary}
+            />
           </div>
         </div>
       </div>

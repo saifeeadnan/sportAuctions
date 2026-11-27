@@ -97,6 +97,114 @@ function LikelihoodBar({ fraction, variant }: { fraction: number; variant: "succ
 const tableHead = "text-left border-b border-black/10 dark:border-white/10";
 const tableRow = "border-b border-black/5 dark:border-white/5 last:border-0";
 
+export type SimulationPlanSummaryDisplay = {
+  budgetTargets: { categoryName: string; targetAvgPrice: number }[];
+  mustHaves: { playerId: string; playerName: string }[];
+  avoids: { playerId: string; playerName: string }[];
+  predictions: {
+    playerId: string;
+    playerName: string;
+    teamName: string | null;
+    amount: number | null;
+    minAmount: number | null;
+    unsold: boolean;
+  }[];
+};
+
+// Shown above the Run controls, before a result exists, so the manager can
+// sanity-check what they're about to simulate against — a wrong budget
+// target or a forgotten must-have is a lot cheaper to catch here than after
+// reading 100 runs' worth of outcomes.
+function PlanSummary({ summary }: { summary: SimulationPlanSummaryDisplay }) {
+  const hasBudgets = summary.budgetTargets.length > 0;
+  const hasWishlist = summary.mustHaves.length > 0 || summary.avoids.length > 0;
+  const hasPredictions = summary.predictions.length > 0;
+
+  function describePrediction(p: SimulationPlanSummaryDisplay["predictions"][number]) {
+    if (p.unsold) return "Unsold";
+    const parts: string[] = [];
+    if (p.teamName) parts.push(p.teamName);
+    if (p.amount != null) parts.push(Math.round(p.amount).toLocaleString());
+    else if (p.minAmount != null) parts.push(`${Math.round(p.minAmount).toLocaleString()}+`);
+    return parts.length > 0 ? parts.join(" · ") : "—";
+  }
+
+  return (
+    <details className={card} open>
+      <summary className="cursor-pointer select-none px-4 py-3 text-sm font-medium">
+        Your plan for this simulation
+      </summary>
+      <div className="px-4 pb-4 grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="flex flex-col gap-1.5 min-w-0">
+          <h3 className="text-xs font-medium uppercase tracking-wide text-black/50 dark:text-white/50">
+            Budgets{hasBudgets ? ` (${summary.budgetTargets.length})` : ""}
+          </h3>
+          {hasBudgets ? (
+            <ul className="flex flex-col gap-0.5 text-sm max-h-40 overflow-y-auto">
+              {summary.budgetTargets.map((b) => (
+                <li key={b.categoryName} className="flex items-center justify-between gap-2">
+                  <span className="truncate">{b.categoryName}</span>
+                  <span className="tabular-nums text-black/70 dark:text-white/70 shrink-0">
+                    {b.targetAvgPrice.toLocaleString()}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-black/50 dark:text-white/50">No budget targets set.</p>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-1.5 min-w-0">
+          <h3 className="text-xs font-medium uppercase tracking-wide text-black/50 dark:text-white/50">Wish list</h3>
+          {hasWishlist ? (
+            <div className="flex flex-col gap-1.5 text-sm max-h-40 overflow-y-auto">
+              {summary.mustHaves.length > 0 && (
+                <p>
+                  <Badge variant="info">Must-have ({summary.mustHaves.length})</Badge>{" "}
+                  <span className="text-black/70 dark:text-white/70">
+                    {summary.mustHaves.map((m) => m.playerName).join(", ")}
+                  </span>
+                </p>
+              )}
+              {summary.avoids.length > 0 && (
+                <p>
+                  <Badge variant="neutral">Avoid ({summary.avoids.length})</Badge>{" "}
+                  <span className="text-black/70 dark:text-white/70">
+                    {summary.avoids.map((a) => a.playerName).join(", ")}
+                  </span>
+                </p>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-black/50 dark:text-white/50">No must-haves or avoids set.</p>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-1.5 min-w-0">
+          <h3 className="text-xs font-medium uppercase tracking-wide text-black/50 dark:text-white/50">
+            Predictions{hasPredictions ? ` (${summary.predictions.length})` : ""}
+          </h3>
+          {hasPredictions ? (
+            <ul className="flex flex-col gap-0.5 text-sm max-h-40 overflow-y-auto">
+              {summary.predictions.map((p) => (
+                <li key={p.playerId} className="flex items-center justify-between gap-2">
+                  <span className="truncate">{p.playerName}</span>
+                  <span className="text-black/70 dark:text-white/70 text-right shrink-0">
+                    {describePrediction(p)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-black/50 dark:text-white/50">No predictions made.</p>
+          )}
+        </div>
+      </div>
+    </details>
+  );
+}
+
 function Scorecard({ summary }: { summary: SimulationSummaryDisplay }) {
   const wishlistRows = [
     ...summary.mustHaves.map((m) => ({
@@ -220,6 +328,7 @@ const DEFAULT_RUN_COUNT = 100;
 export function SimulationPanel({
   teamAuctionEntryId,
   totalSlots,
+  planSummary,
 }: {
   teamAuctionEntryId: string;
   /** Your current full roster size, for the "Min squad size" input's
@@ -227,6 +336,7 @@ export function SimulationPanel({
    * without it (falling back to whatever the server resolves), it just
    * can't show a specific placeholder or clamp client-side first. */
   totalSlots?: number;
+  planSummary: SimulationPlanSummaryDisplay;
 }) {
   const [runCount, setRunCount] = useState(DEFAULT_RUN_COUNT);
   // Empty string means "use the full squad" — not forced to a specific
@@ -260,6 +370,8 @@ export function SimulationPanel({
 
   return (
     <div className="flex flex-col gap-4">
+      <PlanSummary summary={planSummary} />
+
       <div className="flex items-center gap-3">
         <label className="flex items-center gap-2 text-sm text-black/70 dark:text-white/70">
           Runs
