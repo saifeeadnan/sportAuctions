@@ -276,6 +276,42 @@ describe("simulateAuctionRun", () => {
     // The pre-existing 500 spend must never have blocked rivalA outright.
     expect(rivalAEverWon).toBe(true);
   });
+
+  it("waterfalls a higher-priority category's unused budget target down into the next category self also targeted", () => {
+    const platinum = { id: "platinum", name: "Platinum", basePrice: 150, bidIncrement: null };
+    const gold = { id: "gold", name: "Gold", basePrice: 10, bidIncrement: null };
+    const players = [
+      { id: "p1", name: "p1", categoryId: "platinum", basePrice: 150 },
+      { id: "p2", name: "p2", categoryId: "gold", basePrice: 10 },
+    ];
+    const snapshot = baseSnapshot({
+      // Self alone — no rival to contest either lot, so both outcomes are
+      // fully deterministic from self's own budget/target math.
+      teams: [{ id: "self", name: "Self", budgetRemaining: 100, totalSlots: 1 }],
+      categories: [platinum, gold],
+      players,
+      budgetTargets: [
+        { categoryId: "platinum", targetAvgPrice: 500 },
+        { categoryId: "gold", targetAvgPrice: 20 },
+      ],
+    });
+
+    const run = simulateAuctionRun(snapshot, 1);
+
+    // Self's legal max (100, with only 1 slot needed and nothing spent yet)
+    // is below Platinum's base price (150), so self can never contest p1 —
+    // it's guaranteed to go unsold, leaving self's Platinum spend at 0 and
+    // its full 500 target unused.
+    const platinumLot = run.lots.find((l) => l.playerId === "p1")!;
+    expect(platinumLot).toEqual({ playerId: "p1", categoryId: "platinum", unsold: true });
+
+    // That unused 500 waterfalls onto Gold's own 20 target (520 total),
+    // which is now so far above self's legal max (100) that the max itself
+    // becomes the binding constraint — self pays its full legal max (100),
+    // not the 20 its own standalone Gold target would have capped it at.
+    const goldLot = run.lots.find((l) => l.playerId === "p2")!;
+    expect(goldLot).toEqual({ playerId: "p2", categoryId: "gold", teamId: "self", price: 100, source: "self" });
+  });
 });
 
 describe("simulateAuctionRuns", () => {
@@ -319,5 +355,17 @@ describe("isRunComplete", () => {
       lots: [{ playerId: "p1", categoryId: "gold", teamId: "rival", price: 10, source: "contested" as const }],
     };
     expect(isRunComplete(snapshot, run)).toBe(false); // self got 0 of its 2 slots
+  });
+
+  it("uses minSquadSize as a lower bar instead of the full roster size when given", () => {
+    const run = {
+      seed: 1,
+      lots: [{ playerId: "p1", categoryId: "gold", teamId: "self", price: 10, source: "self" as const }],
+    };
+    // self.totalSlots is 2, self only won 1 -> not complete by the default,
+    // full-roster bar...
+    expect(isRunComplete(snapshot, run)).toBe(false);
+    // ...but is complete against an explicit, lower minSquadSize of 1.
+    expect(isRunComplete(snapshot, run, 1)).toBe(true);
   });
 });

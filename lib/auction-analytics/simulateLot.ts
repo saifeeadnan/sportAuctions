@@ -131,12 +131,16 @@ export function resolveContestedLot(args: {
   budgetTargetByCategoryId: ReadonlyMap<string, number>;
   /** Self's own cumulative spend in this player's category so far this run
    * (sum of salesSoFar where teamId === selfTeamId in this categoryId) —
-   * once this reaches the category's budget target, self stops bidding on
-   * further players in that category for the rest of the run. A SIMULATION-
-   * ONLY behavior: budgetTargetByCategoryId/categoryTargetAvgPrice still
-   * means "per-player average" everywhere else (computeBidGuidance, v1's
-   * live guidance) — this is an additional gate layered on top, not a
-   * reinterpretation of that field. */
+   * subtracted from the category's budget target before it's ever handed
+   * to computeBidGuidance, so the target behaves as one depleting pool
+   * across every pick in the category (spend 4000 of a 4500 Marquee
+   * target on one must-have, and the next Marquee evaluation — must-have
+   * or not — only has 500 left to work with, not a fresh 4500) rather than
+   * a flat per-player ceiling applied independently to each one. Once the
+   * remaining pool hits 0, a non-must-have is excluded from the category
+   * entirely for the rest of the run; a must-have still gets a base-price
+   * attempt (computeBidGuidance's own floor) — losing that bid is an
+   * accepted outcome, not something this engine fights to avoid. */
   selfCategorySpentSoFar: number;
   /** Rival team ids that have already spent, in this run, at or beyond the
    * manager's own "My estimates" (RivalCategoryEstimateInput) budget for
@@ -198,12 +202,15 @@ export function resolveContestedLot(args: {
   const candidates: { teamId: string; amount: number }[] = [];
 
   const selfState = teamState.get(selfTeamId)!;
-  // A must-have always overrides budget considerations (same precedence
-  // computeBidGuidance already gives it) — the category spend cap below
-  // only ever gates a non-must-have pick.
   const categoryBudgetCap = budgetTargetByCategoryId.get(player.categoryId) ?? null;
   const isSelfMustHave = mustHaveIds.has(player.id);
   const overCategoryBudgetCap = categoryBudgetCap != null && !isSelfMustHave && selfCategorySpentSoFar >= categoryBudgetCap;
+  // The target as one depleting pool: whatever's already gone to earlier
+  // picks in this same category (must-have or not) comes off the top
+  // before this pick gets a cap to work with — see selfCategorySpentSoFar's
+  // own doc comment above.
+  const remainingCategoryBudget =
+    categoryBudgetCap != null ? Math.max(categoryBudgetCap - selfCategorySpentSoFar, 0) : null;
 
   // The server-ENFORCED ceiling self will actually be clamped to below —
   // computeMaxBid (pool-aware) can disagree with this, especially when the
@@ -214,49 +221,75 @@ export function resolveContestedLot(args: {
   // have to drag below 0 from ever being added in the first place.
   const selfLegalMaxEnforced = legalMaxBidEnforced(selfState, unit);
 
-  if (selfState.slotsRemaining > 0 && !overCategoryBudgetCap && selfLegalMaxEnforced >= effectiveBasePrice) {
+  if (selfState.slotsRemaining > 0 && selfLegalMaxEnforced >= effectiveBasePrice) {
     const legalMaxSelf = computeMaxBid(remainingPoolBasePricesForSelf, selfState.budgetRemaining, selfState.slotsRemaining);
-    const guidance = computeBidGuidance({
-      basePrice: effectiveBasePrice,
-      isMustHave: isSelfMustHave,
-      isAvoid: avoidIds.has(player.id),
-      categoryTargetAvgPrice: categoryBudgetCap,
-      liveCategoryAvgPrice: liveAvgRaw,
-      legalMaxBid: legalMaxSelf,
-      otherMustHavesRemainingInCategory,
-      predictedRival: null, // never reached for a predicted player, by construction
-    });
-    if (
-      (guidance.signal === "BID" || guidance.signal === "CONSIDER" || guidance.signal === "SPOILER") &&
-      guidance.suggestedMaxBid != null
-    ) {
-      // A must-have (BID) legitimately goes all the way to its legal max —
-      // that's the point of marking it must-have. SPOILER is already
-      // tightly, deliberately bounded by its own formula. CONSIDER is the
-      // one case that can fall back to "no budget target set, here's your
-      // raw legal max" — bound that one to a realistic fair share so it
-      // doesn't consume nearly the whole budget on a single early pick.
-      const selfAmount =
-        guidance.signal === "CONSIDER"
-          ? Math.min(guidance.suggestedMaxBid, fairShareBound(selfState))
-          : guidance.suggestedMaxBid;
-      if (selfAmount >= effectiveBasePrice) {
-        candidates.push({ teamId: selfTeamId, amount: selfAmount });
+    let selfBecameCandidate = false;
+
+    // A category budget cap is a veto on the normal guidance-driven path
+    // only — it never even gets consulted once the category's own target
+    // is exhausted. It must NOT also veto the desperation fallback just
+    // below: a manager's per-category targets are a spending PLAN, not a
+    // promise to finish with slots unfilled and money unspent once every
+    // target happens to be used up. "Budgets take priority over the wish
+    // list" means a cap can cost self a bid it would otherwise have won —
+    // it was never meant to guarantee an incomplete squad on top of that.
+    if (!overCategoryBudgetCap) {
+      const guidance = computeBidGuidance({
+        basePrice: effectiveBasePrice,
+        isMustHave: isSelfMustHave,
+        isAvoid: avoidIds.has(player.id),
+        categoryTargetAvgPrice: remainingCategoryBudget,
+        liveCategoryAvgPrice: liveAvgRaw,
+        legalMaxBid: legalMaxSelf,
+        otherMustHavesRemainingInCategory,
+        predictedRival: null, // never reached for a predicted player, by construction
+      });
+      if (
+        (guidance.signal === "BID" || guidance.signal === "CONSIDER" || guidance.signal === "SPOILER") &&
+        guidance.suggestedMaxBid != null
+      ) {
+        // A must-have (BID) legitimately goes all the way to its legal max —
+        // that's the point of marking it must-have. SPOILER is already
+        // tightly, deliberately bounded by its own formula. CONSIDER is the
+        // one case that can fall back to "no budget target set, here's your
+        // raw legal max" — bound that one to a realistic fair share so it
+        // doesn't consume nearly the whole budget on a single early pick.
+        const selfAmount =
+          guidance.signal === "CONSIDER"
+            ? Math.min(guidance.suggestedMaxBid, fairShareBound(selfState))
+            : guidance.suggestedMaxBid;
+        if (selfAmount >= effectiveBasePrice) {
+          candidates.push({ teamId: selfTeamId, amount: selfAmount });
+          selfBecameCandidate = true;
+        }
       }
-    } else if (
+    }
+
+    if (
+      !selfBecameCandidate &&
       !avoidIds.has(player.id) &&
       // No slack left: fewer lots remain (including this one) than self
       // still needs to fill its own roster — skipping here would mathematically
-      // guarantee an unfilled slot. A PASS from the manager's own strategy is
-      // a recommendation, not a hard veto, so self still tries for it rather
-      // than passively finishing short. (A category budget cap, checked
-      // above, and an avoid tag remain absolute vetoes even here.)
+      // guarantee an unfilled slot. A PASS from the manager's own strategy
+      // (whether from guidance itself, or an exhausted category cap above)
+      // is a recommendation, not a hard veto, so self still tries for it
+      // rather than passively finishing short. An avoid tag remains the one
+      // absolute veto even here.
       selfState.slotsRemaining >= remainingLotsAfterThis + 1
     ) {
-      const desperationAmount = Math.min(legalMaxSelf, fairShareBound(selfState));
-      if (desperationAmount >= effectiveBasePrice) {
-        candidates.push({ teamId: selfTeamId, amount: desperationAmount });
-      }
+      // Bypassing the category cap's "don't even try" veto above must not
+      // also let the PRICE ignore that same category's remaining budget —
+      // still respect whatever's left of it, floored at base price (same
+      // reasoning as the must-have cap's own floor in guidance.ts) so a
+      // fully-exhausted category still gets a last-resort attempt instead
+      // of an unbounded one. Safe to floor unconditionally: the outer gate
+      // above already confirmed effectiveBasePrice is legally affordable
+      // (selfLegalMaxEnforced), and the final winning price gets re-clamped
+      // against that same hard ceiling below regardless of this amount.
+      const categoryCappedLegalMax =
+        remainingCategoryBudget != null ? Math.min(legalMaxSelf, remainingCategoryBudget) : legalMaxSelf;
+      const desperationAmount = Math.max(Math.min(categoryCappedLegalMax, fairShareBound(selfState)), effectiveBasePrice);
+      candidates.push({ teamId: selfTeamId, amount: desperationAmount });
     }
   }
 

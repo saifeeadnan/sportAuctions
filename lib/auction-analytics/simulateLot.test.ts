@@ -347,7 +347,7 @@ describe("resolveContestedLot", () => {
     expect(lot).toEqual({ playerId: "p1", categoryId: "gold", unsold: true });
   });
 
-  it("lets a must-have bypass an already-exceeded category spend cap", () => {
+  it("falls back to base price once a must-have's category budget is already exhausted — budgets take priority over the wish list", () => {
     const teamState = new Map<string, TeamRunState>([["self", { budgetRemaining: 1000, slotsRemaining: 5 }]]);
 
     const lot = resolveContestedLot({
@@ -360,7 +360,7 @@ describe("resolveContestedLot", () => {
       mustHaveIds: new Set(["p1"]),
       avoidIds: new Set(),
       budgetTargetByCategoryId: new Map([["gold", 100]]),
-      selfCategorySpentSoFar: 500, // already way over the 100 target
+      selfCategorySpentSoFar: 500, // already way over the 100 target -> 0 left in the pool
       teamsOverEstimatedCategoryBudget: new Set(),
       otherMustHavesRemainingInCategory: 0,
       remainingLotsAfterThis: 1000, // large enough that urgency never dominates richness here
@@ -370,7 +370,130 @@ describe("resolveContestedLot", () => {
       rng: sequenceRng([0.5]),
     });
 
-    expect(lot).toEqual({ playerId: "p1", categoryId: "gold", teamId: "self", price: 960, source: "self" });
+    // No pool left (100 target - 500 already spent, floored at 0) means the
+    // must-have only gets p1's own base price (10) to work with, not the
+    // legal max (960) it would have gotten pre-fix — it can still win at
+    // base price if nobody outbids it, but it no longer blows through the
+    // category budget just because it's a must-have.
+    expect(lot).toEqual({ playerId: "p1", categoryId: "gold", teamId: "self", price: 10, source: "self" });
+  });
+
+  it("lets the desperation fallback bypass an exhausted category budget cap rather than guarantee an unfilled slot", () => {
+    // Not a must-have, not avoided, and way over its tiny 10-target in this
+    // category (overCategoryBudgetCap -> true) -- would normally never be
+    // considered again in this category. But this is the LAST lot
+    // (remainingLotsAfterThis: 0) and self still needs its one remaining
+    // slot (slotsRemaining: 1), so the desperation path must still kick in:
+    // a spent-out category target is a plan, not a promise to finish with
+    // an empty slot and unspent budget. The category's own pool is fully
+    // exhausted (0 left), so the attempt is floored at base price (10),
+    // not the full legal max (1000) — bypassing the "don't even try" veto
+    // must not also let the PRICE ignore the same budget target.
+    const teamState = new Map<string, TeamRunState>([["self", { budgetRemaining: 1000, slotsRemaining: 1 }]]);
+
+    const lot = resolveContestedLot({
+      player: p1,
+      category: GOLD,
+      teams: [self],
+      selfTeamId: "self",
+      teamState,
+      unit: 10,
+      mustHaveIds: new Set(),
+      avoidIds: new Set(),
+      budgetTargetByCategoryId: new Map([["gold", 10]]),
+      selfCategorySpentSoFar: 500, // way over the 10 target -> 0 left in the pool
+      teamsOverEstimatedCategoryBudget: new Set(),
+      otherMustHavesRemainingInCategory: 0,
+      remainingLotsAfterThis: 0, // the very last lot
+      remainingPoolBasePricesForSelf: [],
+      players: [p1],
+      salesSoFar: [],
+      rng: sequenceRng([0.5]),
+    });
+
+    expect(lot).toEqual({ playerId: "p1", categoryId: "gold", teamId: "self", price: 10, source: "self" });
+  });
+
+  it("caps the desperation fallback's price at what's LEFT of the category budget, not the full legal max", () => {
+    // 200 target, 150 already spent -> 50 left in the pool. Legal max here
+    // is ~1000 (budgetRemaining=1000, 1 slot left) — if the cap weren't
+    // applied, desperation would bid far more than this category's own
+    // remaining budget allows.
+    const teamState = new Map<string, TeamRunState>([["self", { budgetRemaining: 1000, slotsRemaining: 1 }]]);
+
+    const lot = resolveContestedLot({
+      player: p1,
+      category: GOLD,
+      teams: [self],
+      selfTeamId: "self",
+      teamState,
+      unit: 10,
+      mustHaveIds: new Set(),
+      avoidIds: new Set(),
+      budgetTargetByCategoryId: new Map([["gold", 200]]),
+      selfCategorySpentSoFar: 150, // 50 left of the 200 target
+      teamsOverEstimatedCategoryBudget: new Set(),
+      otherMustHavesRemainingInCategory: 0,
+      remainingLotsAfterThis: 0,
+      remainingPoolBasePricesForSelf: [],
+      players: [p1],
+      salesSoFar: [],
+      rng: sequenceRng([0.5]),
+    });
+
+    expect(lot).toEqual({ playerId: "p1", categoryId: "gold", teamId: "self", price: 50, source: "self" });
+  });
+
+  it("still never bids on an avoid-tagged player even in genuine desperation, category cap or not", () => {
+    const teamState = new Map<string, TeamRunState>([["self", { budgetRemaining: 1000, slotsRemaining: 1 }]]);
+
+    const lot = resolveContestedLot({
+      player: p1,
+      category: GOLD,
+      teams: [self],
+      selfTeamId: "self",
+      teamState,
+      unit: 10,
+      mustHaveIds: new Set(),
+      avoidIds: new Set(["p1"]),
+      budgetTargetByCategoryId: new Map(),
+      selfCategorySpentSoFar: 0,
+      teamsOverEstimatedCategoryBudget: new Set(),
+      otherMustHavesRemainingInCategory: 0,
+      remainingLotsAfterThis: 0,
+      remainingPoolBasePricesForSelf: [],
+      players: [p1],
+      salesSoFar: [],
+      rng: sequenceRng([0.5]),
+    });
+
+    expect(lot).toEqual({ playerId: "p1", categoryId: "gold", unsold: true });
+  });
+
+  it("caps a must-have's bid at what's LEFT of the category budget, not the flat target, once part of it is already spent", () => {
+    const teamState = new Map<string, TeamRunState>([["self", { budgetRemaining: 1000, slotsRemaining: 5 }]]);
+
+    const lot = resolveContestedLot({
+      player: p1,
+      category: GOLD,
+      teams: [self],
+      selfTeamId: "self",
+      teamState,
+      unit: 10,
+      mustHaveIds: new Set(["p1"]),
+      avoidIds: new Set(),
+      budgetTargetByCategoryId: new Map([["gold", 100]]),
+      selfCategorySpentSoFar: 60, // 40 left of the 100 target, not a fresh 100
+      teamsOverEstimatedCategoryBudget: new Set(),
+      otherMustHavesRemainingInCategory: 0,
+      remainingLotsAfterThis: 1000,
+      remainingPoolBasePricesForSelf: [],
+      players: [p1],
+      salesSoFar: [],
+      rng: sequenceRng([0.5]),
+    });
+
+    expect(lot).toEqual({ playerId: "p1", categoryId: "gold", teamId: "self", price: 40, source: "self" });
   });
 
   it("lets a relatively poor rival contest anyway once its urgency (slots needed vs. lots left) outweighs its low richness", () => {

@@ -74,27 +74,31 @@ describe("computeBidGuidance", () => {
     });
   });
 
-  it("bids cautiously when other must-haves are still to come in the category", () => {
-    // reserve = 150 * 2 = 300; cautiousMaxBid = 500 - 300 = 200 >= basePrice(100)
+  it("holds back entirely from a non-must-have pick while another must-have is still pending in the same category", () => {
     const result = computeBidGuidance({
       ...base,
       categoryTargetAvgPrice: 150,
       otherMustHavesRemainingInCategory: 2,
     });
-    expect(result.signal).toBe("CONSIDER");
-    expect(result.suggestedMaxBid).toBe(200);
+    expect(result).toEqual({
+      signal: "PASS",
+      suggestedMaxBid: null,
+      reason:
+        "You still have 2 must-have picks to come in this category — holding back until they're resolved, won or lost",
+    });
   });
 
-  it("passes when reserving for other must-haves would leave too little to bid at all", () => {
-    // reserve = 150 * 2 = 300; cautiousMaxBid = 250 - 300 = -50 < basePrice(100)
+  it("holds back even with plenty of legal budget to spare — this is a strategic hold, not a budget shortfall", () => {
+    // legalMaxBid is deliberately huge here: holding back is unconditional
+    // while a must-have is pending, never a matter of "could it afford to
+    // bid cautiously anyway."
     const result = computeBidGuidance({
       ...base,
-      legalMaxBid: 250,
-      categoryTargetAvgPrice: 150,
-      otherMustHavesRemainingInCategory: 2,
+      legalMaxBid: 100000,
+      otherMustHavesRemainingInCategory: 1,
     });
     expect(result.signal).toBe("PASS");
-    expect(result.suggestedMaxBid).toBe(0);
+    expect(result.suggestedMaxBid).toBeNull();
   });
 
   it("considers within a manager-set budget target", () => {

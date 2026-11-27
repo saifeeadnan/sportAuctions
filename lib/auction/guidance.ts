@@ -111,33 +111,40 @@ export function computeBidGuidance(input: {
   }
 
   if (isMustHave) {
+    // Budgets take priority over the wish list: a must-have no longer
+    // blows straight past the category's own budget target to the legal
+    // max — it's capped there, same as an ordinary CONSIDER pick below,
+    // just with a basePrice floor so a must-have is never suggested a bid
+    // it can't actually win with (legalMaxBid >= basePrice is already
+    // guaranteed above). No target set at all means nothing to cap against,
+    // so it still goes all the way to the legal max as before.
+    const budgetCap = categoryTargetAvgPrice != null ? Math.min(legalMaxBid, categoryTargetAvgPrice) : legalMaxBid;
+    const suggestedMaxBid = Math.max(budgetCap, basePrice);
     return {
       signal: "BID",
-      suggestedMaxBid: legalMaxBid,
-      reason: "Must-have pick — go up to your legal max",
+      suggestedMaxBid,
+      reason:
+        categoryTargetAvgPrice != null
+          ? `Must-have pick — capped at your budget target for this category (${Math.round(categoryTargetAvgPrice)})`
+          : "Must-have pick — go up to your legal max",
     };
   }
 
   if (otherMustHavesRemainingInCategory > 0) {
-    // Best guess at what each still-to-come must-have will cost: the
-    // manager's own budget target for this category if they set one, else
-    // the live category average if anything's sold yet, else just base price.
-    const perPickReserve = categoryTargetAvgPrice ?? liveCategoryAvgPrice ?? basePrice;
-    const reserve = perPickReserve * otherMustHavesRemainingInCategory;
-    const cautiousMaxBid = legalMaxBid - reserve;
+    // Hold back from every non-must-have pick in this category entirely
+    // while a must-have is still unresolved in it — not a cautious, partial
+    // bid sized around a reserve estimate. Focus the category's budget on
+    // winning the priority pick first; only once it's resolved (won or
+    // lost) does this category open back up to ordinary bidding. (The
+    // simulate engine's own desperation fallback can still override this
+    // hold, same as it already overrides an exhausted budget cap, so a
+    // genuine risk of finishing short doesn't get locked out by it.)
     const pick = otherMustHavesRemainingInCategory === 1 ? "pick" : "picks";
-
-    return cautiousMaxBid < basePrice
-      ? {
-          signal: "PASS",
-          suggestedMaxBid: Math.max(0, cautiousMaxBid),
-          reason: `You still have ${otherMustHavesRemainingInCategory} must-have ${pick} to come in this category — bidding here risks not being able to afford ${otherMustHavesRemainingInCategory === 1 ? "it" : "them"}`,
-        }
-      : {
-          signal: "CONSIDER",
-          suggestedMaxBid: cautiousMaxBid,
-          reason: `Bid cautiously — ${otherMustHavesRemainingInCategory} must-have ${pick} still to come in this category`,
-        };
+    return {
+      signal: "PASS",
+      suggestedMaxBid: null,
+      reason: `You still have ${otherMustHavesRemainingInCategory} must-have ${pick} to come in this category — holding back until ${otherMustHavesRemainingInCategory === 1 ? "it's" : "they're"} resolved, won or lost`,
+    };
   }
 
   const effectiveTarget = categoryTargetAvgPrice ?? liveCategoryAvgPrice;

@@ -66,8 +66,18 @@ describe("computeSimulationAggregateSummary", () => {
 
   const summary = computeSimulationAggregateSummary(snapshot, runs, []);
 
-  it("tallies a must-have won in every run", () => {
-    expect(summary.mustHaves).toEqual([{ playerId: "p1", wonRunCount: 3, lostRunCount: 0, unresolvedRunCount: 0 }]);
+  it("tallies a must-have won in every run, and its average price across those wins (20+25+30)/3", () => {
+    expect(summary.mustHaves).toEqual([
+      { playerId: "p1", wonRunCount: 3, lostRunCount: 0, unresolvedRunCount: 0, avgSpendWhenWon: 25 },
+    ]);
+  });
+
+  it("is null when a must-have was never won in any run", () => {
+    const neverWonSnapshot = baseSnapshot({ ...snapshot, wishlist: [{ playerId: "p3", type: "MUST_HAVE" }] });
+    const neverWonSummary = computeSimulationAggregateSummary(neverWonSnapshot, runs, []);
+    expect(neverWonSummary.mustHaves).toEqual([
+      { playerId: "p3", wonRunCount: 0, lostRunCount: 0, unresolvedRunCount: 3, avgSpendWhenWon: null },
+    ]);
   });
 
   it("splits an avoid-listed player's outcome between won-by-self and avoided across runs", () => {
@@ -187,5 +197,39 @@ describe("computeSimulationAggregateSummary — most likely squad", () => {
       matchingRunCount: 2,
       sampleRunCount: 3,
     });
+  });
+});
+
+describe("computeSimulationAggregateSummary — excludes pre-existing (pre-auction) players", () => {
+  const category = { id: "gold", name: "Gold", basePrice: 10, bidIncrement: null };
+  const retained = { id: "retained", name: "retained", categoryId: "gold", basePrice: 10 };
+  const p1 = { id: "p1", name: "p1", categoryId: "gold", basePrice: 10 };
+  const p2 = { id: "p2", name: "p2", categoryId: "gold", basePrice: 10 };
+
+  const snapshot = baseSnapshot({
+    teams: [{ id: "self", name: "Self", budgetRemaining: 1000, totalSlots: 3 }], // 1 retained + 2 open
+    categories: [category],
+    players: [retained, p1, p2],
+    sales: [{ playerId: "retained", teamId: "self", price: 500, timestamp: "t0" }],
+  });
+
+  const runs: SimulationRun[] = [
+    { seed: 1, lots: [{ playerId: "p1", categoryId: "gold", teamId: "self", price: 10, source: "self" }] },
+    { seed: 2, lots: [{ playerId: "p2", categoryId: "gold", teamId: "self", price: 10, source: "self" }] },
+  ];
+
+  const summary = computeSimulationAggregateSummary(snapshot, runs, []);
+
+  it("never lists a pre-existing (retained/traded) player in the most-likely-squad breakdown, even at 100% frequency", () => {
+    expect(summary.squadFrequencies.some((f) => f.playerId === "retained")).toBe(false);
+  });
+
+  it("caps the breakdown at self's OPEN slots (totalSlots minus pre-existing), not the full roster size", () => {
+    // totalSlots=3, 1 already retained -> 2 open slots, and both p1/p2
+    // show up (each won in exactly one of the two runs).
+    expect(summary.squadFrequencies).toEqual([
+      { playerId: "p1", runCount: 1, frequency: 0.5 },
+      { playerId: "p2", runCount: 1, frequency: 0.5 },
+    ]);
   });
 });

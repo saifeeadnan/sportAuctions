@@ -19,6 +19,10 @@ export type SimulationMustHaveAggregate = {
   wonRunCount: number;
   lostRunCount: number;
   unresolvedRunCount: number;
+  /** Average price self actually paid, across only the runs where this
+   * must-have was won by self — null when it was never won in any run
+   * (nothing to average). */
+  avgSpendWhenWon: number | null;
 };
 
 /** The AVOID-list mirror of SimulationMustHaveAggregate — computeWishlistFeasibility
@@ -171,19 +175,25 @@ export function computeSimulationAggregateSummary(
   runs: SimulationRun[],
   valueScores: PlayerValueScore[]
 ): SimulationAggregateSummary {
-  const { teams, players, selfTeamId, wishlist } = snapshot;
+  const { teams, players, selfTeamId, wishlist, sales } = snapshot;
   const mustHaves = wishlist.filter((w) => w.type === "MUST_HAVE");
   const avoids = wishlist.filter((w) => w.type === "AVOID");
+  // Already on self's roster before this simulation (retained/traded) —
+  // excluded from the "most likely squad" breakdown below, which is about
+  // what the RUN itself decided, not facts the manager already knows (and
+  // which would otherwise sit at a deterministic 100% frequency, crowding
+  // out the actually-variable picks once sliced to totalSlots rows).
+  const preExistingSelfPlayerIds = new Set(sales.filter((s) => s.teamId === selfTeamId).map((s) => s.playerId));
 
   const selfTeamStrengths: number[] = [];
   const selfBudgetsRemaining: number[] = [];
   const selfRanks: number[] = [];
-  const mustHaveTally = new Map(mustHaves.map((w) => [w.playerId, { won: 0, lost: 0, unresolved: 0 }]));
+  const mustHaveTally = new Map(mustHaves.map((w) => [w.playerId, { won: 0, lost: 0, unresolved: 0, spendSum: 0 }]));
   const avoidTally = new Map(avoids.map((w) => [w.playerId, { wonBySelf: 0, avoided: 0, unresolved: 0 }]));
   const squadIdsByRun: string[][] = [];
 
   for (const run of runs) {
-    squadIdsByRun.push(selfSquadPlayerIds(snapshot, run));
+    squadIdsByRun.push(selfSquadPlayerIds(snapshot, run).filter((id) => !preExistingSelfPlayerIds.has(id)));
 
     const { adjustedTeams, combinedSales } = mergeRunIntoSnapshot(snapshot, run);
     const rosters = computeRivalRosters(adjustedTeams, players, combinedSales, valueScores);
@@ -199,8 +209,14 @@ export function computeSimulationAggregateSummary(
       const wishlistSummary = computeWishlistFeasibility(selfTeam, players, combinedSales, wishlist, valueScores);
       for (const item of wishlistSummary.items) {
         const tally = mustHaveTally.get(item.playerId)!;
-        if (item.status === "WON") tally.won += 1;
-        else if (item.status === "LOST") tally.lost += 1;
+        if (item.status === "WON") {
+          tally.won += 1;
+          // computeWishlistFeasibility deliberately nulls out estimatedPrice
+          // once a wishlist player is resolved, so the real price this run
+          // actually paid comes straight from this run's own sales instead.
+          const sale = combinedSales.find((s) => s.playerId === item.playerId && s.teamId === selfTeamId);
+          tally.spendSum += sale?.price ?? 0;
+        } else if (item.status === "LOST") tally.lost += 1;
         else tally.unresolved += 1;
       }
     }
@@ -215,6 +231,10 @@ export function computeSimulationAggregateSummary(
   }
 
   const selfTotalSlots = teams.find((t) => t.id === selfTeamId)?.totalSlots ?? 0;
+  // Open slots only, now that pre-existing players are excluded above —
+  // there's no reason to show more rows than self actually has left to
+  // fill with new picks.
+  const selfOpenSlots = Math.max(selfTotalSlots - preExistingSelfPlayerIds.size, 0);
   const runCountByPlayerId = new Map<string, number>();
   for (const squadIds of squadIdsByRun) {
     for (const playerId of squadIds) {
@@ -224,7 +244,7 @@ export function computeSimulationAggregateSummary(
   const squadFrequencies: SquadFrequencyEntry[] = Array.from(runCountByPlayerId.entries())
     .map(([playerId, runCount]) => ({ playerId, runCount, frequency: runCount / runs.length }))
     .sort((a, b) => b.frequency - a.frequency)
-    .slice(0, selfTotalSlots);
+    .slice(0, selfOpenSlots);
 
   return {
     runCount: runs.length,
@@ -234,7 +254,13 @@ export function computeSimulationAggregateSummary(
     totalTeams: teams.length,
     mustHaves: mustHaves.map((w) => {
       const t = mustHaveTally.get(w.playerId)!;
-      return { playerId: w.playerId, wonRunCount: t.won, lostRunCount: t.lost, unresolvedRunCount: t.unresolved };
+      return {
+        playerId: w.playerId,
+        wonRunCount: t.won,
+        lostRunCount: t.lost,
+        unresolvedRunCount: t.unresolved,
+        avgSpendWhenWon: t.won > 0 ? t.spendSum / t.won : null,
+      };
     }),
     avoids: avoids.map((w) => {
       const t = avoidTally.get(w.playerId)!;

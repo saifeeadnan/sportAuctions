@@ -15,6 +15,12 @@ export type RivalRosterDisplay = {
   isSelf: boolean;
   budgetRemaining: number;
   teamStrength: number;
+  /** The team's real total slots filled (pre-existing + any since) and
+   * roster size — independent of `players.length` below, which a caller
+   * (the Simulate tab) may have trimmed to just this run's own picks while
+   * the team's actual slot count still reflects everything. */
+  slotsFilled: number;
+  slotsTotal: number;
   players: RivalRosterPlayerDisplay[];
 };
 
@@ -40,7 +46,7 @@ export function RivalRostersPanel({ rosters }: { rosters: RivalRosterDisplay[] }
               {r.isSelf && <Badge variant="info">You</Badge>}
             </span>
             <span className="text-black/60 dark:text-white/60 font-normal">
-              {r.players.length} player{r.players.length === 1 ? "" : "s"} &middot; budget left{" "}
+              {r.slotsFilled}/{r.slotsTotal} slots filled &middot; budget left{" "}
               {r.budgetRemaining.toLocaleString()} &middot; strength {r.teamStrength.toFixed(1)}
             </span>
           </summary>

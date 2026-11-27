@@ -142,10 +142,39 @@ export function simulateAuctionRun(snapshot: AuctionAnalyticsSnapshot, seed: num
   const salesSoFar: SaleEvent[] = [...sales];
   const lots: SimulatedLot[] = [];
 
+  // Waterfall: whatever's left of a higher-base-price category's own
+  // budget target once self is done bidding in it (target minus actual
+  // self spend there, never negative) rolls down into the next category
+  // self ALSO has a target for — skipping over any untargeted category in
+  // between rather than landing there (an untargeted category stays
+  // unconstrained, not suddenly capped by someone else's leftover).
+  // orderPoolByCategoryPriority already groups shuffledPlayers into
+  // highest-base-price-first blocks, so "self is done bidding in it" is
+  // simply "we've moved on to a different category," detected below.
+  const effectiveBudgetTargetByCategoryId = new Map(budgetTargetByCategoryId);
+  let waterfallCarry = 0;
+  let lastCategoryId: string | null = null;
+
   for (let i = 0; i < shuffledPlayers.length; i++) {
     const player = shuffledPlayers[i];
     const category = categoryById.get(player.categoryId);
     if (!category) continue; // defensive: an unmatched category name/id, see analyticsAdapter.ts's own fallback
+
+    if (category.id !== lastCategoryId) {
+      if (lastCategoryId != null) {
+        const prevTarget = effectiveBudgetTargetByCategoryId.get(lastCategoryId);
+        if (prevTarget != null) {
+          const spentInPrev = teamSpentInCategory(selfTeamId, lastCategoryId, players, salesSoFar);
+          waterfallCarry += Math.max(prevTarget - spentInPrev, 0);
+        }
+      }
+      const thisTarget = effectiveBudgetTargetByCategoryId.get(category.id);
+      if (thisTarget != null && waterfallCarry > 0) {
+        effectiveBudgetTargetByCategoryId.set(category.id, thisTarget + waterfallCarry);
+        waterfallCarry = 0;
+      }
+      lastCategoryId = category.id;
+    }
 
     const prediction = predictionByPlayerId.get(player.id);
     // A prediction is honored only while it's still legally possible — once
@@ -182,7 +211,7 @@ export function simulateAuctionRun(snapshot: AuctionAnalyticsSnapshot, seed: num
           unit,
           mustHaveIds,
           avoidIds,
-          budgetTargetByCategoryId,
+          budgetTargetByCategoryId: effectiveBudgetTargetByCategoryId,
           selfCategorySpentSoFar: teamSpentInCategory(selfTeamId, player.categoryId, players, salesSoFar),
           teamsOverEstimatedCategoryBudget: rivalsOverEstimatedCategoryBudget(
             teams,
@@ -236,11 +265,94 @@ export function simulateAuctionRun(snapshot: AuctionAnalyticsSnapshot, seed: num
  * If self's own squad falls short, though, that's excluded from the
  * scorecard/display rather than silently counted alongside genuinely
  * complete ones and skewing the averages.
+ *
+ * `minSquadSize` lowers that bar below the full roster size — some real
+ * auctions only require a minimum squad, not every slot filled (this app's
+ * own data model only tracks one squadSize today, so there's no per-auction
+ * min/max to default to; a caller passes whatever threshold it wants a run
+ * judged against). Defaults to the full totalSlots, i.e. today's original,
+ * stricter behavior, when omitted.
  */
-export function isRunComplete(snapshot: AuctionAnalyticsSnapshot, run: SimulationRun): boolean {
+export function isRunComplete(
+  snapshot: AuctionAnalyticsSnapshot,
+  run: SimulationRun,
+  minSquadSize?: number
+): boolean {
   const selfTeam = snapshot.teams.find((t) => t.id === snapshot.selfTeamId);
   if (!selfTeam) return false;
-  return selfSquadPlayerIds(snapshot, run).length === selfTeam.totalSlots;
+  const threshold = minSquadSize ?? selfTeam.totalSlots;
+  return selfSquadPlayerIds(snapshot, run).length >= threshold;
+}
+
+export type RunShortfall = {
+  slotsStillNeeded: number;
+  /** Self became legally unable to afford even the cheapest remaining
+   * category's base price at some point before the pool ran out — a hard
+   * budget wall, not a matter of losing bids. */
+  ranOutOfLegalBudget: boolean;
+  /** Lots self could have legally afforded (after self's last win, or
+   * anywhere self still needed slots) but a rival won instead — purely a
+   * competition/contention loss, not a budget problem. */
+  eligibleLotsLostToRivals: number;
+  /** Lots self could have legally afforded that nobody won at all — self's
+   * own strategy (an avoid tag, or simply never being selected as a
+   * contender by the engine's own heuristics) passed on them even though
+   * budget wasn't the obstacle. */
+  lotsWentUnsoldWhileEligible: number;
+};
+
+/**
+ * Best-effort root cause for why self's squad came up short in one run —
+ * a pure post-hoc replay of the run's already-resolved lots (no new random
+ * decisions), tracking self's own budget/slots exactly as
+ * simulateAuctionRun did, to classify every lot self needed but didn't win
+ * into "couldn't legally afford it" vs "could have, but lost it to a rival
+ * or it went unsold." Null for an already-complete run (nothing to explain)
+ * or if selfTeamId doesn't resolve. `minSquadSize` — see isRunComplete —
+ * is the same threshold a run is judged against, so "slots still needed"
+ * here lines up with whatever bar counted it as incomplete in the first
+ * place, rather than always assuming the full roster.
+ */
+export function diagnoseRunShortfall(
+  snapshot: AuctionAnalyticsSnapshot,
+  run: SimulationRun,
+  minSquadSize?: number
+): RunShortfall | null {
+  const selfTeam = snapshot.teams.find((t) => t.id === snapshot.selfTeamId);
+  if (!selfTeam) return null;
+
+  const threshold = minSquadSize ?? selfTeam.totalSlots;
+  const alreadySold = snapshot.sales.filter((s) => s.teamId === snapshot.selfTeamId).length;
+  let state: TeamRunState = { budgetRemaining: selfTeam.budgetRemaining, slotsRemaining: threshold - alreadySold };
+  if (state.slotsRemaining <= 0) return null;
+
+  const unit = reserveUnit(snapshot.categories);
+  const basePriceByPlayerId = new Map(snapshot.players.map((p) => [p.id, p.basePrice]));
+
+  let ranOutOfLegalBudget = false;
+  let eligibleLotsLostToRivals = 0;
+  let lotsWentUnsoldWhileEligible = 0;
+
+  for (const lot of run.lots) {
+    if (state.slotsRemaining <= 0) break;
+    const basePrice = basePriceByPlayerId.get(lot.playerId) ?? 0;
+    const eligible = legalMaxBidEnforced(state, unit) >= basePrice;
+
+    if ("unsold" in lot) {
+      if (eligible) lotsWentUnsoldWhileEligible += 1;
+      else ranOutOfLegalBudget = true;
+      continue;
+    }
+    if (lot.teamId === snapshot.selfTeamId) {
+      state = { budgetRemaining: state.budgetRemaining - lot.price, slotsRemaining: state.slotsRemaining - 1 };
+    } else if (eligible) {
+      eligibleLotsLostToRivals += 1;
+    } else {
+      ranOutOfLegalBudget = true;
+    }
+  }
+
+  return { slotsStillNeeded: state.slotsRemaining, ranOutOfLegalBudget, eligibleLotsLostToRivals, lotsWentUnsoldWhileEligible };
 }
 
 /** The player ids on self's final roster for one run: snapshot.sales (already
